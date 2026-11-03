@@ -28,4 +28,13 @@ full = (
 (ROOT / "index.html").write_text(full)
 (ROOT / "dist").mkdir(exist_ok=True)
 (ROOT / "dist" / "daggerfall.html").write_text(f"{head}\n{body}\n")
+# the whole game must parse: one stray `//` inside a one-line statement breaks everything after it
+import shutil, subprocess, tempfile
+if shutil.which("node"):
+    with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False) as f:
+        f.write(js)
+    r = subprocess.run(["node", "--check", f.name], capture_output=True, text=True)
+    pathlib.Path(f.name).unlink()
+    if r.returncode:
+        raise SystemExit("the built JS does not parse:\n" + r.stderr.strip()[:1500])
 print(f"built index.html ({len(full) // 1024} KB), {js.count(chr(10))} lines of JS")
