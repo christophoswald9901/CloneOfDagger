@@ -73,7 +73,7 @@ PLACE = r"""(()=>{const g=__game,G=g.G,P=G.player; G.time=12*60+G.time-(G.time%1
     let d=6; for(;d<420;d+=6){ if(g.terrainH(X+fx*d,Z+fz*d)>gy+1.6-d*0.035) break; } return d; };
   let gy=g.terrainH(X,Z), Y=yaw;
   if(arc>0&&fly===null){ let bestD=-1; for(let k=-8;k<=8;k++){ const yy=yaw+k/8*arc, d=openD(X,Z,yy,gy); if(d>bestD+12){bestD=d;Y=yy;} }
-    if(bestD<60&&name!=='upland'){ // (the high ground stays on its top) let bb=[bestD,X,Z,Y]; for(let r=10;r<=90;r+=10) for(let a=0;a<12;a++){ const nx=X+Math.cos(a*0.5236)*r, nz=Z+Math.sin(a*0.5236)*r, ng=g.terrainH(nx,nz); if(ng<-0.5) continue; if(Math.hypot(g.terrainH(nx+2,nz)-g.terrainH(nx-2,nz),g.terrainH(nx,nz+2)-g.terrainH(nx,nz-2))/4>0.55) continue;
+    if(bestD<60&&name!=='upland'){ /* the high ground stays on its top */ let bb=[bestD,X,Z,Y]; for(let r=10;r<=90;r+=10) for(let a=0;a<12;a++){ const nx=X+Math.cos(a*0.5236)*r, nz=Z+Math.sin(a*0.5236)*r, ng=g.terrainH(nx,nz); if(ng<-0.5) continue; if(Math.hypot(g.terrainH(nx+2,nz)-g.terrainH(nx-2,nz),g.terrainH(nx,nz+2)-g.terrainH(nx,nz-2))/4>0.55) continue;
         for(let k=-8;k<=8;k++){ const yy=yaw+k/8*arc, d=openD(nx,nz,yy,ng); if(d>bb[0]+12) bb=[d,nx,nz,yy]; } } [bestD,X,Z,Y]=bb; gy=g.terrainH(X,Z); } }
   P.pos.set(X,gy,Z); P.vy=0; P.yaw=Y; P.pitch=pitch;
   if(fly!==null){ g.settings.dbgFly=true; g.setFlying(true); P.pos.y=gy+fly; } else { g.settings.dbgFly=false; g.setFlying(false); }
@@ -102,7 +102,12 @@ async def main():
     for seed in SEEDS:
         c = CDP()
         if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}'): print('boot failed', c.errors()[:2]); c.stop(); return
-        await c.new_game(); await asyncio.sleep(2)
+        await c.new_game()
+        for _ in range(40):  # wait until the game is really in play (a view taken before that shows the title camera)
+            if await c.ev("!!(__game.G.player && __game.G.state === 'play')"): break
+            await asyncio.sleep(0.5)
+        else: print('new game never started', c.errors()[:2]); c.stop(); return
+        await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
         views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else FIND))
         files = []
@@ -110,6 +115,7 @@ async def main():
             if ONLY and name not in ONLY: continue
             args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
             where = await c.ev(PLACE.replace('ARGS', args))
+            if not where or str(where).startswith('ERR'): print(seed, name, 'placement failed:', str(where)[:200]); continue  # never pass a stuck view off as a real one
             await asyncio.sleep(float(os.environ.get('WAIT', '6')))
             f = f'{OUT}/s{seed}_{name}.png'; await c.shot(f); files.append((name, f))
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
