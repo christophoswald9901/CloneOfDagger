@@ -5314,10 +5314,11 @@ const TOWN_CFGS = [{
 
 // how each quarter builds: plot frontage and depth, storeys, walls and roofs
 const TK = {
-  grand: { w: [7, 11], d: [14, 18], stories: [3, 3, 4], styles: ['brick', 'brick', 'stone'], roofs: ['roofSlate', 'roofBrown'], step: 0.75, jetty: 0 },
+  grand: { w: [7, 11], d: [14, 18], stories: [3, 3, 4], styles: ['brick', 'brick', 'stone'], roofs: ['roofSlate', 'roofBrown', 'roofRed'], step: 0.75, jetty: 0 },
   close: { w: [8, 12], d: [12, 16], stories: [2, 3], styles: ['stone', 'stoneLight', 'brick'], roofs: ['roofSlate'], step: 0.35, jetty: 0 },
   citadel: { w: [8, 12], d: [12, 16], stories: [2, 2, 3], styles: ['stone', 'brick', 'timber2'], roofs: ['roofSlate', 'roofBrown'], step: 0.15, jetty: 0.2 },
-  canal: { w: [8, 13], d: [14, 20], stories: [3, 4], styles: ['brick', 'brick', 'timber2'], roofs: ['roofBrown', 'roofSlate'], step: 0.55, jetty: 0.1, warehouse: 0.45 },
+  canal: { w: [8, 13], d: [14, 20], stories: [3, 4], styles: ['brick', 'brick', 'timber2'], roofs: ['roofBrown', 'roofSlate', 'roofRed'], step: 0.55, jetty: 0.1, warehouse: 0.45 },
+  suburb: { w: [6, 9], d: [9, 11], stories: [1, 2, 2], styles: ['brick', 'timber2', 'brick', 'plaster'], roofs: ['roofSlate', 'roofBrown', 'roofRed'], step: 0.3, jetty: 0.2 },
   commons: { w: [6, 9], d: [9, 12], stories: [1, 1, 2], styles: ['timber2', 'plaster', 'wood'], roofs: ['roofThatch', 'roofThatch', 'roofBrown'], step: 0, jetty: 0.1 },
   weavers: { w: [6, 9], d: [11, 15], stories: [2, 3, 3], styles: ['timber2', 'timber2', 'plaster', 'brick'], roofs: ['roofBrown', 'roofSlate', 'roofRed'], step: 0.2, jetty: 0.55 },
 };
@@ -5371,7 +5372,7 @@ class Town {
     const sq = nearest(C.mainU + fu * 40, C.mainV + fv * 40, b => (fu > 0 ? b.u0 > C.mainU : b.u1 < C.mainU) && (fv > 0 ? b.v0 > C.mainV - 1 : b.v1 < C.mainV + 1) && Math.abs((b.v0 + b.v1) / 2 - C.canal.v) > 20); if (sq) { sq.use = 'square'; this.square = sq; }
     const hall = sq && nearest(sq.uc, sq.vc - fv * 60, b => (fv > 0 ? b.v1 < C.mainV + 1 : b.v0 > C.mainV - 1) && b !== sq && Math.abs(b.uc - sq.uc) < 60 && b.v1 - b.v0 > 20 && b.use === 'lots'); if (hall) { hall.use = 'hall'; this.hall = hall; }
     const side = C.canal.v < C.mainV ? -1 : 1; // the cathedral stands beyond the canal from the main street
-    const cat = this.blocks.filter(b => b.use === 'lots' && (side < 0 ? b.v1 < C.canal.v : b.v0 > C.canal.v) && b.v1 - b.v0 > 46 && Math.hypot(b.uc + fu * A * 0.45, b.vc - (C.canal.v + side * B) / 2) < 300).sort((a, b) => (b.u1 - b.u0) * (b.v1 - b.v0) - (a.u1 - a.u0) * (a.v1 - a.v0))[0]; if (cat) { cat.use = 'cathedral'; this.cathedral = cat; }
+    const cat = this.blocks.filter(b => b.use === 'lots' && (side < 0 ? b.v1 < C.canal.v : b.v0 > C.canal.v) && b.v1 - b.v0 > 46 && Math.hypot(b.uc + fu * A * 0.45, b.vc - (C.canal.v + side * B) / 2) < 300).sort((a, b) => (b.u1 - b.u0) * (b.v1 - b.v0) - (a.u1 - a.u0) * (a.v1 - a.v0))[0]; if (cat) { cat.use = 'cathedral'; this.cathedral = cat; const pv = this.blocks.find(b => b.r === cat.r && b.use === 'lots' && b.u0 > cat.u1 && b.u0 - cat.u1 < 16); if (pv) { pv.use = 'parvis'; this.parvis = pv; } } // the open square before its west front
     const cit = nearest(fu * (A - 60), -fv * (B - 60), b => b.u1 - b.u0 > 50 && b.v1 - b.v0 > 45 && b.use === 'lots' && Math.max(b.u1 - b.u0, b.v1 - b.v0) < 1.7 * Math.min(b.u1 - b.u0, b.v1 - b.v0)); if (cit) { cit.use = 'citadel'; this.citadel = cit; }
     const mk = nearest(fu * A * 0.6, C.mainV + fv * 60, b => b.use === 'lots' && b.u1 - b.u0 > 45 && b.v1 - b.v0 > 40); if (mk) { mk.use = 'market'; this.market = mk; }
     const ch = nearest(-fu * A * 0.55, fv * B * 0.55, b => b.use === 'lots'); if (ch) { ch.chapel = true; }
@@ -5426,7 +5427,7 @@ class Town {
     for (const g of this.gates) { const pu = -g.nv, pv = g.nu, start = C.moat.off + C.moat.w + 26;
       for (const s of [-1, 1]) { let t = start + rng.range(0, 6), first = true;
         while (t < start + 170) { const w = rng.range(7, 10), d = rng.range(9, 11), mid = t + w / 2, off = 4 + rng.range(1.5, 4) + d / 2, u = g.u + g.nu * mid + pu * s * off, v = g.v + g.nv * mid + pv * s * off;
-          this.lots.push({ u, v, a: Math.atan2(-s * pu, -s * pv), w, d, kind: 'commons', seed: rng.int(1, 1e9), corner: true, type: first && s > 0 ? 'tavern' : 'house', suburb: true }); first = false; t += w + rng.range(2, 7); } } }
+          this.lots.push({ u, v, a: Math.atan2(-s * pu, -s * pv), w, d, kind: 'suburb', seed: rng.int(1, 1e9), corner: true, type: first && s > 0 ? 'tavern' : 'house', suburb: true }); first = false; t += w + rng.range(0, 2.5); } } }
     // landmarks, for the map and for finding
     const lm = (id, name, b, du = 0, dv = 0) => b && { id, name, u: b.uc + du, v: b.vc + dv };
     this.landmarks = [lm('square', 'the Grand Square', this.square), lm('belfry', 'the Belfry', this.hall, 0, (this.hall ? fv * ((this.hall.v1 - this.hall.v0) / 2 - 12) : 0)), lm('cathedral', 'the Cathedral of Saint Aurel', this.cathedral), lm('citadel', 'the Citadel', this.citadel), lm('market', 'the Market Hall', this.market)].filter(Boolean)
@@ -5598,10 +5599,10 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
       // lamps along the main streets (their light is kept with the town)
     }
   }
-  for (const b of this.blocks) if (b.use === 'square' || b.use === 'market' || b.use === 'cathedral') {
+  for (const b of this.blocks) if (b.use === 'square' || b.use === 'market' || b.use === 'cathedral' || b.use === 'parvis') {
     const t = 16; for (let u = b.u0 - (b.use === 'cathedral' ? 0 : 0); u < b.u1 - 0.01; u += t) for (let v = b.v0; v < b.v1 - 0.01; v += t) { const [mx, mz] = this.w(u + Math.min(t, b.u1 - u) / 2, v + Math.min(t, b.v1 - v) / 2); if (!inC(mx, mz)) continue;
       if (b.use === 'cathedral' && (u > b.u0 + 10 && u < b.u1 - 30 && v > b.v0 + 6 && v < b.v1 - 6)) { drapePatch(gb, 'gGrass', this.xf, u, v, Math.min(u + t, b.u1), Math.min(v + t, b.v1), { cell: 4, lift: 0.04 }); continue; } // the close's lawn
-      drapePatch(gb, b.use === 'square' ? 'sqFlag' : 'sqCobble', this.xf, u, v, Math.min(u + t, b.u1), Math.min(v + t, b.v1), { cell: 4, lift: 0.055 }); }
+      drapePatch(gb, b.use === 'square' || b.use === 'parvis' ? 'sqFlag' : 'sqCobble', this.xf, u, v, Math.min(u + t, b.u1), Math.min(v + t, b.v1), { cell: 4, lift: 0.055 }); }
   }
   // the market on the Grand Square: stalls with awnings, a well, carts and barrels
   if (this.square) { const b = this.square, r2 = new RNG(8100), W2 = b.u1 - b.u0, H2 = b.v1 - b.v0;
@@ -5615,11 +5616,15 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
     for (let k = 0; k < 3; k++) { const [cx2, cz2] = at(b.u0 + r2.range(8, W2 - 8), b.v0 + r2.range(6, H2 - 6)); if (!inC(cx2, cz2)) continue; const a = r2.range(0, 6.28); gb.setXf(cx2, cz2, a, H0); gb.box(-0.8, 0.5, -1.5, 0.8, 1.1, 1.5, { side: 'woodDark', top: 'wood' }, 1, 1); for (const sd of [-1, 1]) gb.box(sd * 0.85 - 0.06, 0, -0.5, sd * 0.85 + 0.06, 1.0, 0.5, 'woodDark', 1, 1); gb.box(-0.05, 0.6, 1.5, 0.05, 0.7, 3.2, 'woodDark', 1, 1); gb.xf = null; siteCol(area, cx2, cz2, a, 0.9, 1.6, H0 - 1, H0 + 1.1); }
     for (let k = 0; k < 8; k++) { const [bx2, bz2] = at(b.u0 + r2.range(3, W2 - 3), b.v0 + r2.range(3, H2 - 3)); if (inC(bx2, bz2)) gb.cyl('woodDark', bx2, bz2, 0.35, H0, H0 + 0.9, 8, 1, 1); }
     { const [px, pz] = at(b.u0 + W2 * 0.8, b.vc); if (inC(px, pz)) { gb.box(px - 1.6, H0, pz - 1.6, px + 1.6, H0 + 0.6, pz + 1.6, 'stone', 2, 2); gb.box(px - 0.2, H0 + 0.6, pz - 0.2, px + 0.2, H0 + 3.4, pz + 0.2, 'woodDark', 1, 1); gb.box(px - 0.9, H0 + 2.4, pz - 0.15, px + 0.9, H0 + 2.8, pz + 0.15, 'woodDark', 1, 1); siteCol(area, px, pz, 0, 1.6, 1.6, H0 - 1, H0 + 0.6); } } } // the pillory
+  if (this.parvis) { const b = this.parvis, r2 = new RNG(8300), [cx2, cz2] = this.w((b.u0 + b.u1) / 2, b.vc);
+    if (inC(cx2, cz2)) { gb.box(cx2 - 1.2, H0, cz2 - 1.2, cx2 + 1.2, H0 + 0.8, cz2 + 1.2, 'stone', 2, 2); gb.box(cx2 - 0.25, H0 + 0.8, cz2 - 0.25, cx2 + 0.25, H0 + 5.5, cz2 + 0.25, 'stoneLight', 1, 1); gb.setXf(cx2, cz2, C.ang, H0); gb.box(-1.2, 4.2, -0.22, 1.2, 4.7, 0.22, 'stoneLight', 1, 1); gb.xf = null; siteCol(area, cx2, cz2, 0, 1.2, 1.2, H0 - 1, H0 + 0.8); } // the calvary
+    for (let u = b.u0 + 5; u < b.u1 - 4; u += 9) for (const v of [b.v0 + 3, b.v1 - 3]) { const [tx, tz] = this.w(u, v); if (!inC(tx, tz)) continue; fl[r2.pick(['oak0', 'oak1'])].push([tx, H0 - 0.15, tz, r2.range(0.75, 0.95)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: H0 - 1, y1: H0 + 8 }); } }
   // boats moored along the quays, and a crane or two for the warehouses
   { const ci = C.canal, r2 = new RNG(8200);
     for (let u = -C.A + 20; u < C.A - 20; u += r2.range(22, 46)) { const sd = r2.chance(0.5) ? 1 : -1, v = ci.v + sd * (ci.w / 2 - 1.8), [bx2, bz2] = this.w(u, v); if (!inC(bx2, bz2) || this.U.some(L => Math.abs(L.p - u) < L.w / 2 + 6)) continue; const wl = this.wl();
-      gb.setXf(bx2, bz2, C.ang + Math.PI / 2, wl); gb.box(-1.2, -0.4, -4, 1.2, 0.5, 4, { side: 'woodDark', top: 'wood' }, 1, 1); gb.box(-1.25, 0.5, -4, 1.25, 0.75, -3.4, 'woodDark', 1, 1); gb.box(-1.25, 0.5, 3.4, 1.25, 0.75, 4, 'woodDark', 1, 1);
-      if (r2.chance(0.4)) { gb.box(-0.08, 0.5, -0.5, 0.08, 5, -0.3, 'woodDark', 1, 1); gb.box(-0.6, 0.6, 0.6, 0.4, 1.2, 1.6, 'cloth', 1, 1); } gb.xf = null; }
+      gb.setXf(bx2, bz2, C.ang + Math.PI / 2, wl); gb.box(-1.2, -0.4, -3.4, 1.2, 0.5, 3.4, { side: 'woodDark', top: 'wood' }, 1, 1);
+      for (const sd of [-1, 1]) { gb.tri('woodDark', [-1.2, -0.4, sd * 3.4], [1.2, -0.4, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [0, 0.3, sd]); gb.tri('woodDark', [-1.2, 0.5, sd * 3.4], [0, 0.9, sd * 5], [-1.2, -0.4, sd * 3.4], [0, 0], [1, 0], [0.5, 1], [-1, 0, 0]); gb.tri('woodDark', [1.2, 0.5, sd * 3.4], [1.2, -0.4, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [1, 0, 0]); gb.tri('wood', [-1.2, 0.5, sd * 3.4], [1.2, 0.5, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [0, 1, 0]); } // bow and stern
+      if (r2.chance(0.6)) { gb.box(-0.08, 0.5, -0.6, 0.08, 7, -0.4, 'woodDark', 1, 1); gb.quad('sail', [-0.05, 2.2, -0.45], [0, 0, 1], [0, 1, 0], 2.6, 4, 2, 2, { double: true }); } else gb.box(-0.9, 0.5, 0.6, 0.9, 1.7, 2.6, { side: 'woodDark', top: 'roofBrown' }, 1, 1); gb.xf = null; }
     for (const u of [-C.A * 0.45, C.A * 0.2]) { const v = ci.v - ci.w / 2 - 2.5, [kx, kz] = this.w(u, v); if (!inC(kx, kz)) continue; gb.setXf(kx, kz, C.ang, H0); gb.box(-0.6, 0, -0.6, 0.6, 9, 0.6, 'woodDark', 1, 1); gb.box(-0.3, 8.4, -0.3, 0.3, 8.9, 6.5, 'woodDark', 1, 1); gb.box(-0.03, 4, 6.2, 0.03, 8.4, 6.26, 'iron', 1, 1); gb.box(-1.4, 0, -1.4, 1.4, 1.6, 1.4, { side: 'woodDark', top: 'wood' }, 1, 1); gb.xf = null; siteCol(area, kx, kz, C.ang, 1.4, 1.4, H0 - 1, H0 + 9); } }
   // the great buildings, with the chunk their middle stands in
   for (const b of this.blocks) { if (!TOWN_BUILD[b.use]) continue; const [mx, mz] = this.w(b.uc, b.vc); if (inC(mx, mz)) { TOWN_BUILD[b.use](this, gb, b, area); n += 20; } }
@@ -5686,7 +5691,7 @@ Town.prototype.buildLasting = function (area, mats) {
     const WP = this.wallPieces(); sg.tint = [0.92, 0.9, 0.86];
     for (const p of WP.pieces) { const [ax, az] = this.w(p.u0, p.v0), [bx, bz] = this.w(p.u1, p.v1), L = Math.hypot(bx - ax, bz - az); sg.setXf((ax + bx) / 2, (az + bz) / 2, Math.atan2(bx - ax, bz - az), H0); sg.box(-C.wall.t / 2, -1, -L / 2, C.wall.t / 2, C.wall.h + 1, L / 2, 'tfWall', 3, 3); sg.xf = null; }
     for (const t of WP.towers) { const [x, z] = this.w(t.u, t.v), s = C.wall.tower / 2 + (t.corner ? 1.5 : 0), h = C.wall.towerH + (t.corner ? 4 : 0); sg.setXf(x, z, C.ang, H0); sg.box(-s, -1, -s, s, h, s, 'tfWall', 3, 3); sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -s, -s, s, s, h, s * 1.1, 0.4); sg.tint = [0.92, 0.9, 0.86]; sg.xf = null; }
-    const tall = (u, v, hx, hz, h, roof) => { const [x, z] = this.w(u, v); sg.setXf(x, z, C.ang, H0); sg.box(-hx, 0, -hz, hx, h, hz, 'tfWall', 3, 3); if (roof) { sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -hx, -hz, hx, hz, h, roof, 0.3); sg.tint = [0.92, 0.9, 0.86]; } sg.xf = null; };
+    const tall = (u, v, hx, hz, h, roof) => { const [x, z] = this.w(u, v); sg.setXf(x, z, C.ang, H0); sg.tint = h > 30 ? [0.75, 0.66, 0.6] : [0.92, 0.9, 0.86]; sg.box(-hx, 0, -hz, hx, h, hz, h > 30 ? 'tfBrick' : 'tfWall', 3, 3); if (roof) { sg.tint = [0.45, 0.5, 0.6]; hipRoof(sg, 'tfRoof', -hx, -hz, hx, hz, h, roof, 0.3); sg.tint = [0.92, 0.9, 0.86]; } sg.xf = null; };
     if (this.cathedral) { const b = this.cathedral, { L, cu, nw, aw } = this.cathDims(b); tall(cu, b.vc, L / 2, nw + aw, 22, 9); if (this.oneTower) tall(cu + L / 2 + 3.5, b.vc, 7.5, 7.5, 62, 30); else { tall(cu + L / 2 + 3.5, b.vc - 8.5, 5.5, 5.5, 52, 34); tall(cu + L / 2 + 3.5, b.vc + 8.5, 5.5, 5.5, 52, 34); } }
     if (this.hall) { const b = this.hall, f = this.fv; tall(b.uc, f > 0 ? b.v1 - 9 : b.v0 + 9, Math.min(35, (b.u1 - b.u0) / 2 - 3), 8, 15, 6); tall(b.uc, f > 0 ? b.v1 - 3 : b.v0 + 3, 7, 7, 66, 13); }
     if (this.citadel) { const b = this.citadel; tall(b.uc, b.vc - 10, 12, 12, 38, 0); }
@@ -5697,7 +5702,7 @@ Town.prototype.buildLasting = function (area, mats) {
   // the doors: every house, shop and inn can be entered, as in Daggerfall
   const used = new Set();
   for (const l of this.lots) {
-    const r = new RNG(l.seed + 11), K = TK[l.kind], wealth = { grand: 3, close: 2.2, citadel: 1.5, canal: 2.2, commons: 0.7, weavers: 1.3 }[l.kind], owner = makeOwner(r, l.type, wealth);
+    const r = new RNG(l.seed + 11), K = TK[l.kind], wealth = { grand: 3, close: 2.2, citadel: 1.5, canal: 2.2, commons: 0.7, weavers: 1.3, suburb: 0.8 }[l.kind], owner = makeOwner(r, l.type, wealth);
     let name = buildingName(r, l.type, owner, wealth); for (let k = 0; k < 5 && used.has(name) && l.type !== 'house'; k++) name = buildingName(r, l.type, owner, wealth); used.add(name);
     const rec = { type: l.type, name, owner, door: this.doorOf(l), seed: r.int(1, 1e9), district: this.id + ':' + l.kind, wealth, poly: obbCorners(l.o), town: this.id };
     if (l.type === 'house') rec.residents = [owner];
@@ -5713,7 +5718,7 @@ Town.prototype.updateFolk = function (px, pz, dt) {
   // people lingering in the squares: they stand about and wander a little, near the player
   this.loiter = (this.loiter || []).filter(e => !e.removed);
   for (const b of [this.square, this.market]) { if (!b) continue; const [sx, sz] = this.w(b.uc, b.vc), d = Math.hypot(sx - px, sz - pz), have = this.loiter.filter(e => e.data.sq === b);
-    if (d < 180 && near && !have.length && !isNight(G.time)) for (let k = 0; k < 10; k++) { const r = new RNG(9500 + k + (b === this.market ? 50 : 0)), g = r.chance(0.5) ? 'f' : 'm', [x, z] = this.w(r.range(b.u0 + 4, b.u1 - 4), r.range(b.v0 + 4, b.v1 - 4)); this.loiter.push(spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 2), gender: g, x, z, role: 'wander', wanderR: 9, speed: 1, dialog: 'townsfolk', spriteKey: 'sq' + k, data: { sq: b } })); }
+    if (d < 180 && near && !have.length && !isNight(G.time)) for (let k = 0; k < 18; k++) { const r = new RNG(9500 + k + (b === this.market ? 50 : 0)), g = r.chance(0.5) ? 'f' : 'm', [x, z] = this.w(r.range(b.u0 + 4, b.u1 - 4), r.range(b.v0 + 4, b.v1 - 4)); this.loiter.push(spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 2), gender: g, x, z, role: 'wander', wanderR: 9, speed: 1, dialog: 'townsfolk', spriteKey: 'sq' + k, data: { sq: b } })); }
     else if ((d > 260 || isNight(G.time)) && have.length) for (const e of have) e.remove(); }
   if (!near) { for (const e of this.folk) e.remove(); this.folk = []; return; }
   const night = isNight(G.time), want = night ? 8 : 34;
