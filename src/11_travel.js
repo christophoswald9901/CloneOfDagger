@@ -120,15 +120,17 @@ const Travel = {
     if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.'); return; }
     const ox = P.pos.x, oz = P.pos.z, st = spd * h;
     P.pos.x += dx * st; P.pos.z += dz * st;
-    collide(G.area, P.pos, 0.38, P.pos.y, 1.75); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y);
+    collide(G.area, P.pos, 0.38, P.pos.y + 1.5, 0.3); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y); // a traveller climbs the stiles: hedges, field walls and fences under two metres do not stop the journey
     if (Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R) wildFooting(P, ox, oz);
     P.pos.y = groundAt(G.area, P.pos.x, P.pos.z, 0.38, P.pos.y + 0.6); P.vy = 0; P.onGround = true;
     const moved = Math.hypot(P.pos.x - ox, P.pos.z - oz); c.moved += moved; P.bob += moved * 0.4;
     P.stepT -= moved / 1.15; if (P.stepT <= 0) { P.stepT = 1.9 * 3; SFX.play('step'); } // (fewer steps heard at speed)
     if (this.lookT <= 0) { const want = Math.atan2(-dx, -dz); let d = want - P.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; P.yaw += d * Math.min(1, h * 1.5); P.pitch = lerp(P.pitch, -0.03, Math.min(1, h)); }
     // blocked: try to step round it, then give up
-    c.chk.t += h; if (c.chk.t > 2.5) { const prog = c.moved - c.chk.s; c.chk = { s: c.moved, t: 0 };
-      if (prog < spd * 2.5 * 0.3) { c.stuck++; if (c.stuck > 4) { this.stop('Your way is blocked.'); return; } c.detour = (c.stuck % 2 ? 1 : -1) * (0.6 + 0.3 * c.stuck); c.detourT = 3; } else c.stuck = Math.max(0, c.stuck - 1); }
+    // (progress is measured along the way, so sliding to and fro along a hedge does not count)
+    c.chk.t += h; if (c.chk.t > 2.5) { const prog = c.s - c.chk.s; c.chk = { s: c.s, t: 0 };
+      if (prog < spd * 2.5 * 0.3) { c.stuck++; if (c.stuck > 6) { this.stop('Your way is blocked.'); return; } c.detour = (c.stuck % 2 ? 1 : -1) * 1.25; c.detourT = 2 + 2.5 * c.stuck; } // walk along it, one way then further the other, looking for a gap or a gate
+      else c.stuck = Math.max(0, c.stuck - 1); }
     // something worth stopping for
     const site = Sites.update(P.pos.x, P.pos.z); if (site && this.cur) { this.stop(`You come upon ${site.name}.`, 'good'); return; }
     const poi = POI.update(P.pos.x, P.pos.z); if (poi && this.cur) { this.stop(`You come upon ${poi.name}.`, 'good'); return; }
