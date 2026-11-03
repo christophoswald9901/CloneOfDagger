@@ -1,0 +1,4 @@
+# Screenshot/contact-sheet output from tools/*.py (critic-loop renders); regenerate locally
+tools/out/
+__pycache__/
+*.pyc

@@ -1,0 +1,193 @@
+<!--HEAD-->
+<title>One-City Daggerfall</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=VT323&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #eadcb4; --dim: #a99a7b; --gold: #d9b35c; --edge-hi: #8f7f5e; --edge-lo: #120f0b;
+    --bg: #0a0907; --good: #b8e08a; --bad: #ff8a70; --stone-img: none;
+  }
+  html, body { height: 100%; margin: 0; background: var(--bg); overflow: hidden; }
+  body { font-family: 'VT323', ui-monospace, Menlo, Consolas, monospace; color: var(--ink); font-size: 22px; user-select: none; -webkit-user-select: none; }
+  [hidden] { display: none !important; }
+  #game, #hud { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+  #hud { pointer-events: none; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 40%, rgba(110, 0, 0, .9)); opacity: 0; }
+  #dmg { position: fixed; inset: 0; pointer-events: none; background: rgba(170, 20, 10, .45); opacity: 0; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .28s; z-index: 30; }
+  #fade.on { opacity: 1; }
+  #msgs { position: fixed; left: 16px; top: calc(10px + env(safe-area-inset-top, 0px)); width: min(72ch, calc(100% - 32px)); display: flex; flex-direction: column; gap: 2px; pointer-events: none; z-index: 5; }
+  .m { text-shadow: 2px 2px 0 #000; line-height: 1.05; transition: opacity .8s; }
+  .m.out { opacity: 0; } .m-good { color: var(--good); } .m-bad { color: var(--bad); } .m-quest { color: #ffd76a; } .m-ghost { color: #9fd8ff; } .m-bark { color: #f0b890; } .m-district { color: #e8d8a8; font-style: italic; }
+  #big { position: fixed; left: 0; right: 0; top: 26%; text-align: center; font-family: 'IM Fell English SC', Georgia, serif; font-size: clamp(44px, 9vw, 110px); color: #f0d890; text-shadow: 3px 3px 0 #000, 0 0 30px rgba(0, 0, 0, .8); opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 6; }
+  #big.on { opacity: 1; }
+  #hint { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%); font-size: 25px; text-shadow: 2px 2px 0 #000; white-space: nowrap; pointer-events: none; z-index: 5; }
+  #hint.dim { color: var(--dim); font-size: 21px; }
+  #status { position: fixed; right: 16px; top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 20px; color: var(--dim); text-shadow: 2px 2px 0 #000; pointer-events: none; text-align: right; z-index: 5; max-width: calc(100% - 32px); }
+  #restinfo { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; font-size: 26px; white-space: nowrap; }
+  #resume { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .35); z-index: 15; cursor: pointer; padding: 16px; }
+  #resume p { margin: 4px 0 0; color: var(--dim); }
+
+  .panel { background: linear-gradient(rgba(32, 27, 22, .86), rgba(22, 19, 15, .92)), var(--stone-img); background-size: auto, 96px; border: 4px solid; border-color: var(--edge-hi) var(--edge-lo) var(--edge-lo) var(--edge-hi); box-shadow: 0 0 0 2px #000, 0 18px 50px rgba(0, 0, 0, .7); padding: 18px 22px; color: var(--ink); box-sizing: border-box; }
+  #panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; max-height: calc(100% - 32px); display: flex; flex-direction: column; width: min(560px, calc(100% - 32px)); }
+  #backdrop { position: fixed; inset: 0; z-index: 19; background: rgba(0, 0, 0, .3); }
+  /* whatever the panel holds, its body scrolls and its buttons stay on screen */
+  #panel > * { flex: none; }
+  #panel > .scroll, #panel > .sheet, #panel > .settings, #panel > .keys, #panel > .dlg { flex: 0 1 auto; min-height: 0; overflow-y: auto; }
+  #panel.small { width: min(440px, calc(100% - 32px)); }
+  #panel.mid { width: min(680px, calc(100% - 32px)); }
+  #panel.wide { width: min(960px, calc(100% - 32px)); }
+  .scroll { overflow-y: auto; min-height: 0; scrollbar-color: #6a5c44 #1a1510; }
+  #panel h2, #resume h2 { font-family: 'IM Fell English SC', Georgia, serif; color: var(--gold); font-weight: 400; font-size: 34px; margin: 0 0 8px; letter-spacing: .02em; text-wrap: balance; }
+  #panel h3 { font-family: 'IM Fell English SC', Georgia, serif; color: var(--gold); font-size: 22px; margin: 14px 0 6px; font-weight: 400; letter-spacing: .02em; }
+  #panel p { margin: 6px 0; }
+  .db { font: inherit; font-size: 22px; color: var(--ink); background: linear-gradient(#4b4236, #342d25); border: 3px solid; border-color: #8f7f5e #15110c #15110c #8f7f5e; padding: 3px 14px; cursor: pointer; line-height: 1.1; text-align: center; }
+  .db:hover:not(:disabled) { color: #fff4c8; background: linear-gradient(#5d5242, #3e362c); }
+  .db:active:not(:disabled) { border-color: #15110c #8f7f5e #8f7f5e #15110c; }
+  .db:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .db:disabled { opacity: .45; cursor: default; }
+  .db.on { color: #1c1812; background: linear-gradient(#e0c070, #b8943e); }
+  .db.sm { font-size: 19px; padding: 1px 10px; }
+  .db.xs { font-size: 17px; padding: 0 7px; }
+  .db.ghost { opacity: .75; }
+  .db.primary { background: linear-gradient(#80602a, #5a4018); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; align-items: center; }
+  .btns.col { flex-direction: column; align-items: stretch; }
+  .dlg-head { display: flex; gap: 14px; align-items: center; }
+  .portrait { width: 72px; height: 144px; image-rendering: pixelated; background: #1a1612; border: 2px solid #5a4c38; object-fit: contain; flex: none; }
+  .sub { color: var(--dim); font-size: 20px; }
+  .dlg-text { margin: 12px 0; line-height: 1.2; max-height: 38vh; padding-right: 6px; }
+  .dlg-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .list { display: flex; flex-direction: column; gap: 4px; max-height: 46vh; padding-right: 4px; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 4px 8px; background: rgba(0, 0, 0, .25); border: 1px solid rgba(143, 127, 94, .25); }
+  .row .nm { flex: 1; min-width: 0; }
+  .row small { display: block; color: var(--dim); font-size: 18px; }
+  .row .pr { color: var(--gold); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .gold { color: var(--gold); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .note { color: var(--dim); min-height: 1em; }
+  .good { color: var(--good) !important; } .bad { color: var(--bad) !important; } .dim { color: var(--dim); }
+  .sheet { display: grid; grid-template-columns: 1fr 1.3fr; gap: 22px; min-height: 0; overflow-y: auto; }
+  .sheet .col { min-width: 0; display: flex; flex-direction: column; }
+  .attr { display: flex; gap: 8px; align-items: center; padding: 1px 0; border-bottom: 1px dotted rgba(143, 127, 94, .3); }
+  .attr span { flex: 1; color: var(--dim); }
+  .attr b { font-weight: 400; font-variant-numeric: tabular-nums; }
+  .attrs.two { display: grid; grid-template-columns: 1fr 1fr; column-gap: 22px; }
+  .xpbar { height: 8px; background: #1a1510; border: 1px solid #5a4c38; margin: 6px 0 2px; }
+  .xpbar i { display: block; height: 100%; background: var(--gold); }
+  .vitals { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 8px 0; }
+  .vitals .hp { color: #ff8a70; } .vitals .mp { color: #9ab4ff; } .vitals .ft { color: #a8e08a; }
+  .spells { display: flex; flex-wrap: wrap; gap: 6px; }
+  .journal { max-height: 60vh; padding-right: 6px; }
+  .quest { padding: 8px 12px; margin-bottom: 8px; background: rgba(0, 0, 0, .28); border: 1px solid rgba(143, 127, 94, .35); }
+  .quest h3 { margin: 0 0 4px !important; }
+  .quest small { color: var(--gold); }
+  .quest.done h3 { color: #ffd76a !important; }
+  .story { font-family: 'IM Fell English', Georgia, serif; font-size: 20px; line-height: 1.5; max-width: 62ch; max-height: 60vh; }
+  .story p { margin: 0 0 12px !important; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 3px 18px; }
+  kbd { font: inherit; color: var(--gold); white-space: nowrap; }
+  .settings { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 10px 16px; align-items: center; overflow-x: hidden; }
+  .settings input[type=checkbox] { justify-self: start; }
+  .settings select, .field input { font: inherit; font-size: 21px; background: #1a1612; color: var(--ink); border: 2px solid #5a4c38; padding: 2px 8px; min-width: 0; }
+  .settings input[type=range] { accent-color: var(--gold); width: 100%; }
+  .settings .sub { grid-column: 1 / -1; margin-top: 8px; border-top: 1px solid #5a4c38; padding-top: 8px; color: var(--gold); }
+  .settings .note { grid-column: 1 / -1; font-size: 17px; opacity: 0.75; }
+  .field { display: flex; gap: 12px; align-items: center; }
+  .field input { flex: 1; }
+  .grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .create { max-height: 64vh; padding-right: 6px; }
+  #title { position: fixed; inset: 0; display: grid; place-items: center; z-index: 10; background: radial-gradient(ellipse at center, rgba(0, 0, 0, .05) 25%, rgba(0, 0, 0, .7)); padding: 16px; box-sizing: border-box; overflow-y: auto; }
+  .logo { text-align: center; }
+  .logo h1 { font-family: 'IM Fell English SC', Georgia, serif; font-weight: 400; font-size: clamp(58px, 12vw, 156px); margin: 0; color: #e8c872; text-shadow: 0 4px 0 #5a3a10, 0 8px 30px rgba(0, 0, 0, .9); letter-spacing: .04em; line-height: .95; }
+  .logo .pre { font-size: 20px; color: #cbbd98; letter-spacing: .22em; text-transform: uppercase; text-shadow: 2px 2px 0 #000; }
+  .logo .post { font-family: 'IM Fell English', Georgia, serif; font-style: italic; font-size: clamp(22px, 3.2vw, 34px); color: #efe2b8; margin-top: 4px; text-shadow: 2px 2px 0 #000; }
+  .menu { display: flex; flex-direction: column; gap: 8px; width: min(320px, 100%); margin: 28px auto 0; }
+  .menu .db { font-size: 27px; padding: 6px 14px; }
+  .foot { margin: 18px auto 0; color: #cbbd98; font-size: 19px; text-align: center; max-width: 60ch; text-shadow: 2px 2px 0 #000; }
+  #mapview { position: fixed; inset: 0; z-index: 25; background: #1b1712; }
+  #mapc { width: 100%; height: 100%; display: block; }
+  #maplegend { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: 140px; color: var(--dim); font-size: 20px; text-shadow: 2px 2px 0 #000; }
+  #mapbtns { position: absolute; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; }
+  #mapbtns .db { min-width: 44px; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 30px; color: var(--gold); background: var(--bg); z-index: 40; font-family: 'IM Fell English SC', Georgia, serif; padding: 16px; text-align: center; }
+  /* touch controls */
+  html { -webkit-text-size-adjust: 100%; }
+  body.touch { touch-action: manipulation; -webkit-touch-callout: none; }
+  body.touch #game { touch-action: none; }
+  body.touch .db { min-height: 44px; padding: 6px 16px; }
+  body.touch .db.sm, body.touch .db.xs { min-height: 40px; min-width: 40px; }
+  body.touch .settings input[type=checkbox] { width: 28px; height: 28px; }
+  #touch { position: fixed; inset: 0; z-index: 8; display: none; touch-action: none; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; --ts: var(--tsu, 1); }
+  body.touch #touch.live { display: block; }
+  #touch .tb { position: absolute; box-sizing: border-box; font: inherit; font-size: calc(21px * var(--ts)); line-height: 1; color: var(--ink); text-shadow: 2px 2px 0 #000; padding: 0 4px;
+    width: calc(70px * var(--ts)); height: calc(70px * var(--ts)); border-radius: 50%; display: grid; place-items: center; touch-action: none; -webkit-tap-highlight-color: transparent;
+    background: radial-gradient(circle at 40% 35%, rgba(88, 76, 60, .7), rgba(26, 22, 17, .72)); border: 3px solid; border-color: rgba(160, 142, 104, .85) rgba(14, 11, 8, .85) rgba(14, 11, 8, .85) rgba(160, 142, 104, .85); box-shadow: 0 0 0 1px rgba(0, 0, 0, .6); }
+  #touch .tb.on { border-color: rgba(14, 11, 8, .9) rgba(160, 142, 104, .9) rgba(160, 142, 104, .9) rgba(14, 11, 8, .9); background: radial-gradient(circle at 50% 50%, rgba(120, 96, 50, .85), rgba(40, 32, 20, .85)); color: #fff4c8; }
+  #touch .tb.ready { color: #1c1812; text-shadow: none; background: radial-gradient(circle at 40% 35%, rgba(240, 206, 120, .95), rgba(170, 130, 50, .9)); }
+  #touch .tb.off { opacity: .45; }
+  #touch .tact { position: absolute; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--hudb, 80px) + 14px + env(safe-area-inset-bottom, 0px)); width: calc(236px * var(--ts)); height: calc(300px * var(--ts)); pointer-events: none; }
+  #touch .tact .tb { pointer-events: auto; }
+  #touch .tb.big { width: calc(104px * var(--ts)); height: calc(104px * var(--ts)); right: 0; bottom: 0; font-size: calc(24px * var(--ts)); }
+  #touch [data-k="use"] { right: calc(120px * var(--ts)); bottom: calc(4px * var(--ts)); }
+  #touch [data-k="cast"] { right: calc(104px * var(--ts)); bottom: calc(96px * var(--ts)); }
+  #touch .tb.jump { right: calc(8px * var(--ts)); bottom: calc(122px * var(--ts)); }
+  #touch .tb.down { right: calc(8px * var(--ts)); bottom: calc(206px * var(--ts)); width: calc(60px * var(--ts)); height: calc(60px * var(--ts)); }
+  #touch .tside { position: absolute; right: calc(184px * var(--ts)); bottom: calc(96px * var(--ts)); display: flex; flex-direction: column-reverse; gap: calc(8px * var(--ts)); align-items: flex-end; pointer-events: none; }
+  #touch .tb.pill, #touch .tb.sq { position: static; width: auto; min-width: calc(76px * var(--ts)); height: calc(42px * var(--ts)); border-radius: 8px; padding: 0 calc(10px * var(--ts)); font-size: calc(19px * var(--ts)); white-space: nowrap; pointer-events: auto; }
+  #touch .tbar { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(40px + env(safe-area-inset-top, 0px)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: calc(100% - 24px); }
+  #touch .tbar .tb.sq { min-width: calc(64px * var(--ts)); }
+  #touch.min [data-k="use"] { right: 0; bottom: 0; width: calc(96px * var(--ts)); height: calc(96px * var(--ts)); font-size: calc(23px * var(--ts)); }
+  #touch.min .tb.jump { right: calc(112px * var(--ts)); bottom: calc(8px * var(--ts)); }
+  #touch.min .tb.down { right: calc(112px * var(--ts)); bottom: calc(92px * var(--ts)); }
+  #touch.min .tside { right: 0; bottom: calc(112px * var(--ts)); }
+  #touch .stk { position: absolute; width: calc(132px * var(--ts)); height: calc(132px * var(--ts)); margin: calc(-66px * var(--ts)) 0 0 calc(-66px * var(--ts)); border-radius: 50%; border: 3px solid rgba(200, 180, 130, .45); background: rgba(20, 16, 12, .28); pointer-events: none; display: grid; place-items: center; }
+  #touch .stk i { width: calc(62px * var(--ts)); height: calc(62px * var(--ts)); border-radius: 50%; background: radial-gradient(circle at 40% 35%, rgba(200, 180, 130, .75), rgba(80, 66, 44, .75)); border: 2px solid rgba(0, 0, 0, .5); }
+  #touch .stk.run { border-color: rgba(240, 206, 120, .85); }
+  #touch .stk.run i { background: radial-gradient(circle at 40% 35%, rgba(250, 220, 140, .95), rgba(170, 130, 50, .9)); }
+  body.touch #msgs { top: calc(94px + env(safe-area-inset-top, 0px)); }
+  @media (max-height: 560px) { #touch { --ts: calc(var(--tsu, 1) * .72); } #touch .tact { bottom: calc(var(--hudb, 60px) + 8px + env(safe-area-inset-bottom, 0px)); } }
+  @media (max-width: 700px) {
+    body { font-size: 19px; }
+    #panel h2 { font-size: 28px; }
+    .sheet { grid-template-columns: 1fr; }
+    .attrs.two { grid-template-columns: 1fr; }
+    #hint { font-size: 19px; white-space: normal; text-align: center; width: calc(100% - 32px); }
+    #status { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #fade, .m, #big { transition: none; } }
+</style>
+<!--/HEAD-->
+<canvas id="game" aria-label="Game view"></canvas>
+<canvas id="hud" aria-hidden="true"></canvas>
+<div id="vignette"></div>
+<div id="dmg"></div>
+<div id="fade"></div>
+<div id="msgs" aria-live="polite"></div>
+<div id="big"></div>
+<div id="hint"></div>
+<div id="status"></div>
+<div id="restinfo" class="panel" hidden></div>
+<div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Daggerfall</p></div></div>
+<div id="backdrop" hidden></div>
+<div id="panel" class="panel" hidden role="dialog" aria-modal="true"></div>
+<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
+<div id="touch" aria-hidden="true"></div>
+<div id="title" hidden>
+  <div class="title-wrap">
+    <div class="logo"><div class="pre">The Iliac Bay, 3E 405</div><h1>Daggerfall</h1><div class="post">~ One City ~</div></div>
+    <nav class="menu" aria-label="Main menu">
+      <button class="db" data-t="new">New Game</button>
+      <button class="db" data-t="continue">Continue</button>
+      <button class="db" data-t="controls">Controls</button>
+      <button class="db" data-t="settings">Settings</button>
+    </nav>
+    <p class="foot">Keyboard and mouse: WASD to move, mouse to look, click to swing, E to interact. On a tablet, touch controls appear on screen.<br>An unofficial fan tribute to <i>The Elder Scrolls II: Daggerfall</i>. Not affiliated with Bethesda Softworks.</p>
+  </div>
+</div>
+<div id="loading">Raising the walls of Daggerfall…</div>
+<script type="module">
+/*__GAME_JS__*/
+</script>
