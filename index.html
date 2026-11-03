@@ -30,7 +30,7 @@
   #hint { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%); font-size: 25px; text-shadow: 2px 2px 0 #000; white-space: nowrap; pointer-events: none; z-index: 5; }
   #hint.dim { color: var(--dim); font-size: 21px; }
   #status { position: fixed; right: 16px; top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 20px; color: var(--dim); text-shadow: 2px 2px 0 #000; pointer-events: none; text-align: right; z-index: 5; max-width: calc(100% - 32px); }
-  #travelinfo { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 22; font-size: 22px; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  #travelinfo { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 22; font-size: 19px; padding: 6px 12px; white-space: nowrap; max-width: max(220px, calc(100vw - 400px)); overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* out of the way: bottom left, clear of the compass */
   #mapdest { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(52px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; max-width: calc(100vw - 32px); background: rgba(20,16,12,.85); padding: 8px 12px; border: 2px solid #5a4a36; }
   #mapdest .nm { color: #efe2b8; font-size: 22px; margin-right: 6px; }
   #restinfo { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; font-size: 26px; white-space: nowrap; }
@@ -155,7 +155,6 @@
   #touch .stk.run { border-color: rgba(240, 206, 120, .85); }
   #touch .stk.run i { background: radial-gradient(circle at 40% 35%, rgba(250, 220, 140, .95), rgba(170, 130, 50, .9)); }
   body.touch #msgs { top: calc(94px + env(safe-area-inset-top, 0px)); }
-  body.touch #travelinfo { top: 34%; font-size: 20px; } /* clear of the button bar at the top */
   @media (max-height: 560px) { #touch { --ts: calc(var(--tsu, 1) * .72); } #touch .tact { bottom: calc(var(--hudb, 60px) + 8px + env(safe-area-inset-bottom, 0px)); } }
   @media (max-width: 700px) {
     body { font-size: 19px; }
