@@ -2,3 +2,4 @@
 tools/out/
 __pycache__/
 *.pyc
+tools/.npmcache/

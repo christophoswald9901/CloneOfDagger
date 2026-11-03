@@ -31,4 +31,4 @@ python3 -m http.server 8765 --bind 127.0.0.1   # in the background
 python3 tools/check.py                          # boot, new game, report errors
 ```
 
-They need Python `websockets` and `Pillow`, and Chrome or Chromium on PATH (or `$CHROME`). In a fresh container: `pip install websockets pillow`, plus a Chromium package if none is installed. Renders go to `tools/out/`, which is gitignored, so earlier renders exist only on the machine that made them.
+They need Python `websockets` and `Pillow`, and Chrome or Chromium on PATH (or `$CHROME`). In a fresh container: `pip install websockets pillow`, plus a Chromium package if none is installed. If the sandbox blocks `cdn.jsdelivr.net` (where three.js is loaded from), `tools/cdp.py` intercepts those requests and serves them from an `npm pack` copy in `tools/.npmcache/` (gitignored), so npm registry access is enough. Renders go to `tools/out/`, which is gitignored, so earlier renders exist only on the machine that made them.
