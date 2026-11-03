@@ -9,10 +9,10 @@
 
 // rc: wholly fixed within this radius; rb: wholly generated beyond it. road: from the site out to where the generated tracks take over
 const SITES = [
-  { id: 'greywatch', name: 'Greywatch', kind: 'ruin', x: -2400, z: -2900, rc: 280, rb: 820, discR: 240,
+  { id: 'greywatch', name: 'Greywatch', kind: 'ruin', x: -2400, z: -2900, rc: 280, rb: 820, discR: 240, bare: 110,
     blurb: 'the broken keep of Greywatch on its crag, abandoned since the War of Betony',
     road: [[26, 26], [52, 50], [92, 82], [140, 112], [196, 140], [262, 168], [330, 202], [400, 246], [470, 300], [540, 360]] },
-  { id: 'stones', name: 'the Ninefold Stones', kind: 'stones', x: 3600, z: -5600, rc: 300, rb: 860, discR: 200,
+  { id: 'stones', name: 'the Ninefold Stones', kind: 'stones', x: 3600, z: -5600, rc: 300, rb: 860, discR: 200, bare: 260,
     blurb: 'a ring of nine standing stones on a bare hilltop, older than any kingdom of the Bay',
     road: [[-14, 18], [-40, 52], [-80, 92], [-130, 128], [-196, 160], [-270, 196], [-344, 240], [-420, 290], [-500, 344]] },
   { id: 'mirrormere', name: 'Mirrormere', kind: 'hamlet', x: -4600, z: -8200, rc: 560, rb: 1050, discR: 330, wl: 96,
@@ -42,9 +42,9 @@ const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI;
 function greywatchH(x, z) {
   const S = SITES[0], dx = x - S.x, dz = z - S.z, H0 = 46;
   const gentle = smoothstep(1.05, 0.25, angDiff(Math.atan2(dz, dx), Math.PI / 4));
-  const r = Math.hypot(dx, dz) + 7 * fbm(x / 40, z / 40, 2, 901), re = r / lerp(1, 2.0, gentle);
-  const t = clamp((re - 44) / 105, 0, 1), prof = 1 - smoothstep(0, 1, Math.pow(t, lerp(0.5, 0.85, gentle))); // sheer near the top on three sides
-  let h = H0 + 60 * prof + 1.4 * fbm(x / 16, z / 16, 2, 902) * prof;
+  const r = Math.hypot(dx, dz) + 7 * fbm(x / 40, z / 40, 2, 901), re = r / lerp(1, 4.2, gentle);
+  const t = clamp((re - 44) / 95, 0, 1), prof = 1 - smoothstep(0, 1, Math.pow(t, lerp(0.42, 0.9, gentle))); // sheer near the top on three sides, a long even ramp on the fourth
+  let h = H0 + 54 * prof + 1.4 * fbm(x / 16, z / 16, 2, 902) * prof;
   h += (1 - 0.8 * prof) * (7 * fbm(x / 210, z / 210, 3, 903) + 2.5 * fbm(x / 55, z / 55, 2, 904));
   h -= 10 * smoothstep(260, 560, r) * smoothstep(-0.1, 0.5, fbm(x / 300 + 4, z / 300, 2, 906)); // a hollow or two in the land round about
   return h;
@@ -53,7 +53,7 @@ function greywatchH(x, z) {
 function stonesH(x, z) {
   const S = SITES[1], dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz) + 10 * fbm(x / 80, z / 80, 2, 911), H0 = 70;
   const dome = Math.exp(-Math.pow(r / 240, 2)), crown = 1 - smoothstep(18, 40, r);
-  return H0 + 36 * dome + crown * 0.3 * (1 - dome) + (1 - crown) * (5 * fbm(x / 170, z / 170, 3, 912) + 1.6 * fbm(x / 40, z / 40, 2, 913));
+  return H0 + 58 * dome + crown * 0.3 * (1 - dome) + (1 - crown) * (5 * fbm(x / 170, z / 170, 3, 912) + 1.6 * fbm(x / 40, z / 40, 2, 913));
 }
 // Mirrormere: a lake in a bowl of hills, open to the south-east where its outflow would run; the hamlet on a terrace on the east shore
 const MERE = { wl: 96 };
@@ -74,6 +74,7 @@ function kestrelH(x, z) {
   const pk = Math.exp(-Math.pow((Math.abs(dx) - 380) / 210, 2)), wall = smoothstep(60, 260, Math.abs(dx));
   let h = H0 + 200 * pk * (0.7 + 0.45 * ridgedMF(x / 260, z / 260, 4, 931)) + 70 * wall * (1 - pk) * (0.6 + 0.5 * fbm(x / 200, z / 200, 2, 932));
   h -= 55 * smoothstep(90, 900, Math.abs(dz)) * (1 - 0.7 * pk); // the pass falls away to north and south
+  h += 7 * Math.exp(-((dx + 24) ** 2 + (dz - 6) ** 2) / (30 * 30)); // the knoll the tower stands on
   h += 3 * fbm(x / 50, z / 50, 2, 933) - 2 * (1 - smoothstep(0, 40, Math.abs(dx + 4 * fbm(z / 90, 1.3, 2, 934)))); // the road worn a little into its floor
   return h;
 }
@@ -84,7 +85,7 @@ function siteCoast(x, z) { const w = 1 - smoothstep(650, 1600, Math.abs(x - GULL
 function gullscarH(x, z) {
   const d = gullCoast(x) - z;
   if (d < 0) return SEA - 0.3 - Math.min(9, -d * 0.09);
-  return SEA + 0.3 + 24 * smoothstep(0, 16, d) + 0.025 * Math.max(0, d - 16) + 3.5 * fbm(x / 90, z / 90, 2, 943) * smoothstep(8, 40, d);
+  return SEA + 0.3 + 36 * smoothstep(0, 18, d) + 0.025 * Math.max(0, d - 16) + 3.5 * fbm(x / 90, z / 90, 2, 943) * smoothstep(8, 40, d);
 }
 const SITE_H = { greywatch: greywatchH, stones: stonesH, mirrormere: mirrormereH, kestrel: kestrelH, gullscar: gullscarH };
 // the ground with the sites laid in: their fixed shape where they hold, blended into whatever lies round them
@@ -95,7 +96,7 @@ function siteFix(x, z, h) {
 
 /* ---------------- what grows there: woods (0..1) and heath (0..1), fixed ---------------- */
 function siteForest(S, x, z, h) {
-  const dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz), n = fbm(x / 150, z / 150, 2, 950), n2 = fbm(x / 60, z / 60, 2, 951);
+  const dx = x - S.x, dz = z - S.z, n = fbm(x / 150, z / 150, 2, 950), n2 = fbm(x / 60, z / 60, 2, 951), r = Math.hypot(dx, dz) + 70 * fbm(x / 120 + 3, z / 120, 2, 952); // (a ragged radius: no wood edge runs round a site in a circle)
   switch (S.id) {
     case 'greywatch': return smoothstep(0.0, 0.3, n + 0.15 * n2) * smoothstep(150, 240, r) * smoothstep(40, -160, dz + dx * 0.4); // an oakwood under the north cliffs
     case 'stones': return 0;
@@ -127,6 +128,7 @@ const Sites = {
     this.cols = area.colliders; area.colliders = saved;
     const G2 = area.grid; for (const col of this.cols) for (let ix = Math.floor(col.x0 / CELL); ix <= Math.floor(col.x1 / CELL); ix++) for (let iz = Math.floor(col.z0 / CELL); iz <= Math.floor(col.z1 / CELL); iz++) { const k = ix * 10007 + iz; let l = G2.get(k); if (!l) G2.set(k, l = []); l.push(col); }
     this.group = gb.build(mats); this.group.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); }); area.scene.add(this.group);
+    for (const S of SITES) for (const [fx, fy, fz, fa] of S.flags || []) makeFlag(area, TEX.bannerRed, fx, fy, fz, fa, 2.4, 1.4);
     if (this.glows.length) { const b = new SpriteBatch(area, TEX.glow, 3.2, 3.2, this.glows, { additive: true, lit: false, fog: false }); this.glowMat = b.mat; }
   },
   // true where a site keeps the ground clear: its solids (for any plant), its yards and courts (for trees and bushes)
@@ -187,13 +189,13 @@ const SITE_BUILD = {
     const rng = new RNG(7101), cx = S.x - 4, cz = S.z - 4, R = 33, n = 9, pts = []; S.clear = [[cx, cz, 42]];
     for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + 0.2, rr = R * (0.92 + 0.16 * (0.5 + 0.5 * Math.sin(k * 1.9))); pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]); }
     const gate = pts.reduce((b, p, k) => { const q = pts[(k + 1) % n], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2, sc = (mx - cx) + (mz - cz); return sc > b[0] ? [sc, k] : b; }, [-1e9, 0])[1]; // the side facing the road (south-east)
-    for (let k = 0; k < n; k++) { const [ax, az] = pts[k], [bx, bz] = pts[(k + 1) % n], L = Math.hypot(bx - ax, bz - az); ruinWall(gb, area, H, ax, az, bx, bz, 2.2, 7.5, 2.2, 13 + k * 7, rng, k === gate ? Math.round(L / 2.6 / 2) - 0.5 : -1); }
-    pts.forEach(([x, z], k) => { if (k % 2) return; const y = H(x, z) - 0.8; roundTower(gb, area, x, z, y, 3.6, rng.range(6, 11), rng, true); });
+    for (let k = 0; k < n; k++) { const [ax, az] = pts[k], [bx, bz] = pts[(k + 1) % n], L = Math.hypot(bx - ax, bz - az); ruinWall(gb, area, H, ax, az, bx, bz, 3, 10, 2.2, 13 + k * 7, rng, k === gate ? Math.round(L / 2.6 / 2) - 0.5 : -1); }
+    pts.forEach(([x, z], k) => { if (k % 2) return; const y = H(x, z) - 0.8; roundTower(gb, area, x, z, y, 3.8, rng.range(9, 15), rng, true); });
     // the keep: four walls with their tops broken off, a doorway on the south side, open to the sky
     { const kx = cx - 6, kz = cz - 8, hw = 6.5, th = 1.6, y = Math.min(H(kx - hw, kz - hw), H(kx + hw, kz - hw), H(kx - hw, kz + hw), H(kx + hw, kz + hw)) - 0.8;
       const wall = (ax, az, bx, bz, door) => { const L = Math.hypot(bx - ax, bz - az), n2 = Math.round(L / 1.6), ang = Math.atan2(bx - ax, bz - az);
         for (let q = 0; q < n2; q++) { const f = (q + 0.5) / n2, mx = lerp(ax, bx, f), mz = lerp(az, bz, f); if (door && Math.abs(f - 0.5) < 0.12) { gb.setXf(mx, mz, ang, y); gb.box(-th / 2, 3.6, -L / n2 / 2, th / 2, 7, L / n2 / 2, 'stone', 3, 3); gb.xf = null; siteCol(area, mx, mz, ang, th / 2, L / n2 / 2, y + 3.6, y + 7); continue; }
-          const top = 12 + 9 * (0.5 + 0.5 * Math.sin(q * 1.7 + ax)) * (0.6 + 0.4 * (0.5 + 0.5 * Math.cos(q * 0.6))) + rng.range(-1, 1);
+          const top = 19 + 12 * (0.5 + 0.5 * Math.sin(q * 1.7 + ax)) * (0.6 + 0.4 * (0.5 + 0.5 * Math.cos(q * 0.6))) + rng.range(-1, 1);
           gb.setXf(mx, mz, ang, y); gb.box(-th / 2, 0, -L / n2 / 2 - 0.02, th / 2, top, L / n2 / 2 + 0.02, 'stone', 3, 3); gb.xf = null; siteCol(area, mx, mz, ang, th / 2, L / n2 / 2, y - 1, y + top);
           if (q % 3 === 1 && top > 8) for (let wy = 4.5; wy < top - 2; wy += 4.2) { const [nx, nz] = [Math.cos(ang), -Math.sin(ang)]; for (const s of [1, -1]) gb.quad('winB', [mx + nx * (th / 2 + 0.03) * s - Math.sin(ang) * 0.35 * s, y + wy, mz + nz * (th / 2 + 0.03) * s - Math.cos(ang) * 0.35 * s], [Math.sin(ang) * s, 0, Math.cos(ang) * s], [0, 1, 0], 0.7, 1.3, 1, 1, { fixedUV: true }); } } };
       wall(kx - hw, kz + hw, kx + hw, kz + hw, true); wall(kx + hw, kz + hw, kx + hw, kz - hw); wall(kx + hw, kz - hw, kx - hw, kz - hw); wall(kx - hw, kz - hw, kx - hw, kz + hw);
@@ -206,9 +208,10 @@ const SITE_BUILD = {
     for (let k = 0; k < 9; k++) {
       const a = k / 9 * Math.PI * 2 + 0.3, r = 13 + rng.range(-0.6, 0.6), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r, y = H(x, z) - 0.6, ang = a + Math.PI / 2 + rng.range(-0.2, 0.2);
       if (k === 3 || k === 7) { gb.setXf(x, z, ang + 1.3, y + 0.2); gb.box(-0.55, 0, -1.6, 0.55, 0.85, 1.6, 'rock', 2, 2); gb.xf = null; siteCol(area, x, z, ang + 1.3, 0.55, 1.6, y - 1, y + 1.05); continue; } // fallen
-      const h = rng.range(2.6, 3.8), w = rng.range(0.55, 0.75);
-      gb.setXf(x, z, ang, y); gb.box(-w, 0, -0.32, w, h, 0.32, 'rock', 2, 2); gb.box(-w * 0.7, h, -0.25, w * 0.6, h + 0.35, 0.25, 'rock', 2, 2); gb.xf = null; siteCol(area, x, z, ang, w, 0.35, y - 1, y + h + 0.35);
+      const h = rng.range(3.8, 5.2), w = rng.range(0.6, 0.85);
+      gb.tint = [1.3, 1.28, 1.2]; gb.setXf(x, z, ang, y); gb.box(-w, 0, -0.32, w, h, 0.32, 'rock', 2, 2); gb.box(-w * 0.7, h, -0.25, w * 0.6, h + 0.35, 0.25, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, x, z, ang, w, 0.35, y - 1, y + h + 0.35);
     }
+    { const kx = S.x + 30, kz = S.z + 22, y = H(kx, kz) - 0.8; gb.tint = [1.3, 1.28, 1.2]; gb.setXf(kx, kz, 0.6, y); gb.box(-1.1, 0, -0.5, 1.1, 7.2, 0.5, 'rock', 2, 2); gb.box(-0.8, 7.2, -0.4, 0.7, 7.7, 0.4, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, kx, kz, 0.6, 1.1, 0.5, y - 1, y + 7.7); } // the king stone, standing apart
     { const y = H(S.x, S.z) - 0.3; gb.setXf(S.x, S.z, 0.4, y); gb.box(-1.3, 0, -0.75, 1.3, 0.85, 0.75, 'rock', 2, 2); gb.xf = null; siteCol(area, S.x, S.z, 0.4, 1.3, 0.75, y - 1, y + 0.85); }
     for (let q = 0; q < 8; q++) { const a = rng.range(0, 6.283), r = rng.range(30, 120), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 1.0), rng); }
   },
@@ -226,13 +229,14 @@ const SITE_BUILD = {
     // the chapel, at the head of the lane, its little bell-cote over the door
     { const [x, z] = o(274, -26), r2 = new RNG(7320); gb.setXf(x, z, 0, y0 - 0.1);
       makeBuilding(area, gb, r2, { fp: { x0: -4, z0: -7, x1: 4, z1: 7 }, h: 5.2, style: 'stone', roof: 'gable', roofKey: 'roofSlate', doorT: 0.5, found: 0.6, chimney: 0, alongX: false, winRate: 0.8 });
-      gb.box(-1, 5.2, 5.6, 1, 9.6, 6.8, { side: 'stone', top: 'stone' }, 2, 2); gb.cone('roofSlate', 0, 6.2, 1.3, 9.6, 2, 4, 2); gb.xf = null; siteCol(area, x, z + 6.2, 0, 1, 0.6, y0 + 5, y0 + 11); }
+      gb.tint = [0.8, 0.8, 0.82]; gb.box(-1.6, -0.6, -10.2, 1.6, 12, -7, { side: 'stone', top: 'stone' }, 2, 2); gb.tint = null; gb.cone('roofSlate', 0, -8.6, 2.4, 12, 7, 4, 2); gb.xf = null; // the steeple, at the far end from the door
+      const [sx, sz] = xfP(makeXf(x, z, 0), 0, -8.6); siteCol(area, sx, sz, 0, 1.6, 1.6, y0 - 1, y0 + 19); }
     // the jetty and two boats drawn up beside it
     { const [x, z] = o(128, 2), ang = -Math.PI / 2; gb.setXf(x, z, ang, WL);
-      gb.box(-1.4, 0.35, 0, 1.4, 0.6, 26, { side: 'woodDark', top: 'wood' }, 2, 2);
-      for (let t = 2; t < 26; t += 4) for (const s of [-1.2, 1.2]) gb.box(s - 0.14, -3.5, t - 0.14, s + 0.14, 0.6, t + 0.14, 'woodDark', 1, 1);
+      gb.box(-1.4, 0.35, 0, 1.4, 0.6, 40, { side: 'woodDark', top: 'wood' }, 2, 2);
+      for (let t = 2; t < 40; t += 4) for (const s of [-1.2, 1.2]) gb.box(s - 0.14, -3.5, t - 0.14, s + 0.14, 0.6, t + 0.14, 'woodDark', 1, 1);
       for (const [bx, bz] of [[3, 8], [-3.2, 17]]) gb.box(bx - 0.8, -0.2, bz - 2.2, bx + 0.8, 0.45, bz + 2.2, { side: 'woodDark', top: 'wood' }, 1, 1);
-      gb.xf = null; const [jx, jz] = xfP(makeXf(x, z, ang), 0, 13); siteCol(area, jx, jz, ang, 1.4, 13, WL - 5, WL + 0.6); }
+      gb.xf = null; const [jx, jz] = xfP(makeXf(x, z, ang), 0, 20); siteCol(area, jx, jz, ang, 1.4, 20, WL - 5, WL + 0.6); }
     // the lake itself
     { const g = gb.grp('wStream'), base = g.p.length / 3, n = 72; g.p.push(S.x, WL, S.z); g.u.push(S.x / 6, S.z / 6); g.c.push(0.74, 0.86, 0.9);
       for (let k = 0; k <= n; k++) { const a = k / n * Math.PI * 2, rr = mereR(S.x + Math.cos(a) * 100, S.z + Math.sin(a) * 100) + 3, x = S.x + Math.cos(a) * rr, z = S.z + Math.sin(a) * rr; g.p.push(x, WL, z); g.u.push(x / 6, z / 6); g.c.push(0.8, 0.9, 0.92); if (k) g.i.push(base, base + k, base + k + 1, base, base + k + 1, base + k); } }
@@ -243,8 +247,8 @@ const SITE_BUILD = {
   // the watchtower at the crest of the pass, with a walled yard and a beacon on its roof
   kestrel(gb, S, H, area) {
     const rng = new RNG(7401), tx = S.x - 24, tz = S.z + 6; S.clear = [[tx, tz, 20]]; const y = Math.min(H(tx - 4, tz - 4), H(tx + 4, tz - 4), H(tx - 4, tz + 4), H(tx + 4, tz + 4)) - 0.4;
-    gb.setXf(tx, tz, Math.PI / 2, y); makeBuilding(area, gb, rng, { fp: { x0: -4, z0: -4, x1: 4, z1: 4 }, h: 17, style: 'stone', roof: 'flat', doorT: 0.5, found: 1.2, winRate: 0.35, chimney: 0 }); gb.xf = null;
-    this.glowAt(S, tx, y + 18.2, tz);
+    gb.setXf(tx, tz, Math.PI / 2, y); makeBuilding(area, gb, rng, { fp: { x0: -4, z0: -4, x1: 4, z1: 4 }, h: 25, style: 'stone', roof: 'flat', doorT: 0.5, found: 1.2, winRate: 0.35, chimney: 0 }); gb.xf = null;
+    this.glowAt(S, tx, y + 26.2, tz); gb.box(tx - 0.1, y + 25, tz - 0.1, tx + 0.1, y + 31, tz + 0.1, 'woodDark', 1, 1); S.flags = [[tx + 0.1, y + 30.2, tz, 0.4]];
     // the yard wall, with a gate to the road
     const yw = [[-12, -10], [12, -10], [12, 12], [-12, 12]].map(([a, b]) => [tx + a, tz + b]);
     for (let k = 0; k < 4; k++) { const [ax, az] = yw[k], [bx, bz] = yw[(k + 1) % 4]; ruinWall(gb, area, H, ax, az, bx, bz, 2.2, 2.6, 0.8, 50 + k, new RNG(7410 + k), k === 1 ? 4 : -1); }
@@ -253,11 +257,11 @@ const SITE_BUILD = {
   // the lighthouse at the tip of the headland, its keeper's cottage beside it
   gullscar(gb, S, H, area) {
     const rng = new RNG(7501), lx = GULL.x, lz = gullCoast(GULL.x) - 34, y = H(lx, lz) - 0.5; S.clear = [[lx, lz, 12], [lx - 4, lz - 22, 12]];
-    gb.tint = [1.15, 1.15, 1.12]; gb.cyl('plaster', lx, lz, 4.2, y, y + 21, 14, 4, 4); gb.tint = null;
-    gb.cyl('stone', lx, lz, 4.6, y - 1.5, y + 1.2, 14, 3, 3); gb.cyl('iron', lx, lz, 3.0, y + 21, y + 24, 10, 2, 2); gb.cone('roofRed', lx, lz, 4.2, y + 24, 4.5, 12, 3); gb.disc('flag', lx, y + 21, lz, 4.25, 14, 3);
-    for (let wy = 4; wy < 20; wy += 5) gb.quad('winB', [lx - 0.45, y + wy, lz + 4.23], [1, 0, 0], [0, 1, 0], 0.9, 1.4, 1, 1, { fixedUV: true });
-    siteCol(area, lx, lz, 0, 4.4, 4.4, y - 2, y + 28);
-    this.glowAt(S, lx, y + 22.5, lz, 7);
+    gb.tint = [1.15, 1.15, 1.12]; gb.cyl('plaster', lx, lz, 4.6, y, y + 30, 14, 4, 4); gb.tint = null;
+    gb.cyl('stone', lx, lz, 5.0, y - 1.5, y + 1.2, 14, 3, 3); gb.cyl('iron', lx, lz, 3.2, y + 30, y + 33.5, 10, 2, 2); gb.cone('roofRed', lx, lz, 4.4, y + 33.5, 5, 12, 3); gb.disc('flag', lx, y + 30, lz, 4.65, 14, 3);
+    for (let wy = 4; wy < 28; wy += 5) gb.quad('winB', [lx - 0.45, y + wy, lz + 4.63], [1, 0, 0], [0, 1, 0], 0.9, 1.4, 1, 1, { fixedUV: true });
+    siteCol(area, lx, lz, 0, 4.8, 4.8, y - 2, y + 38);
+    this.glowAt(S, lx, y + 31.8, lz, 8);
     const cx = lx - 4, cz = lz - 22, cy = H(cx, cz); gb.setXf(cx, cz, 0.15, cy - 0.1); makeBuilding(area, gb, rng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: 'plaster', roof: 'gable', roofKey: 'roofSlate', doorT: 0.4, found: 0.8, chimney: 1 }); gb.xf = null;
     drapeStrip(gb, 'rDirt', resampleEven([[cx + 1, cz + 4], [lx - 1, lz - 6]], 3), 2.4, { lift: 0.07 });
   },

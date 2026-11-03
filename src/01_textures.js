@@ -598,9 +598,12 @@ function drawTree(kind, seed) {
   }
   if (kind === 'bush' || kind === 'bushB') {
     const [c, x] = cnv(32, 20), B = kind === 'bushB'; // B: a hawthorn-ish, olive shrub beside the darker hazel
-    for (let i = 0; i < 9; i++) pxCircle(x, rng.int(8, 24), rng.int(9, 13), rng.int(4, 7), B ? '#3a4a24' : '#2f4a22');
-    for (let i = 0; i < 6; i++) pxCircle(x, rng.int(9, 22), rng.int(7, 11), rng.int(2, 4), B ? '#5a6a30' : '#48682c');
-    if (B) for (let i = 0; i < 7; i++) { x.fillStyle = rng.chance(0.5) ? '#d8d0b8' : '#7a2a24'; x.fillRect(rng.int(8, 24), rng.int(5, 14), 1, 1); } // blossom or haws
+    // a dome sitting on the ground: dark below, lit on top (not a ring)
+    for (let i = 0; i < 10; i++) pxCircle(x, rng.int(7, 25), rng.int(12, 15), rng.int(4, 7), B ? '#34421f' : '#2a431e');
+    x.fillStyle = B ? '#2c381a' : '#233a19'; x.fillRect(6, 15, 20, 5);
+    for (let i = 0; i < 7; i++) pxCircle(x, rng.int(9, 23), rng.int(7, 10), rng.int(2, 4), B ? '#4e5e2a' : '#3e5c26');
+    for (let i = 0; i < 4; i++) pxCircle(x, rng.int(11, 21), rng.int(5, 8), rng.int(1, 2), B ? '#64743a' : '#527434');
+    if (B) for (let i = 0; i < 5; i++) { x.fillStyle = rng.chance(0.5) ? '#d8d0b8' : '#7a2a24'; x.fillRect(rng.int(9, 23), rng.int(6, 13), 1, 1); } // blossom or haws
     noiseImg(x, 32, 20, 0.2, rng); outline(c, [14, 22, 10]); return c;
   }
   // oak

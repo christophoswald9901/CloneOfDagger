@@ -7,19 +7,44 @@
    ===================================================================== */
 const POI_KINDS = {
   shrine: { name: 'a wayside shrine', r: 7 }, cart: { name: 'a broken-down cart', r: 6 }, camp: { name: "a hunters' camp", r: 9 },
-  hut: { name: "a woodcutter's hut", r: 9 }, ruin: { name: 'an abandoned cottage', r: 10 }, well: { name: 'an old well', r: 5 },
+  hut: { name: "a woodcutter's hut", r: 9 }, hamlet: { name: 'a hamlet', r: 70 }, ruin: { name: 'an abandoned cottage', r: 10 }, well: { name: 'an old well', r: 5 },
   cairn: { name: 'a burial cairn', r: 6 }, dolmen: { name: 'an ancient dolmen', r: 6 }, stone: { name: 'a lone standing stone', r: 4 }, oak: { name: 'a great old oak', r: 9 },
 };
 const POI = {
   list: [], hash: new Map(), HC: 700, discR: 55,
   // one chance in each cell of a coarse grid; what stands there follows the ground
+  // hamlets: a handful of cottages facing a track, every few kilometres along the ways out from the city, with farmland round them
+  planHamlets() {
+    const out = [], A = ['Ash', 'Bram', 'Cold', 'Elm', 'Fern', 'Gor', 'Hart', 'Kel', 'Lark', 'Mer', 'Oak', 'Rook', 'Sedge', 'Thorn', 'Wil', 'Bar', 'Dun', 'Hol', 'Brack', 'Stan'], B = ['ford', 'ham', 'wick', 'by', 'stead', 'ley', 'combe', 'thorpe', 'well', 'hollow', 'cote', 'mere'];
+    Wild.tracks.forEach((T, ti) => {
+      if (T.site) return; let acc = 900 + 900 * _h2(ti, 1, 6200 + WSEED);
+      for (let q = 6; q < T.length - 6; q++) {
+        acc += 3; if (acc < 2300) continue;
+        const [x, z] = T[q], h = terrainRaw(x, z);
+        if (Math.hypot(x, z) < 1900 || rimDist(x, z) < 1800 || h < SEA + 4 || siteZone(x, z, 150) || riverNear(x, z, 70) || out.some(o => Math.hypot(o.x - x, o.z - z) < 1500)) continue;
+        let lo = 1e9, hi = -1e9; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) { const v = terrainRaw(x + a * 20, z + b * 20); lo = Math.min(lo, v); hi = Math.max(hi, v); } if (hi - lo > 9) continue;
+        const k = out.length, rng = new RNG(Math.floor(_h2(ti, q, 6210 + WSEED) * 2147483647)), houses = [], n = rng.int(4, 7);
+        for (let m = 0; m < n; m++) {
+          const qq = clamp(q + Math.round((m - (n - 1) / 2) * 7 + rng.range(-1, 1)), 1, T.length - 2), sd = m % 2 ? 1 : -1, [px, pz] = T[qq], a = T[qq - 1], b = T[qq + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * sd, nz = (b[0] - a[0]) / l * sd, off = rng.range(11, 15);
+          const hx = px + nx * off, hz = pz + nz * off; houses.push({ x: hx, z: hz, ang: Math.atan2(-nx, -nz), seed: rng.int(1, 1e9), o: mkObb(hx, hz, Math.atan2(-nx, -nz), 6, 5) });
+        }
+        const [wx, wz] = (() => { const a = T[q - 1], b = T[q + 1], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [x + (b[1] - a[1]) / l * 7, z - (b[0] - a[0]) / l * 7]; })();
+        out.push({ id: `h${ti}_${q}`, name: A[rng.int(0, A.length - 1)] + B[rng.int(0, B.length - 1)], x, z, houses, well: [wx, wz] }); acc = 0;
+      }
+    });
+    this.hamlets = out; this.houseHash = new SHash(32); for (const H of out) for (const h of H.houses) this.houseHash.add(h, obbAabb(h.o));
+    return out;
+  },
+  hamletNear(x, z, r) { return (this.hamlets || []).some(H => Math.hypot(H.x - x, H.z - z) < r); },
+  housesIn(x0, z0, x1, z1) { return this.houseHash ? this.houseHash.query(x0, z0, x1, z1) : []; },
   plan() {
     this.list = []; this.hash = new Map(); const C = this.HC;
+    for (const H of this.planHamlets()) { const p = { id: H.id, kind: 'hamlet', name: `the hamlet of ${H.name}`, x: H.x, z: H.z, ang: 0, r: 70, hamlet: H }; this.list.push(p); this.addHash(p); }
     for (let i = Math.floor(WORLD.x0 / C); i <= Math.floor(WORLD.x1 / C); i++) for (let j = Math.floor(WORLD.z0 / C); j <= Math.floor(WORLD.z1 / C); j++) {
       if (_h2(i, j, 6001 + WSEED) > 0.42) continue;
       for (let t = 0; t < 4; t++) {
         const x = (i + 0.15 + 0.7 * _h2(i, j, 6002 + t + WSEED)) * C, z = (j + 0.15 + 0.7 * _h2(i, j, 6010 + t + WSEED)) * C;
-        if (Math.hypot(x, z) < 1100 || rimDist(x, z) < 1600 || coastZ(x) - z < 80 || siteWeight(x, z) > 0) continue;
+        if (Math.hypot(x, z) < 1100 || rimDist(x, z) < 1600 || coastZ(x) - z < 80 || siteWeight(x, z) > 0 || this.hamletNear(x, z, 260)) continue;
         const h = terrainRaw(x, z); if (h < SEA + 3) continue;
         const sl = Math.hypot(terrainRaw(x + 6, z) - terrainRaw(x - 6, z), terrainRaw(x, z + 6) - terrainRaw(x, z - 6)) / 12; if (sl > 0.22) continue;
         if (riverNear(x, z, 40)) continue;
@@ -33,19 +58,27 @@ const POI = {
         else kind = u < 0.35 ? 'ruin' : u < 0.55 ? 'oak' : u < 0.7 ? 'camp' : u < 0.85 ? 'well' : 'stone';
         const p = { id: `p${i}_${j}`, kind, name: POI_KINDS[kind].name, x, z, ang: _h2(i, j, 6030) * Math.PI * 2, r: POI_KINDS[kind].r };
         if (kind === 'cart' || kind === 'shrine') { const tp = Wild.trackPtsNear(x - 90, z - 90, x + 90, z + 90, 2); let bd = 1e9, b = null; for (const q of tp) { const d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; b = q; } } if (b) p.ang = Math.atan2(b[0] - x, b[1] - z); } // facing the way
-        this.list.push(p); const k = i * 100003 + j; this.hash.set(k, p); break;
+        this.list.push(p); this.addHash(p); break;
       }
     }
   },
-  near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r) / C); i <= Math.floor((x + r) / C); i++) for (let j = Math.floor((z - r) / C); j <= Math.floor((z + r) / C); j++) { const p = this.hash.get(i * 100003 + j); if (p && Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
+  addHash(p) { const k = Math.floor(p.x / this.HC) * 100003 + Math.floor(p.z / this.HC); let l = this.hash.get(k); if (!l) this.hash.set(k, l = []); l.push(p); },
+  near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r - 80) / C); i <= Math.floor((x + r + 80) / C); i++) for (let j = Math.floor((z - r - 80) / C); j <= Math.floor((z + r + 80) / C); j++) { const l = this.hash.get(i * 100003 + j); if (l) for (const p of l) if (Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
   found(p) { return !!(G.flags.poi && G.flags.poi[p.id]); },
   update(x, z) {
     if (!G.player || G.area !== G.city) return null; let hit = null;
-    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    // the people of the nearest hamlet, about their doors by day
+    const H = (this.hamlets || []).find(h => Math.hypot(h.x - x, h.z - z) < 380);
+    if (this.folk && (this.folk.H !== H || this.folk.list[0].removed)) { for (const e of this.folk.list) if (!e.removed) e.remove(); this.folk = null; }
+    if (H && !this.folk) this.folk = { H, list: H.houses.slice(0, 4).map((h, k) => { const r = new RNG(h.seed), g = r.chance(0.5) ? 'f' : 'm', [vx, vz] = xfP(makeXf(h.x, h.z, h.ang), r.range(-2, 2), 7);
+      return spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 0.7), gender: g, x: vx, z: vz, role: 'wander', wanderR: 7, speed: 1.0, dialog: 'villager', spriteKey: 'ham' + (h.seed % 24), data: { hamlet: H.name } }); }) };
+    if (this.folk) { const night = isNight(G.time); for (const e of this.folk.list) if (!e.dead) e.active = !night; }
     return hit;
   },
   // what a chunk builds for the places within it: geometry, colliders (cols), plants (fl), and ground kept clear (blocks)
   build(p, gb, cols, fl, blocks, hAt) {
+    if (p.kind === 'hamlet') return; // (its houses are built with the chunk each stands in)
     const rng = new RNG(Math.floor(_h2(Math.round(p.x), Math.round(p.z), 6100) * 2147483647)), area = { colliders: cols };
     const at = (lx, lz) => xfP(makeXf(p.x, p.z, p.ang), lx, lz), y0 = Math.min(hAt(p.x - 3, p.z - 3), hAt(p.x + 3, p.z - 3), hAt(p.x - 3, p.z + 3), hAt(p.x + 3, p.z + 3), hAt(p.x, p.z));
     const box = (lx, lz, ang, y, x0, yb, z0, x1, yt, z1, k, tw = 2) => { const [wx, wz] = at(lx, lz); gb.setXf(wx, wz, p.ang + ang, y); gb.box(x0, yb, z0, x1, yt, z1, k, tw, tw); gb.xf = null; };

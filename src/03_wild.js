@@ -49,7 +49,8 @@ function wildCult(x, z) {
   const ring = (0.62 - 0.27 * smoothstep(700, 1700, r)) * (1 - smoothstep(1900, 3800, r)) * smoothstep(0, 220, sd);
   const belt = (1 - smoothstep(80, 440, Wild.trackD(x, z))) * 0.8 * (1 - smoothstep(7000, 17000, r));
   const vale = (1 - smoothstep(80, 520, riverD(x, z))) * 0.6 * (1 - smoothstep(6000, 15000, r)) * smoothstep(250, 600, sd); // the broad river valleys are farmed too
-  return Math.max(band, ring, belt, vale) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWeight(x, z)); // (no generated farmland in a site)
+  let ham = 0; for (const H of POI.hamlets || []) { const d = Math.abs(H.x - x) + Math.abs(H.z - z); if (d < 900) ham = Math.max(ham, 0.95 * (1 - smoothstep(120, 650, Math.hypot(H.x - x, H.z - z)))); } // a hamlet's own fields round it
+  return Math.max(band, ring, belt, vale, ham) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWeight(x, z)); // (no generated farmland in a site)
 }
 
 // a pool of billboards that turn to the camera on the graphics card, so thousands cost nothing per frame
@@ -258,7 +259,7 @@ const Wild = {
           if (q < 0 || bd > 170 || bd < 30) continue; // within a short lane of a track
           const [ax, az] = tp[q - 1], [bx, bz] = tp[q + 1], nx = (fx - tp[q][0]) / bd, nz = (fz - tp[q][1]) / bd;
           const hs = []; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) hs.push(terrainRaw(fx + a * 7, fz + b * 7));
-          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWeight(fx, fz) > 0 || POI.near(fx, fz, 40).length || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
+          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWeight(fx, fz) > 0 || POI.near(fx, fz, 40).some(p => p.kind !== 'hamlet') || POI.hamletNear(fx, fz, 160) || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
           farm = { x: fx, z: fz, ang: Math.atan2(-nx, -nz), sg: [ax, az, bx, bz] };
         }
       }
@@ -287,9 +288,9 @@ const Wild = {
       if (o.x < x0 - 45 || o.x >= x0 + WC + 45 || o.z < z0 - 45 || o.z >= z0 + WC + 45) return no('out'); // near this chunk (it is drawn by the chunk that laid it)
       // arable strips want gentle ground; hedged pasture climbs the hillsides
       const cs = obbCorners(o), hs = cs.map(([x, z]) => hAt(x, z)), sp = Math.max(...hs) - Math.min(...hs), sl = Math.hypot(hAt(o.x + 8, o.z) - hAt(o.x - 8, o.z), hAt(o.x, o.z + 8) - hAt(o.x, o.z - 8)) / 16;
-      if (Math.min(...hs) < SEA + 1.5 || sp > 14 || sl > 0.24) return no('slope');
+      if (Math.min(...hs) < SEA + 1.5 || sp > 10 || sl > 0.2) return no('slope');
       if (cs.some(([x, z]) => siteWeight(x, z) > 0.05)) return no('site');
-      if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).length) return no('poi');
+      if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).some(p => p.kind !== 'hamlet') || POI.housesIn(o.x - 40, o.z - 40, o.x + 40, o.z + 40).some(h => obbOverlap(o, h.o, 8))) return no('poi');
       if (sp > 8 || sl > 0.13) { o.key = 'fMeadow'; o.nofill = sl > 0.19 || sp > 14; } // pasture climbs the gentler slopes: there the turf itself shows within the hedges
       for (const [x, z] of [...cs, [o.x, o.z]]) if (E.forestMask(x, z, hAt(x, z)) > 0.5) return no('wood');
       for (const p of tp) if (circleObb(p[0], p[1], 12, o)) return no('track');                                   // clear of the tracks' cuttings
@@ -452,7 +453,7 @@ const Wild = {
       if (R.box[0] > x0 + WC + 20 || R.box[2] < x0 - 20 || R.box[1] > z0 + WC + 20 || R.box[3] < z0 - 20) continue;
       let run = null;
       for (let q = 0; q < R.P.length; q++) {
-        const [px, pz] = R.P[q], ins = px > x0 - 24 && px < x0 + WC + 24 && pz > z0 - 24 && pz < z0 + WC + 24 && (R.hand || R.w[q] >= 2.4); // the trickles at the springs are left to the valley they run in
+        const [px, pz] = R.P[q], ins = px > x0 - 24 && px < x0 + WC + 24 && pz > z0 - 24 && pz < z0 + WC + 24 && (R.hand || Math.max(R.w[Math.max(0, q - 6)], R.w[q], R.w[Math.min(R.w.length - 1, q + 6)]) >= 2.4); // the trickles at the springs are left to the valley they run in
         if (ins) { if (!run) rivRuns.push(run = { R, q0: Math.max(0, q - 1), q1: q }); run.q1 = Math.min(R.P.length - 1, q + 1); } else run = null;
       }
     }
@@ -496,7 +497,7 @@ const Wild = {
         colR[k] = sh[0] * cav * rt * lerp(0.94, 1.85, snow); colR[k + 1] = sh[1] * cav * rt * lerp(0.97, 1.87, snow); colR[k + 2] = sh[2] * cav * rt * lerp(1.03, 1.95, snow); // grey stone out here
         const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 ? 0 : q[1];
         qE[v] = (1 - smoothstep(3.5, 10, best[kb])) * smoothstep(0.22, 0.5, Math.hypot(gx, gz)); // the raw earth of a track's cutting
-        qF[v] = coastZ(x) - z < 220 ? smoothstep(SEA + 1.9 + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
+        qF[v] = coastZ(x) - z < 220 ? smoothstep(SEA + 1.9 + 3.5 * Math.min(1, Math.hypot(gx, gz) * 1.5) + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
         { const kr = (b + B) * S + a + B, mw = 0.3 + 4 * smoothstep(-0.35, 0.45, fbm(x / 24, z / 24, 2, 372)); qW[v] = rD[kr] < 90 ? 1 - smoothstep(rW[kr] + 0.2, rW[kr] + mw, rD[kr]) : 0; } // wet mud along the banks, of uneven width
       }
       if (b % 8 === 7) yield;
@@ -541,11 +542,11 @@ const Wild = {
     }
     let lo = Infinity, hi = -Infinity; for (let k = 0; k < H.length; k++) { if (H[k] < lo) lo = H[k]; if (H[k] > hi) hi = H[k]; }
     const skirt = Math.max(12, (hi - lo) * 0.35); // deep enough on steep ground that the coarser far ground beside it never leaves a gap
-    { const g = grp('farGround'); // a skirt round the edge hides any crack against coarser ground beside it
-      const edge = (a0, b0, a1, b1) => { const k0 = b0 * N1 + a0, k1 = b1 * N1 + a1, xa = x0 + a0 * WCELL, za = z0 + b0 * WCELL, xb = x0 + a1 * WCELL, zb = z0 + b1 * WCELL, base = g.p.length / 3;
-        g.p.push(xa, H[k0], za, xb, H[k1], zb, xb, H[k1] - skirt, zb, xa, H[k0] - skirt, za); g.u.push(xa / 5, 0, xb / 5, 0, xb / 5, 2.4, xa / 5, 2.4); for (const k of [k0, k1, k1, k0]) g.c.push(col[k * 3] * 0.8, col[k * 3 + 1] * 0.8, col[k * 3 + 2] * 0.8);
+    { const g = grp('tGrass'); // an apron round the edge hides any crack against coarser ground beside it: sloping out and down, it reads as ground, never as a wall
+      const edge = (a0, b0, a1, b1, ox, oz) => { const k0 = b0 * N1 + a0, k1 = b1 * N1 + a1, xa = x0 + a0 * WCELL, za = z0 + b0 * WCELL, xb = x0 + a1 * WCELL, zb = z0 + b1 * WCELL, base = g.p.length / 3, o = skirt * 1.3;
+        g.p.push(xa, H[k0], za, xb, H[k1], zb, xb + ox * o, H[k1] - skirt, zb + oz * o, xa + ox * o, H[k0] - skirt, za + oz * o); g.u.push(xa / 5, za / 5, xb / 5, zb / 5, (xb + ox * o) / 5, (zb + oz * o) / 5, (xa + ox * o) / 5, (za + oz * o) / 5); for (const k of [k0, k1, k1, k0]) g.c.push(col[k * 3], col[k * 3 + 1], col[k * 3 + 2]);
         g.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2); };
-      for (let q = 0; q < WN; q++) { edge(q, 0, q + 1, 0); edge(q, WN, q + 1, WN); edge(0, q, 0, q + 1); edge(WN, q, WN, q + 1); }
+      for (let q = 0; q < WN; q++) { edge(q, 0, q + 1, 0, 0, -1); edge(q, WN, q + 1, WN, 0, 1); edge(0, q, 0, q + 1, -1, 0); edge(WN, q, WN, q + 1, 1, 0); }
     }
     yield;
     const group = c.group = new THREE.Group();
@@ -584,6 +585,14 @@ const Wild = {
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
     for (const p of POI.list) if (p.x >= x0 && p.x < x0 + WC && p.z >= z0 && p.z < z0 + WC) POI.build(p, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
+    for (const h of POI.housesIn(x0 - 12, z0 - 12, x0 + WC + 12, z0 + WC + 12)) { blocks.push(mkObb(h.x, h.z, h.ang, 7, 6.5));
+      if (h.x < x0 || h.x >= x0 + WC || h.z < z0 || h.z >= z0 + WC) continue;
+      const hr = new RNG(h.seed), cs = obbCorners(mkObb(h.x, h.z, h.ang, 4.6, 3.6)), y = Math.min(...cs.map(([a, b]) => this.heightAt(a, b))), top = Math.max(...cs.map(([a, b]) => this.heightAt(a, b))), saved = this.area.colliders; this.area.colliders = [];
+      gb.setXf(h.x, h.z, h.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -4.5, z0: -3.5, x1: 4.5, z1: 3.5 }, stories: hr.chance(0.25) ? 2 : 1, style: hr.pick(['timber2', 'timber2', 'stone', 'plaster', 'plaster']), roof: 'gable', roofKey: hr.chance(0.7) ? 'roofThatch' : 'roofSlate', roofTint: [1, 0.95, 0.86], doorT: 0.5, found: top - y + 0.8, chimney: 0.9, wealth: 0.8 }); gb.xf = null;
+      c.cols.push(...this.area.colliders); this.area.colliders = saved;
+      const [gx, gz] = xfP(makeXf(h.x, h.z, h.ang), 0, -9); if (hr.chance(0.7)) drapePatch(gb, hr.chance(0.5) ? 'fGreens' : 'fPlowed', makeXf(gx, gz, h.ang), -4, -3, 4, 3, { cell: 3, lift: 0.05, uvFrame: true }); // a garden behind
+      for (let k = 0; k < 2; k++) { const [tx, tz] = xfP(makeXf(h.x, h.z, h.ang), hr.range(-9, 9) + (k ? 7 : -7), hr.range(-14, -8)); const th = this.heightAt(tx, tz); fl[hr.pick(['oak0', 'oak1', 'oak2'])].push([tx, th - 0.15, tz, hr.range(0.8, 1.1)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); } }
+    for (const H of POI.hamlets || []) { const [wx, wz] = H.well; if (wx < x0 || wx >= x0 + WC || wz < z0 || wz >= z0 + WC) continue; POI.build({ kind: 'well', x: wx, z: wz, ang: 0, r: 4 }, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z)); drapeDisc(gb, 'gGrass', H.x, H.z, 6, { segs: 12, rings: 2, lift: 0.04 }); }
     // the farmed strips laid from here (they may reach a little into the chunks beside), each hedged all round, sheep in the pasture.
     // Working out the neighbours' layouts is spread over frames
     for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) if (!this.candCache.has(this.key(i + di, j + dj))) { this.fieldCand(i + di, j + dj); yield; }
@@ -601,16 +610,17 @@ const Wild = {
       for (const [sx, len, along] of sides) {
         const pieces = Math.max(1, Math.ceil(2 * len / 3.5)), gate = hr.chance(0.4) ? hr.int(0, pieces - 1) : -1;
         // one kind of hedge throughout, as round the city: clipped near it, then (some 200 m on) taller, more uneven and grown over with bushes; one height to a hedge
-        const hh = hr.range(1.15, 1.5) + smoothstep(0.25, 1, g) * hr.range(0, 0.45), hw = 0.6 + g * hr.range(0, 0.15);
+        const hh0 = hr.range(1.0, 1.35) + smoothstep(0.25, 1, g) * hr.range(0, 0.4), hw = 0.6 + g * hr.range(0, 0.15);
         for (let k = 0; k < pieces; k++) {
           if (k === gate) continue; // a field gate
+          const hh = hh0 * (0.85 + 0.3 * hr.next()); // uneven along its length
           const t0 = -len + 2 * len * k / pieces, t1 = -len + 2 * len * (k + 1) / pieces;
           const [ax, az] = along ? xfP(o, sx * (o.hx + 1.2), t0) : xfP(o, t0, sx * (o.hz + 1.2)), [bx, bz] = along ? xfP(o, sx * (o.hx + 1.2), t1) : xfP(o, t1, sx * (o.hz + 1.2));
           const mx = (ax + bx) / 2, mz = (az + bz) / 2; if (nearTrack(mx, mz, 3)) continue;
           // a short length set on the ground at its lowest, its top clear of the ground at its highest, so it follows the slope without sinking in
           const ya = this.heightAt(ax, az), yb = this.heightAt(bx, bz), ym = this.heightAt(mx, mz), y = Math.min(ya, yb, ym) - 0.15, top = Math.max(ya, yb, ym) - y + hh * 0.9, L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az);
           gb.setXf(mx, mz, ha, y); gb.box(-hw, -0.5, -L / 2 - 0.2, hw, Math.max(top, hh), L / 2 + 0.2, { side: 'hedge', top: 'hedge' }, 2, 2, { skip: 'ns' }); gb.xf = null;
-          if (g > 0.3 && hr.chance(g * 0.7)) { const n2 = 1 + Math.floor(g * 2 * hr.next()); for (let b = 0; b < n2; b++) { const f = hr.next(), x = lerp(ax, bx, f), z = lerp(az, bz, f); fl[hr.chance(0.5) ? 'bush' : 'bushB'].push([x, y + Math.max(top, hh) - 0.55, z, hr.range(0.55, 0.85)]); } } // a few bushes break the top
+          if (hr.chance(0.3 + g * 0.6)) { const n2 = 1 + Math.floor((0.5 + g * 2) * hr.next()); for (let b = 0; b < n2; b++) { const f = hr.next(), x = lerp(ax, bx, f), z = lerp(az, bz, f); fl[hr.chance(0.5) ? 'bush' : 'bushB'].push([x, y + Math.max(top, hh) - 0.55, z, hr.range(0.55, 0.85)]); } } // a few bushes break the top
           const e = L / 2 + 0.8; c.cols.push({ x0: mx - e, z0: mz - e, x1: mx + e, z1: mz + e, y0: y - 1, y1: y + Math.max(top, hh), o: { x: mx, z: mz, c: Math.cos(ha), s: Math.sin(ha), hx: 0.6, hz: L / 2 + 0.2 } });
           if (hr.chance(0.11)) { const th = this.heightAt(mx, mz); (hr.chance(0.25 - 0.15 * g) ? fl.cypress : hr.chance(0.5) ? fl.oak0 : fl.oak1).push([mx, th - 0.15, mz, hr.range(0.8, 1.15)]); c.cols.push({ x0: mx - 0.35, z0: mz - 0.35, x1: mx + 0.35, z1: mz + 0.35, y0: th - 1, y1: th + 8 }); } // a hedgerow tree
         }
@@ -621,7 +631,7 @@ const Wild = {
     for (const run of runs) for (let q = 1; q < run.length; q += 2) { // the way through farmland runs between hedges, or dry-stone walls on the uplands
       const [ax, az] = run[q - 1], [bx, bz] = run[Math.min(run.length - 1, q + 1)], mx = (ax + bx) / 2, mz = (az + bz) / 2;
       if (mx < x0 || mx >= x0 + WC || mz < z0 || mz >= z0 + WC) continue;
-      const cu = wildCult(mx, mz); if (cu < 0.35 || blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || !near.some(f => circleObb(mx, mz, 16, f))) continue; // only where fields border the way
+      const cu = wildCult(mx, mz); if (cu < 0.35 || blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || !near.some(f => circleObb(mx, mz, 16, f)) || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // only where fields border the way (and not across a cottage's front)
       const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, wall = this.heightAt(mx, mz) > 70;
       for (const sd of [-1, 1]) {
         if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < 0.25 - cu * 0.5) continue; // with gaps and field gates
@@ -654,6 +664,7 @@ const Wild = {
         let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
         if (pick && !pick.small) { const ex = 1 - smoothstep(90, 520, coastZ(x) - z); if (ex > 0 && rng.next() < ex) pick = rng.next() < 0.45 * (1 - ex) ? { kind: rng.chance(0.5) ? 'bush' : 'bushB', s: 0.6 + 0.5 * rng.next() } : null; } // the salt wind: trees thin to scrub towards the sea
         if (pick && st && st.w > 0.5 && Sites.clearAt(x, z, pick.small ? 1 : 4)) continue; // round a site's buildings and roads
+        if (pick && !pick.small && st && st.S.bare && Math.hypot(x - st.S.x, z - st.S.z) < st.S.bare * (0.85 + 0.3 * _h2(Math.floor(x / 40), Math.floor(z / 40), 4403)) && rng.next() < st.w * 1.6) continue; // a site's bare ground: open grass and heath, no copses
         if (!pick) continue;
         if (nearTrack(x, z, pick.small ? 2.2 : 3.6) || inField(x, z, pick.small ? 0.5 : 2.5)) continue;
         if (pick.kind === 'flowers') { const fk = 'flowers' + rng.int(0, 3); for (let q = 0; q < 8; q++) { const fx = x + rng.range(-3.5, 3.5), fz = z + rng.range(-3.5, 3.5); if (!inField(fx, fz, 0.3)) fl[fk].push([fx, this.heightAt(fx, fz) - 0.03, fz, rng.range(0.7, 1.1)]); } continue; }
@@ -667,7 +678,7 @@ const Wild = {
       const x = x0 + rng.next() * WC, z = z0 + rng.next() * WC, h = this.heightAt(x, z); if (h < SEA + 1) continue;
       if (siteHere && siteWeight(x, z) > 0.3) continue; // a site has its own stones
       const qr = qAt(qR, x, z), qs = qAt(qS, x, z), sl = terrainSlope(x, z);
-      const p = qr > 0.15 && qr < 0.9 ? 0.5 : qs > 0.3 ? 0.35 : sl > 0.35 ? 0.12 : 0.03;
+      const TLb = wildTreeLine(x, z), p = qr > 0.15 && qr < 0.9 ? 0.5 : qs > 0.3 ? 0.35 : sl > 0.35 ? 0.12 : h > TLb - 70 ? 0.16 : 0.03; // (the open tops are strewn with stones)
       if (!rng.chance(p) || nearTrack(x, z, 3) || inField(x, z, 3)) continue;
       const s = rng.range(0.5, qr > 0.15 ? 2.4 : 1.4) * (rng.chance(0.12) ? 1.7 : 1);
       boulder(gb, 'boulder', x, h, z, s, rng); c.cols.push({ x0: x - s * 1.1, z0: z - s * 1.1, x1: x + s * 1.1, z1: z + s * 1.1, y0: h - s, y1: h + s * 0.6 });
@@ -721,17 +732,18 @@ const Wild = {
       g.i.push(base, base + 3, base + 1, base, base + 2, base + 3);
     }
     if (inner) { // a skirt round the fine ring, so the coarse ring beyond can never show a crack
-      const edge = (a0, b0, a1, b1) => { const k0 = (b0 * (n + 1) + a0) * 3, k1 = (b1 * (n + 1) + a1) * 3, xa = ox + a0 * C, za = oz + b0 * C, xb = ox + a1 * C, zb = oz + b1 * C, ha = hb(a0, b0), hb2 = hb(a1, b1), base = g.p.length / 3;
-        g.p.push(xa, ha, za, xb, hb2, zb, xb, hb2 - 30, zb, xa, ha - 30, za); g.u.push(xa / 6, 0, xb / 6, 0, xb / 6, 5, xa / 6, 5); for (const k of [k0, k1, k1, k0]) g.c.push(col[k] * 0.85, col[k + 1] * 0.85, col[k + 2] * 0.85);
+      const edge = (a0, b0, a1, b1, dx, dz) => { const k0 = (b0 * (n + 1) + a0) * 3, k1 = (b1 * (n + 1) + a1) * 3, xa = ox + a0 * C, za = oz + b0 * C, xb = ox + a1 * C, zb = oz + b1 * C, ha = hb(a0, b0), hb2 = hb(a1, b1), base = g.p.length / 3, o = 45;
+        g.p.push(xa, ha, za, xb, hb2, zb, xb + dx * o, hb2 - 30, zb + dz * o, xa + dx * o, ha - 30, za + dz * o); g.u.push(xa / 6, za / 6, xb / 6, zb / 6, (xb + dx * o) / 6, (zb + dz * o) / 6, (xa + dx * o) / 6, (za + dz * o) / 6); for (const k of [k0, k1, k1, k0]) g.c.push(col[k], col[k + 1], col[k + 2]);
         g.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2); };
-      for (let q = 0; q < n; q++) for (const [a0, b0, a1, b1] of [[q, 0, q + 1, 0], [q, n, q + 1, n], [0, q, 0, q + 1], [n, q, n, q + 1]]) if (Math.max(hb(a0, b0), hb(a1, b1)) > SEA - 1) edge(a0, b0, a1, b1); // (not under the sea, where it would show through the water far off)
+      for (let q = 0; q < n; q++) for (const [a0, b0, a1, b1, dx, dz] of [[q, 0, q + 1, 0, 0, -1], [q, n, q + 1, n, 0, 1], [0, q, 0, q + 1, -1, 0], [n, q, n, q + 1, 1, 0]]) if (Math.max(hb(a0, b0), hb(a1, b1)) > SEA - 1) edge(a0, b0, a1, b1, dx, dz); // an apron sloping out and down (not under the sea, where it would show through the water far off)
     }
     yield;
     // rivers and tracks painted over the far ground, a little wider than they are so they still read at a distance
     const r = { p: [], u: [], c: [], i: [] }, inBox = (x, z) => x > ox && x < x1 && z > oz && z < z1;
-    const strip = (pts, wf, cl, lift) => { for (let q = 1; q < pts.length; q++) { const [ax, az] = pts[q - 1], [bx, bz] = pts[q]; if (!inBox(ax, az) || !inBox(bx, bz)) continue; const l = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / l, nz = (bx - ax) / l, wa = wf(q - 1) / 2, wb = wf(q) / 2, base = r.p.length / 3;
-      for (const [x, z] of [[ax + nx * wa, az + nz * wa], [bx + nx * wb, bz + nz * wb], [bx - nx * wb, bz - nz * wb], [ax - nx * wa, az - nz * wa]]) { r.p.push(x, hAt(x, z) + lift, z); r.u.push(x / 6, z / 6); r.c.push(...cl); }
-      r.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2); } };
+    const strip = (pts, wf, cl, lift) => { for (let q = 1; q < pts.length; q++) { const [ax0, az0] = pts[q - 1], [bx0, bz0] = pts[q]; if (!inBox(ax0, az0) || !inBox(bx0, bz0)) continue; const L = Math.hypot(bx0 - ax0, bz0 - az0) || 1, nx = -(bz0 - az0) / L, nz = (bx0 - ax0) / L, ns = Math.max(1, Math.ceil(L / (C * 0.5)));
+      for (let s = 0; s < ns; s++) { const f0 = s / ns, f1 = (s + 1) / ns, ax = lerp(ax0, bx0, f0), az = lerp(az0, bz0, f0), bx = lerp(ax0, bx0, f1), bz = lerp(az0, bz0, f1), wa = lerp(wf(q - 1), wf(q), f0) / 2, wb = lerp(wf(q - 1), wf(q), f1) / 2, base = r.p.length / 3; // in pieces no longer than half a cell, so the coarse ground cannot rise through the middle of one
+        for (const [x, z] of [[ax + nx * wa, az + nz * wa], [bx + nx * wb, bz + nz * wb], [bx - nx * wb, bz - nz * wb], [ax - nx * wa, az - nz * wa]]) { r.p.push(x, hAt(x, z) + lift, z); r.u.push(x / 6, z / 6); r.c.push(...cl); }
+        r.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2); } } };
     const wc = M.water.map((v, q) => v * [0.72, 0.84, 0.86][q] / M.noise[q]), dc = M.dirt.map((v, q) => v * 0.95 / M.noise[q]), step = inner ? 4 : 10;
     for (const R of this.rivers) { if (R.box[0] > x1 || R.box[2] < ox || R.box[1] > z1 || R.box[3] < oz) continue; const wmin = inner ? 4 : 7; if (Math.max(...R.w) < wmin) continue;
       const keep = R.P.map((_, q) => (q % step === 0 || q === R.P.length - 1)), pts = R.P.filter((_, q) => keep[q]), ws = R.w.filter((_, q) => keep[q]);
