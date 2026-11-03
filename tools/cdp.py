@@ -1,13 +1,20 @@
 """Minimal Chrome DevTools driver for headless screenshots and checks (dev tooling, not part of the game)."""
-import asyncio, json, subprocess, time, base64, urllib.request
+import asyncio, json, os, shutil, subprocess, tempfile, time, base64, urllib.request
 import websockets
+
+# $CHROME overrides; otherwise the first browser on PATH (cloud images usually only have chromium)
+CHROME = os.environ.get('CHROME') or next((p for p in map(shutil.which, ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser']) if p), None)
+PROFILE = os.path.join(tempfile.gettempdir(), f'claude-{os.getuid()}', 'cdpprof')
 
 class CDP:
     def __init__(self, port=9333): self.port = port; self.id = 0; self.logs = []
     async def start(self, url, w=1280, h=720):
-        self.proc = subprocess.Popen(['google-chrome', '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
+        if not CHROME: raise SystemExit('no Chrome/Chromium found: install one or set $CHROME')
+        os.makedirs(PROFILE, exist_ok=True)
+        self.proc = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
                                       '--enable-unsafe-swiftshader', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',
-                                      '--user-data-dir=/tmp/claude-1000/cdpprof', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                      *(['--no-sandbox'] if os.getuid() == 0 else []),  # containers run as root; Chrome refuses its sandbox there
+                                      f'--user-data-dir={PROFILE}', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(50):
             try: tabs = json.load(urllib.request.urlopen(f'http://127.0.0.1:{self.port}/json')); break
             except Exception: time.sleep(0.2)
