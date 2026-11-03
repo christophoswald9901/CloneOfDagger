@@ -18,7 +18,7 @@ const TOWN_CFGS = [{
   H0: 96,                      // the level of the plain it stands on
   rc: 1000, rb: 2000,          // the fixed ground: wholly within rc, blending out to rb
   wall: { h: 9, t: 3, towerEvery: 58, tower: 8.5, towerH: 15, gateW: 6 },
-  moat: { off: 7, w: 15 },     // its inner edge off the wall's foot, its width
+  moat: { off: 7, w: 20 },     // its inner edge off the wall's foot, its width
   canal: { v: -88, w: 14, quay: 6 },
   mainU: 0, mainV: 34,         // the two main streets, gate to gate
   ring: { off: 13, w: 7 },     // the street inside the wall
@@ -46,6 +46,8 @@ const TK = {
 
 class Town {
   constructor(cfg) {
+    if (cfg.vary) { const r = new RNG(cfg.seed + 31), k = r.range(0.88, 1.12); cfg = { ...cfg, A: Math.round(cfg.A * k), B: Math.round(cfg.B / k), mainU: Math.round(r.range(-0.25, 0.25) * cfg.A), mainV: Math.round(r.range(-0.15, 0.3) * cfg.B), canal: { ...cfg.canal, v: Math.round(r.pick([-1, 1]) * r.range(0.15, 0.45) * cfg.B) }, flip: [r.chance(0.5), r.chance(0.5)], gates: r.chance(0.3) ? 3 : 4 };
+      if (Math.abs(cfg.canal.v - cfg.mainV) < 60) cfg.canal.v = cfg.mainV + (cfg.canal.v > cfg.mainV ? 60 : -60); }
     this.cfg = cfg; this.id = cfg.id; this.name = cfg.name; this.x = cfg.x; this.z = cfg.z; this.H0 = cfg.H0;
     this.xf = makeXf(cfg.x, cfg.z, cfg.ang); this.c = Math.cos(cfg.ang); this.s = Math.sin(cfg.ang);
     this.plan();
@@ -86,12 +88,15 @@ class Town {
     }
     // the great places take whole blocks
     const nearest = (u, v, f = () => true) => this.blocks.filter(f).sort((a, b) => Math.hypot(a.uc - u, a.vc - v) - Math.hypot(b.uc - u, b.vc - v))[0];
-    const sq = nearest(C.mainU + 40, C.mainV + 40, b => b.u0 > C.mainU && b.v0 > C.mainV - 1); if (sq) { sq.use = 'square'; this.square = sq; }
-    const hall = sq && nearest(sq.uc, sq.v0 - 40, b => b.v1 < C.mainV + 1 && b.v1 > C.canal.v && b !== sq && Math.abs(b.uc - sq.uc) < 60); if (hall) { hall.use = 'hall'; this.hall = hall; }
-    const cat = this.blocks.filter(b => b.use === 'lots' && b.v1 < C.canal.v && b.v1 - b.v0 > 46 && Math.hypot(b.uc + A * 0.45, b.vc - ((C.canal.v - B) / 2 - 20)) < 260).sort((a, b) => (b.u1 - b.u0) * (b.v1 - b.v0) - (a.u1 - a.u0) * (a.v1 - a.v0))[0]; if (cat) { cat.use = 'cathedral'; this.cathedral = cat; }
-    const cit = nearest(A - 60, -B + 60, b => b.u1 - b.u0 > 50 && b.v1 - b.v0 > 45 && b.use === 'lots' && Math.max(b.u1 - b.u0, b.v1 - b.v0) < 1.7 * Math.min(b.u1 - b.u0, b.v1 - b.v0)); if (cit) { cit.use = 'citadel'; this.citadel = cit; }
-    const mk = nearest(A * 0.6, C.mainV + 60, b => b.use === 'lots' && b.v0 > C.mainV && b.u1 - b.u0 > 45); if (mk) { mk.use = 'market'; this.market = mk; }
-    const ch = nearest(-A * 0.55, B * 0.55, b => b.use === 'lots'); if (ch) { ch.chapel = true; }
+    // which side of the main streets the great places take (a varied town flips them)
+    const fu = C.flip && C.flip[0] ? -1 : 1, fv = C.flip && C.flip[1] ? -1 : 1; this.fu = fu; this.fv = fv;
+    const sq = nearest(C.mainU + fu * 40, C.mainV + fv * 40, b => (fu > 0 ? b.u0 > C.mainU : b.u1 < C.mainU) && (fv > 0 ? b.v0 > C.mainV - 1 : b.v1 < C.mainV + 1) && Math.abs((b.v0 + b.v1) / 2 - C.canal.v) > 20); if (sq) { sq.use = 'square'; this.square = sq; }
+    const hall = sq && nearest(sq.uc, sq.vc - fv * 60, b => (fv > 0 ? b.v1 < C.mainV + 1 : b.v0 > C.mainV - 1) && b !== sq && Math.abs(b.uc - sq.uc) < 60 && b.v1 - b.v0 > 20 && b.use === 'lots'); if (hall) { hall.use = 'hall'; this.hall = hall; }
+    const side = C.canal.v < C.mainV ? -1 : 1; // the cathedral stands beyond the canal from the main street
+    const cat = this.blocks.filter(b => b.use === 'lots' && (side < 0 ? b.v1 < C.canal.v : b.v0 > C.canal.v) && b.v1 - b.v0 > 46 && Math.hypot(b.uc + fu * A * 0.45, b.vc - (C.canal.v + side * B) / 2) < 300).sort((a, b) => (b.u1 - b.u0) * (b.v1 - b.v0) - (a.u1 - a.u0) * (a.v1 - a.v0))[0]; if (cat) { cat.use = 'cathedral'; this.cathedral = cat; }
+    const cit = nearest(fu * (A - 60), -fv * (B - 60), b => b.u1 - b.u0 > 50 && b.v1 - b.v0 > 45 && b.use === 'lots' && Math.max(b.u1 - b.u0, b.v1 - b.v0) < 1.7 * Math.min(b.u1 - b.u0, b.v1 - b.v0)); if (cit) { cit.use = 'citadel'; this.citadel = cit; }
+    const mk = nearest(fu * A * 0.6, C.mainV + fv * 60, b => b.use === 'lots' && b.u1 - b.u0 > 45 && b.v1 - b.v0 > 40); if (mk) { mk.use = 'market'; this.market = mk; }
+    const ch = nearest(-fu * A * 0.55, fv * B * 0.55, b => b.use === 'lots'); if (ch) { ch.chapel = true; }
     // districts: by what is near
     const dOf = (u, v) => {
       if (this.square && Math.hypot(u - this.square.uc, v - this.square.vc) < 170) return 'grand';
@@ -107,7 +112,7 @@ class Town {
     for (const b of this.blocks) {
       if (b.use !== 'lots') continue;
       const kind = dOf(b.uc, b.vc), K = TK[kind], W = b.u1 - b.u0, Hh = b.v1 - b.v0;
-      const d = rng.range(...K.d), dd = Math.min(d, Hh / 2 - 1), dw = Math.min(d, W / 2 - 1); if (dd < 7) continue;
+      const d = rng.range(...K.d), yard = 7, dd = Math.max(7, Math.min(d, Hh / 2 - yard)), dw = Math.max(7, Math.min(d, W / 2 - yard)); if (Hh < 16) continue; // (a garden or yard is left behind every row)
       // along the u-running sides (whole length), then along the v-running sides between them
       const row = (ax, bx, fixedV, faceA, depth, alongU) => { let t = ax; while (t < bx - 3.5) { let w = rng.range(...K.w); if (bx - t - w < 4) w = bx - t; if (w < 3.5) break;
         const c = t + w / 2, lu = alongU ? c : fixedV, lv = alongU ? fixedV : c; this.lots.push({ u: lu, v: lv, a: faceA, w, d: depth, kind, seed: rng.int(1, 1e9), corner: t === ax || t + w >= bx - 0.01 }); t += w; } };
@@ -137,10 +142,16 @@ class Town {
       { id: 'south', name: 'the Bay Gate', u: C.mainU, v: B, nu: 0, nv: 1 }, { id: 'north', name: 'the Moor Gate', u: C.mainU, v: -B, nu: 0, nv: -1 },
       { id: 'east', name: 'the Sunrise Gate', u: A, v: C.mainV, nu: 1, nv: 0 }, { id: 'west', name: 'the Mill Gate', u: -A, v: C.mainV, nu: -1, nv: 0 },
     ];
+    if (C.gates === 3) this.gates = this.gates.filter(g => g.id !== 'north');
     for (const g of this.gates) { const inner = node(g.u - g.nu * R, g.v - g.nv * R), outer = node(g.u + g.nu * (C.moat.off + C.moat.w + 10), g.v + g.nv * (C.moat.off + C.moat.w + 10)); link(inner, outer, 6); g.node = outer; [g.x, g.z] = this.w(g.u, g.v); [g.ox, g.oz] = this.w(g.u + g.nu * (C.moat.off + C.moat.w + 10), g.v + g.nv * (C.moat.off + C.moat.w + 10)); }
+    // the suburbs: cottages along each road out of a gate, beyond the moat
+    for (const g of this.gates) { const pu = -g.nv, pv = g.nu, start = C.moat.off + C.moat.w + 26;
+      for (const s of [-1, 1]) { let t = start + rng.range(0, 6), first = true;
+        while (t < start + 170) { const w = rng.range(7, 10), d = rng.range(9, 11), mid = t + w / 2, off = 4 + rng.range(1.5, 4) + d / 2, u = g.u + g.nu * mid + pu * s * off, v = g.v + g.nv * mid + pv * s * off;
+          this.lots.push({ u, v, a: Math.atan2(-s * pu, -s * pv), w, d, kind: 'commons', seed: rng.int(1, 1e9), corner: true, type: first && s > 0 ? 'tavern' : 'house', suburb: true }); first = false; t += w + rng.range(2, 7); } } }
     // landmarks, for the map and for finding
     const lm = (id, name, b, du = 0, dv = 0) => b && { id, name, u: b.uc + du, v: b.vc + dv };
-    this.landmarks = [lm('square', 'the Grand Square', this.square), lm('belfry', 'the Belfry', this.hall, 0, (this.hall ? (this.hall.v1 - this.hall.v0) / 2 - 12 : 0)), lm('cathedral', 'the Cathedral of Saint Aurel', this.cathedral), lm('citadel', 'the Citadel', this.citadel), lm('market', 'the Market Hall', this.market)].filter(Boolean)
+    this.landmarks = [lm('square', 'the Grand Square', this.square), lm('belfry', 'the Belfry', this.hall, 0, (this.hall ? fv * ((this.hall.v1 - this.hall.v0) / 2 - 12) : 0)), lm('cathedral', 'the Cathedral of Saint Aurel', this.cathedral), lm('citadel', 'the Citadel', this.citadel), lm('market', 'the Market Hall', this.market)].filter(Boolean)
       .map(l => { [l.x, l.z] = this.w(l.u, l.v); return l; });
     for (const g of this.gates) this.landmarks.push({ id: g.id, name: g.name, u: g.u, v: g.v, x: g.x, z: g.z, gate: true });
     // windmills on the plain outside, by the west and north roads
@@ -168,7 +179,7 @@ class Town {
   wl() { return this.H0 - 0.55; }
 }
 const TOWN_SEED = (() => { try { return parseInt(new URLSearchParams(location.search).get('townseed'), 10) || 0; } catch (e) { return 0; } })(); // (testing only)
-const TOWNS = TOWN_CFGS.map(c => new Town(TOWN_SEED ? { ...c, seed: c.seed + TOWN_SEED * 7919 } : c));
+const TOWNS = TOWN_CFGS.map(c => new Town(TOWN_SEED ? { ...c, seed: c.seed + TOWN_SEED * 7919, vary: true } : c));
 const TownOf = id => TOWNS.find(t => t.id === id);
 // where any town's walls, moat and the ground kept clear round them claim a point (0 outside .. 1 within)
 function townCore(x, z) { let k = 0; for (const T of TOWNS) { if (Math.abs(x - T.x) > T.cfg.A + T.cfg.B + 400 || Math.abs(z - T.z) > T.cfg.A + T.cfg.B + 400) continue; k = Math.max(k, 1 - smoothstep(T.cfg.moat.off + T.cfg.moat.w + 30, T.cfg.moat.off + T.cfg.moat.w + 160, T.rectOut(x, z))); } return k; }
@@ -193,7 +204,8 @@ Town.prototype.wallPieces = function () {
     for (let k = 0; k < n; k++) { const t0 = k / n, t1 = (k + 1) / n; out.push({ u0: lerp(ax, bx, t0), v0: lerp(av, bv, t0), u1: lerp(ax, bx, t1), v1: lerp(av, bv, t1) }); if (k) towers.push({ u: lerp(ax, bx, t0), v: lerp(av, bv, t0) }); } };
   side(-A, -B, A, -B); side(A, -B, A, B); side(A, B, -A, B); side(-A, B, -A, -B);
   for (const [u, v] of [[-A, -B], [A, -B], [A, B], [-A, B]]) towers.push({ u, v, corner: true });
-  this._wp = { pieces: out, towers }; return this._wp;
+  const free = towers.filter(t => !this.gates.some(g => Math.hypot(g.u - t.u, g.v - t.v) < 16)); // (the gatehouse is the tower there)
+  this._wp = { pieces: out, towers: free }; return this._wp;
 };
 // a gable-fronted town house in the current frame (gb.xf): front (+z) to the street, often with a stepped gable in brick
 function townHouse(area, gb, rng, l, K, T) {
@@ -202,11 +214,12 @@ function townHouse(area, gb, rng, l, K, T) {
   const style = wh ? rng.pick(['brick', 'brick', 'timber2']) : rng.pick(K.styles), timber = style.startsWith('timber');
   const roofKey = stories === 1 ? rng.pick(K.roofs) : rng.pick(K.roofs.filter(r => r !== 'roofThatch').concat(['roofSlate']));
   const tint = roofKey === 'roofBrown' ? [0.82, 0.62, 0.52] : roofKey === 'roofSlate' ? [0.78, 0.84, 0.94] : roofKey === 'roofRed' ? [0.86, 0.66, 0.6] : [1, 0.95, 0.85];
-  const fp = { x0: -l.w / 2, z0: -l.d / 2, x1: l.w / 2, z1: l.d / 2 }, h = stories * 3.1 + 0.3 + (wh ? 0.8 : 0);
+  const fp = { x0: -l.w / 2, z0: -l.d / 2, x1: l.w / 2, z1: l.d / 2 }, h = stories * 3.1 + 0.3 + (wh ? 0.8 : 0) + rng.range(-0.3, 0.9);
   const pitch = rng.range(1.15, 1.6); // steep northern roofs
   const door = makeBuilding(area, gb, rng, { fp, h, stories, style, roof: 'gable', roofKey, roofTint: tint, alongX: false, pitch, doorT: T.doorOf(l).dT, found: 0.5, wealth: TK[l.kind] === TK.grand ? 3 : 1.5, sign: shop ? l.type : null,
-    jetty: timber && stories >= 2 && rng.chance(K.jetty), chimney: 0.7, noWin: l.corner ? null : (f) => f === 'e' || f === 'w', doorKey: wh ? 'doorDark' : undefined, doorW: wh ? 2.4 : undefined, doorH: wh ? 3 : undefined });
+    jetty: timber && stories >= 2 && rng.chance(K.jetty), chimney: 0.7, winRate: wh ? 0.5 : rng.range(0.7, 1), plinth: style === 'brick' && rng.chance(0.25), noWin: l.corner ? null : (f) => f === 'e' || f === 'w', doorKey: wh ? 'doorDark' : undefined, doorW: wh ? 2.4 : undefined, doorH: wh ? 3 : undefined });
   const rh = l.w / 2 * pitch;
+  if (shop) { const aw = rng.pick(['stallA', 'stallB', 'stallC']); gb.quad4(aw, [-l.w / 2 + 0.4, 3.0, l.d / 2 + 0.05], [l.w / 2 - 0.4, 3.0, l.d / 2 + 0.05], [l.w / 2 - 0.4, 2.4, l.d / 2 + 1.5], [-l.w / 2 + 0.4, 2.4, l.d / 2 + 1.5], [0, 0], [2, 0], [2, 1], [0, 1], [0, 1, 1]); } // a striped awning over the shop front
   // a stepped gable: the front wall climbs above the roof in steps
   if (!timber && rng.chance(K.step)) { const n = l.w < 8 ? 4 : 5, sw = l.w / 2 / (n + 0.4);
     for (let k = 0; k < n; k++) { const hw = l.w / 2 - k * sw + 0.12, y = h + k * rh / n; gb.box(-hw, y - 0.05, l.d / 2 - 0.42, hw, y + rh / n + 0.25, l.d / 2 + 0.58, { side: style, top: 'stone' }, 3.2, 3.2); }
@@ -240,7 +253,7 @@ const TOWN_BUILD = {
   },
   // the cloth hall facing the square, the belfry rising from the middle of its front
   hall(T, gb, b, area) {
-    const y = T.H0, Lh = Math.min(70, b.u1 - b.u0 - 6), D = 16, [cx, cz] = T.w(b.uc, b.v1 - D / 2 - 1), xf = gb.setXf(cx, cz, T.cfg.ang, y), rng = new RNG(7800);
+    const y = T.H0, Lh = Math.min(70, b.u1 - b.u0 - 6), D = 16, [cx, cz] = T.w(b.uc, T.fv > 0 ? b.v1 - D / 2 - 1 : b.v0 + D / 2 + 1), xf = gb.setXf(cx, cz, T.cfg.ang + (T.fv > 0 ? 0 : Math.PI), y), rng = new RNG(7800);
     makeBuilding(area, gb, rng, { fp: { x0: -Lh / 2, z0: -D / 2, x1: Lh / 2, z1: D / 2 }, h: 12, stories: 3, style: 'brick', roof: 'gable', roofKey: 'roofSlate', roofTint: [0.8, 0.86, 0.95], alongX: true, pitch: 1.0, doorT: 0.3, found: 0.6, chimney: 0, wealth: 3 });
     for (let k = -Lh / 2 + 3; k < Lh / 2 - 2; k += 6) gb.box(k - 0.6, 0, D / 2 - 0.1, k + 0.6, 4.6, D / 2 + 0.9, 'stone', 1, 1); // an arcade of piers along the front
     gb.box(-7, 0, -1, 7, 40, 13, { side: 'brick', top: 'stone' }, 3.2, 3.2); // the belfry: a brick tower over the front
@@ -306,6 +319,23 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
       if (b.use === 'cathedral' && (u > b.u0 + 10 && u < b.u1 - 22 && v > b.v0 + 6 && v < b.v1 - 6)) { drapePatch(gb, 'gGrass', this.xf, u, v, Math.min(u + t, b.u1), Math.min(v + t, b.v1), { cell: 4, lift: 0.04 }); continue; } // the close's lawn
       drapePatch(gb, b.use === 'square' ? 'sqFlag' : 'sqCobble', this.xf, u, v, Math.min(u + t, b.u1), Math.min(v + t, b.v1), { cell: 4, lift: 0.055 }); }
   }
+  // the market on the Grand Square: stalls with awnings, a well, carts and barrels
+  if (this.square) { const b = this.square, r2 = new RNG(8100), W2 = b.u1 - b.u0, H2 = b.v1 - b.v0;
+    const at = (u, v) => this.w(u, v);
+    { const [wx, wz] = at(b.uc + W2 * 0.15, b.vc); if (inC(wx, wz)) { gb.cyl('stone', wx, wz, 1.4, H0 - 0.2, H0 + 0.9, 10, 2, 2); gb.disc('water', wx, H0 + 0.5, wz, 1.2, 10, 2); for (const sd of [-1, 1]) gb.box(wx + sd * 1.3 - 0.1, H0, wz - 0.1, wx + sd * 1.3 + 0.1, H0 + 2.6, wz + 0.1, 'woodDark', 1, 1); gb.box(wx - 1.5, H0 + 2.5, wz - 0.12, wx + 1.5, H0 + 2.7, wz + 0.12, 'woodDark', 1, 1); siteCol(area, wx, wz, 0, 1.4, 1.4, H0 - 1, H0 + 0.9); } }
+    for (let k = 0; k < 16; k++) { const u = b.u0 + 6 + (k % 8) * (W2 - 12) / 7, v = b.vc + (k < 8 ? -1 : 1) * H2 * 0.22 + r2.range(-2, 2), [sx, sz] = at(u, v); if (!inC(sx, sz)) continue; const a = C.ang + (k < 8 ? 0 : Math.PI);
+      gb.setXf(sx, sz, a, H0); gb.box(-1.3, 0, -0.6, 1.3, 0.95, 0.6, { side: 'woodDark', top: 'wood' }, 1, 1); for (const [px, pz] of [[-1.25, -0.6], [1.25, -0.6], [-1.25, 1.1], [1.25, 1.1]]) gb.box(px - 0.05, 0, pz - 0.05, px + 0.05, pz < 0 ? 2.5 : 2.1, pz + 0.05, 'woodDark', 1, 1);
+      gb.quad4(r2.pick(['stallA', 'stallB', 'stallC']), [-1.4, 2.5, -0.75], [1.4, 2.5, -0.75], [1.4, 2.1, 1.25], [-1.4, 2.1, 1.25], [0, 0], [2, 0], [2, 1], [0, 1], [0, 1, 1]);
+      for (let q = 0; q < 3; q++) gb.box(-1 + q * 0.75, 0.95, -0.4, -0.55 + q * 0.75, 1.25, 0.1, r2.pick(['wood', 'roofThatch', 'stallB', 'cloth']), 1, 1);
+      gb.xf = null; siteCol(area, sx, sz, a, 1.3, 0.6, H0 - 1, H0 + 0.95); }
+    for (let k = 0; k < 3; k++) { const [cx2, cz2] = at(b.u0 + r2.range(8, W2 - 8), b.v0 + r2.range(6, H2 - 6)); if (!inC(cx2, cz2)) continue; const a = r2.range(0, 6.28); gb.setXf(cx2, cz2, a, H0); gb.box(-0.8, 0.5, -1.5, 0.8, 1.1, 1.5, { side: 'woodDark', top: 'wood' }, 1, 1); for (const sd of [-1, 1]) gb.box(sd * 0.85 - 0.06, 0, -0.5, sd * 0.85 + 0.06, 1.0, 0.5, 'woodDark', 1, 1); gb.box(-0.05, 0.6, 1.5, 0.05, 0.7, 3.2, 'woodDark', 1, 1); gb.xf = null; siteCol(area, cx2, cz2, a, 0.9, 1.6, H0 - 1, H0 + 1.1); }
+    for (let k = 0; k < 8; k++) { const [bx2, bz2] = at(b.u0 + r2.range(3, W2 - 3), b.v0 + r2.range(3, H2 - 3)); if (inC(bx2, bz2)) gb.cyl('woodDark', bx2, bz2, 0.35, H0, H0 + 0.9, 8, 1, 1); } }
+  // boats moored along the quays, and a crane or two for the warehouses
+  { const ci = C.canal, r2 = new RNG(8200);
+    for (let u = -C.A + 20; u < C.A - 20; u += r2.range(22, 46)) { const sd = r2.chance(0.5) ? 1 : -1, v = ci.v + sd * (ci.w / 2 - 1.8), [bx2, bz2] = this.w(u, v); if (!inC(bx2, bz2) || this.U.some(L => Math.abs(L.p - u) < L.w / 2 + 6)) continue; const wl = this.wl();
+      gb.setXf(bx2, bz2, C.ang + Math.PI / 2, wl); gb.box(-1.2, -0.4, -4, 1.2, 0.5, 4, { side: 'woodDark', top: 'wood' }, 1, 1); gb.box(-1.25, 0.5, -4, 1.25, 0.75, -3.4, 'woodDark', 1, 1); gb.box(-1.25, 0.5, 3.4, 1.25, 0.75, 4, 'woodDark', 1, 1);
+      if (r2.chance(0.4)) { gb.box(-0.08, 0.5, -0.5, 0.08, 5, -0.3, 'woodDark', 1, 1); gb.box(-0.6, 0.6, 0.6, 0.4, 1.2, 1.6, 'cloth', 1, 1); } gb.xf = null; }
+    for (const u of [-C.A * 0.45, C.A * 0.2]) { const v = ci.v - ci.w / 2 - 2.5, [kx, kz] = this.w(u, v); if (!inC(kx, kz)) continue; gb.setXf(kx, kz, C.ang, H0); gb.box(-0.6, 0, -0.6, 0.6, 9, 0.6, 'woodDark', 1, 1); gb.box(-0.3, 8.4, -0.3, 0.3, 8.9, 6.5, 'woodDark', 1, 1); gb.box(-0.03, 4, 6.2, 0.03, 8.4, 6.26, 'iron', 1, 1); gb.box(-1.4, 0, -1.4, 1.4, 1.6, 1.4, { side: 'woodDark', top: 'wood' }, 1, 1); gb.xf = null; siteCol(area, kx, kz, C.ang, 1.4, 1.4, H0 - 1, H0 + 9); } }
   // the great buildings, with the chunk their middle stands in
   for (const b of this.blocks) { if (!TOWN_BUILD[b.use]) continue; const [mx, mz] = this.w(b.uc, b.vc); if (inC(mx, mz)) { TOWN_BUILD[b.use](this, gb, b, area); n += 20; } }
   for (const m of this.mills) if (inC(m.x, m.z)) TOWN_BUILD.mill(this, gb, m, area);
@@ -373,11 +403,11 @@ Town.prototype.buildLasting = function (area, mats) {
     for (const t of WP.towers) { const [x, z] = this.w(t.u, t.v), s = C.wall.tower / 2 + (t.corner ? 1.5 : 0), h = C.wall.towerH + (t.corner ? 4 : 0); sg.setXf(x, z, C.ang, H0); sg.box(-s, -1, -s, s, h, s, 'tfWall', 3, 3); sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -s, -s, s, s, h, s * 1.1, 0.4); sg.tint = [0.92, 0.9, 0.86]; sg.xf = null; }
     const tall = (u, v, hx, hz, h, roof) => { const [x, z] = this.w(u, v); sg.setXf(x, z, C.ang, H0); sg.box(-hx, 0, -hz, hx, h, hz, 'tfWall', 3, 3); if (roof) { sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -hx, -hz, hx, hz, h, roof, 0.3); sg.tint = [0.92, 0.9, 0.86]; } sg.xf = null; };
     if (this.cathedral) { const b = this.cathedral, { L, cu, nw, aw } = this.cathDims(b); tall(cu, b.vc, L / 2, nw + aw, 22, 9); tall(cu + L / 2 + 3.5, b.vc - 8.5, 5.5, 5.5, 46, 26); tall(cu + L / 2 + 3.5, b.vc + 8.5, 5.5, 5.5, 46, 26); }
-    if (this.hall) { const b = this.hall; tall(b.uc, b.v1 - 9, Math.min(35, (b.u1 - b.u0) / 2 - 3), 8, 15, 6); tall(b.uc, b.v1 - 3, 7, 7, 52, 11); }
+    if (this.hall) { const b = this.hall, f = this.fv; tall(b.uc, f > 0 ? b.v1 - 9 : b.v0 + 9, Math.min(35, (b.u1 - b.u0) / 2 - 3), 8, 15, 6); tall(b.uc, f > 0 ? b.v1 - 3 : b.v0 + 3, 7, 7, 52, 11); }
     if (this.citadel) { const b = this.citadel; tall(b.uc, b.vc - 10, 12, 12, 38, 0); }
     for (const m of this.mills) { sg.tint = [1.1, 1.08, 1.0]; sg.cyl('tfWall', m.x, m.z, 4.2, H0 - 1, H0 + 13, 8, 3, 3); }
     sg.tint = null; this.far = sg.build(fm); this.far.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); o.frustumCulled = false; }); area.scene.add(this.far); }
-  if (this.hall) { const b = this.hall, [hx, hz] = this.w(b.uc, b.v1 - 9), [fx, fz] = xfP(makeXf(hx, hz, C.ang), 0.2, 6); makeFlag(area, TEX.bannerRed, fx, H0 + 63.6, fz, C.ang, 2.6, 1.5); }
+  if (this.hall) { const b = this.hall, [hx, hz] = this.w(b.uc, this.fv > 0 ? b.v1 - 9 : b.v0 + 9), [fx, fz] = xfP(makeXf(hx, hz, C.ang + (this.fv > 0 ? 0 : Math.PI)), 0.2, 6); makeFlag(area, TEX.bannerRed, fx, H0 + 63.6, fz, C.ang, 2.6, 1.5); }
   if (this.citadel) { const b = this.citadel, S2 = Math.min(b.u1 - b.u0, b.v1 - b.v0) / 2 - 4, [kx, kz] = this.w(b.uc, b.vc - S2 * 0.25); makeFlag(area, TEX.bannerRed, kx + 0.1, H0 + 41, kz, C.ang, 2.6, 1.5); }
   // the doors: every house, shop and inn can be entered, as in Daggerfall
   const used = new Set();
@@ -399,10 +429,11 @@ Town.prototype.updateFolk = function (px, pz, dt) {
   const night = isNight(G.time), want = night ? 8 : 34;
   for (const e of this.folk) if (Math.hypot(e.pos.x - px, e.pos.z - pz) > 260) e.remove();
   this.folk = this.folk.filter(e => !e.removed); this.spawnT = (this.spawnT || 0) - dt;
-  if (this.folk.length >= want || this.spawnT > 0) return; this.spawnT = 0.4;
-  const cand = this.nodes.map((n, i) => [n, i]).filter(([n]) => { const d = Math.hypot(n.x - px, n.z - pz); return d > 60 && d < 220; }); if (!cand.length) return;
+  if (this.folk.length >= want || this.spawnT > 0) return; this.spawnT = this.folk.length < want / 2 ? 0 : 0.4;
+  const cand = this.nodes.map((n, i) => [n, i]).filter(([n]) => { const d = Math.hypot(n.x - px, n.z - pz); return d > 25 && d < 200; }); if (!cand.length) return;
   const [n, i] = cand[rnd.int(0, cand.length - 1)], k = rnd.int(0, 39), r = new RNG(9300 + k), g = r.chance(0.5) ? 'f' : 'm', kind = this.districtAt(n.x, n.z) || this.cfg.districts[0], guard = r.chance(0.08);
-  const e = spawnNPC(G.city, { name: guard ? 'Town Watch' : personName(r, g), look: guard ? LOOKS.guard : lookByWealth(r, g, kind.wealth), gender: guard ? 'm' : g, x: n.x + rnd.range(-1, 1), z: n.z + rnd.range(-1, 1), role: 'townwalker', dialog: guard ? 'guard' : 'townsfolk', speed: r.range(1.1, 1.5), spriteKey: guard ? 'guard' : 'tw' + k, data: { town: this.id, node: i, prev: -1, lane: rnd.range(-0.8, 0.8) } });
+  const nb = n.n.length ? this.nodes[n.n[rnd.int(0, n.n.length - 1)]] : n, f0 = rnd.next(); // somewhere along a street, not only at the corners
+  const e = spawnNPC(G.city, { name: guard ? 'Town Watch' : personName(r, g), look: guard ? LOOKS.guard : lookByWealth(r, g, kind.wealth), gender: guard ? 'm' : g, x: lerp(n.x, nb.x, f0) + rnd.range(-1, 1), z: lerp(n.z, nb.z, f0) + rnd.range(-1, 1), role: 'townwalker', dialog: guard ? 'guard' : 'townsfolk', speed: r.range(1.1, 1.5), spriteKey: guard ? 'guard' : 'tw' + k, data: { town: this.id, node: i, prev: -1, lane: rnd.range(-0.8, 0.8) } });
   this.folk.push(e);
 };
 Town.prototype.stepFolk = function (e, dt) {

@@ -62,12 +62,13 @@ SITES_V = r"""(()=>{const g=__game,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(t
 # views of a town: approach, gate, square, streets, canal, cathedral, walls, from the air (TOWNSEED=N lays out another town from the same generator)
 TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)),W=(u,v)=>T.w(u,v); const V={};
  const at=(name,u,v,tu,tv,pitch,fly)=>{const [x,z]=W(u,v),[tx,tz]=W(tu,tv); V[name]=[x,z,look(x,z,tx,tz),pitch,fly];};
- at('town_far',C.mainU+30,C.B+900,C.mainU,0,0.02,null);
+ at('town_far',C.mainU,C.B+620,C.mainU,0,0.03,null);
  at('town_gate',C.mainU+4,C.B+C.moat.off+C.moat.w+45,C.mainU,C.B,0.06,null);
  const sq=T.square; if(sq) at('town_square',sq.u1-6,sq.v1-6,sq.uc,sq.v0-30,0.12,null);
  const st=T.streets.filter(s=>!s.main&&!s.ring&&!s.canal).sort((a,b)=>Math.hypot((a.u0+a.u1)/2-120,(a.v0+a.v1)/2-150)-Math.hypot((b.u0+b.u1)/2-120,(b.v0+b.v1)/2-150))[0]; at('town_street',st.u0,st.v0,st.u1,st.v1,0.03,null);
  at('town_canal',-C.A*0.35,C.canal.v+C.canal.w/2+2,C.A*0.2,C.canal.v,0.02,null);
- const cb=T.cathedral; if(cb){const d=T.cathDims(cb); at('town_cathedral',d.cu+d.L/2+40,cb.vc+10,d.cu,cb.vc,0.22,null);}
+ const cb=T.cathedral; if(cb){const d=T.cathDims(cb); at('town_cathedral',cb.u1+4,cb.vc+6,d.cu,cb.vc,0.28,null);}
+ const mk=T.market; if(mk) at('town_market',mk.u0+4,mk.v0+4,mk.uc,mk.vc,0.05,null);
  at('town_commons',-C.A+C.ring.off,C.B*0.4,-C.A+C.ring.off,-C.B*0.4,0.03,null);
  at('town_air',C.A+500,C.B+450,0,0,-0.3,260);
  at('town_air_low',-C.A*0.2,C.mainV+60,C.A*0.3,C.canal.v-80,-0.22,70);
