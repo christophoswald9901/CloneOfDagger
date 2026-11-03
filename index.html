@@ -3074,7 +3074,7 @@ const Wild = {
         colR[k] = sh[0] * cav * rt * lerp(0.94, 1.85, snow); colR[k + 1] = sh[1] * cav * rt * lerp(0.97, 1.87, snow); colR[k + 2] = sh[2] * cav * rt * lerp(1.03, 1.95, snow); // grey stone out here
         const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 ? 0 : q[1];
         qE[v] = (1 - smoothstep(3.5, 10, best[kb])) * smoothstep(0.22, 0.5, Math.hypot(gx, gz)); // the raw earth of a track's cutting
-        qF[v] = coastZ(x) - z < 220 ? smoothstep(SEA + 1.9 + 3.5 * Math.min(1, Math.hypot(gx, gz) * 1.5) + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
+        qF[v] = coastZ(x) - z < 220 ? smoothstep(220, 150, coastZ(x) - z) * smoothstep(SEA + 1.9 + 3.5 * Math.min(1, Math.hypot(gx, gz) * 1.5) + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
         { const kr = (b + B) * S + a + B, mw = 0.3 + 4 * smoothstep(-0.35, 0.45, fbm(x / 24, z / 24, 2, 372)); qW[v] = rD[kr] < 90 ? 1 - smoothstep(rW[kr] + 0.2, rW[kr] + mw, rD[kr]) : 0; } // wet mud along the banks, of uneven width
       }
       if (b % 8 === 7) yield;
