@@ -33,6 +33,8 @@ function siteW(S, x, z) { if (Math.abs(x - S.x) > S.rb + 260 || Math.abs(z - S.z
 // the site a point lies in (or nearest to), with how far its fixed ground holds there (0..1)
 function siteAt(x, z) { let best = null, bw = 0; for (const S of SITES) { const w = siteW(S, x, z); if (w > bw) { bw = w; best = S; } } return best ? { S: best, w: bw } : null; }
 function siteWeight(x, z) { let w = 0; for (const S of SITES) w = Math.max(w, siteW(S, x, z)); return w; }
+// as siteWeight, but leaving out the sites whose country is farmed like any other (the towns: their own fields reach out over the plain)
+function siteWild(x, z) { let w = 0; for (const S of SITES) if (!S.farmed) w = Math.max(w, siteW(S, x, z)); return w; }
 // rivers are not planned through a site or the land blending into it
 function siteZone(x, z, m = 0) { for (const S of SITES) if (Math.abs(x - S.x) < S.rb + m + 260 && Math.abs(z - S.z) < S.rb + m + 260 && siteDist(S, x, z) < S.rb + m) return true; return false; }
 
@@ -124,11 +126,12 @@ const Sites = {
   build(area, mats) {
     const gb = new GB(), saved = area.colliders; area.colliders = [];
     const H = (x, z) => terrainRaw(x, z);
-    for (const S of SITES) SITE_BUILD[S.id](gb, S, H, area);
+    for (const S of SITES) if (SITE_BUILD[S.id]) SITE_BUILD[S.id](gb, S, H, area);
     this.cols = area.colliders; area.colliders = saved;
     const G2 = area.grid; for (const col of this.cols) for (let ix = Math.floor(col.x0 / CELL); ix <= Math.floor(col.x1 / CELL); ix++) for (let iz = Math.floor(col.z0 / CELL); iz <= Math.floor(col.z1 / CELL); iz++) { const k = ix * 10007 + iz; let l = G2.get(k); if (!l) G2.set(k, l = []); l.push(col); }
     this.group = gb.build(mats); this.group.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); }); area.scene.add(this.group);
     for (const S of SITES) for (const [fx, fy, fz, fa] of S.flags || []) makeFlag(area, TEX.bannerRed, fx, fy, fz, fa, 2.4, 1.4);
+    for (const T of TOWNS) T.buildLasting(area, mats); // the towns' water, lamps, silhouettes and doors
     if (this.glows.length) { const b = new SpriteBatch(area, TEX.glow, 3.2, 3.2, this.glows, { additive: true, lit: false, fog: false }); this.glowMat = b.mat; }
   },
   // true where a site keeps the ground clear: its solids (for any plant), its yards and courts (for trees and bushes)

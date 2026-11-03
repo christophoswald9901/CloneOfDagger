@@ -336,7 +336,7 @@ const MapView = {
     if (G.area.kind === 'dungeon') { this.drawDungeon(x, W, H); legend.textContent = 'The Catacombs — explored passages. The door marks the way out. (M or Esc to close)'; return; }
     const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
     let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
-    if (region) { cx = P.pos.x; cz = P.pos.z; }
+    if (region || Math.hypot(P.pos.x, P.pos.z) > 900) { cx = P.pos.x; cz = P.pos.z; } // (out in the country, or in another town, the map is about where you are)
     if (this.view) { cx = this.view[0]; cz = this.view[1]; }
     cx = clamp(cx, WORLD.x0, WORLD.x1); cz = clamp(cz, WORLD.z0, WORLD.z1 + 1000);
     this.tf = { cx, cz, scale, W, H, dpr };
@@ -396,9 +396,20 @@ const MapView = {
     const t = performance.now() / 300;
     if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
     if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
+    // the towns: moat, walls, canal, streets and squares, their great buildings named once the town is found
+    for (const T of TOWNS) { const C = T.cfg, f = (G.flags.found || {})[T.id], P2 = (u, v) => { const [wx, wz] = T.w(u, v); return [X(wx), Z(wz)]; };
+      const rect = (u0, v0, u1, v1, col) => { x.fillStyle = col; x.beginPath(); [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.fill(); };
+      const mo = C.moat.off + C.moat.w / 2; x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1.5, C.moat.w * scale); x.beginPath(); [[-C.A - mo, -C.B - mo], [C.A + mo, -C.B - mo], [C.A + mo, C.B + mo], [-C.A - mo, C.B + mo]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.stroke();
+      rect(-C.A, -C.B, C.A, C.B, 'rgba(74,69,60,0.55)');
+      if (this.zoom > 0.12) { for (const b of T.blocks) if (b.use === 'square' || b.use === 'market') rect(b.u0, b.v0, b.u1, b.v1, '#6e675a'); else if (b.use === 'cathedral' || b.use === 'citadel') rect(b.u0, b.v0, b.u1, b.v1, '#4e4a44');
+        for (const s of T.streets) { const [a, b] = P2(s.u0, s.v0), [c, d] = P2(s.u1, s.v1); x.strokeStyle = s.canal ? '#857c6a' : s.main ? '#9a917e' : '#7a7262'; x.lineWidth = Math.max(1, (s.canal ? C.canal.w + 2 * C.canal.quay : s.w) * scale); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); }
+        { const [a, b] = P2(-C.A - mo, C.canal.v), [c, d] = P2(C.A + mo, C.canal.v); x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1, C.canal.w * scale); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); } }
+      x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(1.5, C.wall.t * scale); x.beginPath(); [[-C.A, -C.B], [C.A, -C.B], [C.A, C.B], [-C.A, C.B]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.stroke();
+      if (f) { if (this.zoom >= 0.3) for (const l of T.landmarks) if (!l.gate || this.zoom >= 1) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 6, '#d8cca8', Math.round(fs * 0.85)]);
+        if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } }
     // the landmarks you know of, the places you have come upon, the way you are going
     const found = G.flags.found || {}, heard = G.flags.heard || {};
-    for (const S of SITES) { if (!found[S.id] && !heard[S.id]) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
+    for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
     for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }

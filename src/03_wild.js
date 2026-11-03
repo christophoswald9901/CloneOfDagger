@@ -50,7 +50,7 @@ function wildCult(x, z) {
   const belt = (1 - smoothstep(80, 440, Wild.trackD(x, z))) * 0.8 * (1 - smoothstep(7000, 17000, r));
   const vale = (1 - smoothstep(80, 520, riverD(x, z))) * 0.6 * (1 - smoothstep(6000, 15000, r)) * smoothstep(250, 600, sd); // the broad river valleys are farmed too
   let ham = 0; for (const H of POI.hamlets || []) { const d = Math.abs(H.x - x) + Math.abs(H.z - z); if (d < 900) ham = Math.max(ham, 0.95 * (1 - smoothstep(120, 650, Math.hypot(H.x - x, H.z - z)))); } // a hamlet's own fields round it
-  return Math.max(band, ring, belt, vale, ham) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWeight(x, z)); // (no generated farmland in a site)
+  return Math.max(band, ring, belt, vale, ham, townFields(x, z)) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWild(x, z)) * (1 - townCore(x, z)); // (no generated farmland in a site)
 }
 
 // a pool of billboards that turn to the camera on the graphics card, so thousands cost nothing per frame
@@ -174,13 +174,13 @@ const Wild = {
     for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q], r = R.w[q] / 2 + 3; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) { const k = i * 8192 + j; rc.set(k, Math.max(rc.get(k) || 0, R.hand ? 99 : R.w[q])); } }
     from.forEach(({ pre, aims }, i) => { const t = wildTrack(pre, aims, 700 + i * 31 + WSEED * 97, used, this.tracks, rc); if (t.length > 1) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } });
     // each site's road: its own fixed way out, then on over the country to the nearest track, which it joins
-    SITES.forEach((S, si) => {
-      const pre = S.road.map(p => p.slice()), [sx, sz] = pre[pre.length - 1];
+    SITES.flatMap(S => (S.roads || [S.road]).map((rd, ri) => [S, rd, ri])).forEach(([S, rd, ri], si) => {
+      const pre = rd.map(p => p.slice()), [sx, sz] = pre[pre.length - 1];
       let tp = null, bd = 1e9; for (const T of this.tracks) for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - sx, T[q][1] - sz); if (d < bd) { bd = d; tp = T[q]; } }
       let pts = pre;
       if (tp) { const r = routeWild([sx, sz], tp, 900 + si * 17 + WSEED * 97, used, rc);
         if (r) { pts = pts.concat(r.path.slice(1)); const [ex, ez] = pts[pts.length - 1]; let bp = tp, bb = 1e9; for (const T of this.tracks) for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bb) { bb = d; bp = q; } } pts.push(bp.slice()); } }
-      const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.site = S.id; S.track = this.tracks.length; this.tracks.push(out);
+      const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.site = S.id; if (!ri) S.track = this.tracks.length; this.tracks.push(out);
       for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); }
     });
     // a farmstead where a track ends: its yard a little beyond the end, well inside one chunk, its front to the way
@@ -263,7 +263,7 @@ const Wild = {
           if (q < 0 || bd > 170 || bd < 30) continue; // within a short lane of a track
           const [ax, az] = tp[q - 1], [bx, bz] = tp[q + 1], nx = (fx - tp[q][0]) / bd, nz = (fz - tp[q][1]) / bd;
           const hs = []; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) hs.push(terrainRaw(fx + a * 7, fz + b * 7));
-          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWeight(fx, fz) > 0 || POI.near(fx, fz, 40).some(p => p.kind !== 'hamlet') || POI.hamletNear(fx, fz, 160) || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
+          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWild(fx, fz) > 0 || townCore(fx, fz) > 0 || POI.near(fx, fz, 40).some(p => p.kind !== 'hamlet') || POI.hamletNear(fx, fz, 160) || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
           farm = { x: fx, z: fz, ang: Math.atan2(-nx, -nz), sg: [ax, az, bx, bz] };
         }
       }
@@ -293,7 +293,7 @@ const Wild = {
       // arable strips want gentle ground; hedged pasture climbs the hillsides
       const cs = obbCorners(o), hs = cs.map(([x, z]) => hAt(x, z)), sp = Math.max(...hs) - Math.min(...hs), sl = Math.hypot(hAt(o.x + 8, o.z) - hAt(o.x - 8, o.z), hAt(o.x, o.z + 8) - hAt(o.x, o.z - 8)) / 16;
       if (Math.min(...hs) < SEA + 1.5 || sp > 10 || sl > 0.2) return no('slope');
-      if (cs.some(([x, z]) => siteWeight(x, z) > 0.05)) return no('site');
+      if (cs.some(([x, z]) => siteWild(x, z) > 0.05 || townCore(x, z) > 0)) return no('site');
       if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).some(p => p.kind !== 'hamlet') || POI.housesIn(o.x - 40, o.z - 40, o.x + 40, o.z + 40).some(h => obbOverlap(o, h.o, 8))) return no('poi');
       if (sp > 8 || sl > 0.13) { o.key = 'fMeadow'; o.nofill = sl > 0.19 || sp > 14; } // pasture climbs the gentler slopes: there the turf itself shows within the hedges
       for (const [x, z] of [...cs, [o.x, o.z]]) if (E.forestMask(x, z, hAt(x, z)) > 0.5) return no('wood');
@@ -589,6 +589,7 @@ const Wild = {
       if (farm.spur) { const spur = resampleEven(farm.spur, 3); drapeStrip(gb, 'rDirt', spur, 2.4, { lift: 0.068 }); drapeFeather(gb, 'rDirtF', spur, 2.4, 0.7, { seed: i + j }); for (let k = 1; k < spur.length; k++) trackSegs.push([spur[k - 1][0], spur[k - 1][1], spur[k][0], spur[k][1], 0, 0]); }
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
+    for (const T of TOWNS) if (T.buildChunk(x0, z0, WC, gb, c.cols, fl, blocks)) yield; // a town's houses, walls and streets in this square
     for (const p of POI.list) if (p.x >= x0 && p.x < x0 + WC && p.z >= z0 && p.z < z0 + WC) POI.build(p, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
     for (const h of POI.housesIn(x0 - 12, z0 - 12, x0 + WC + 12, z0 + WC + 12)) { blocks.push(mkObb(h.x, h.z, h.ang, 7, 6.5));
       if (h.x < x0 || h.x >= x0 + WC || h.z < z0 || h.z >= z0 + WC) continue;
@@ -636,7 +637,7 @@ const Wild = {
     for (const run of runs) for (let q = 1; q < run.length; q += 2) { // the way through farmland runs between hedges, or dry-stone walls on the uplands
       const [ax, az] = run[q - 1], [bx, bz] = run[Math.min(run.length - 1, q + 1)], mx = (ax + bx) / 2, mz = (az + bz) / 2;
       if (mx < x0 || mx >= x0 + WC || mz < z0 || mz >= z0 + WC) continue;
-      const cu = wildCult(mx, mz); if (cu < 0.35 || blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || !near.some(f => circleObb(mx, mz, 16, f)) || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // only where fields border the way (and not across a cottage's front)
+      const cu = wildCult(mx, mz); if (cu < 0.35 || blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || !near.some(f => circleObb(mx, mz, 16, f)) || townCore(mx, mz) > 0 || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // only where fields border the way (and not across a cottage's front)
       const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, wall = this.heightAt(mx, mz) > 70;
       for (const sd of [-1, 1]) {
         if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < 0.25 - cu * 0.5) continue; // with gaps and field gates
@@ -652,7 +653,7 @@ const Wild = {
     // plants: one chance on a jittered 5.5 m grid, as dense as the woods round the city
     const SP = 5.5, DENS = (SP / 5) * (SP / 5);
     const tree = (kind, x, z, h, s) => { const def = WILD_KINDS[kind]; fl[kind].push([x, h - 0.15, z, s]); if (def[4]) c.cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: h - 1, y1: h + def[4] * s }); };
-    const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400);
+    const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400), townHere = TOWNS.some(T => Math.abs(x0 + WC / 2 - T.x) < T.cfg.A + T.cfg.B + 500 && Math.abs(z0 + WC / 2 - T.z) < T.cfg.A + T.cfg.B + 500);
     for (let b = 0; b < WC / SP; b++) {
       for (let a = 0; a < WC / SP; a++) {
         // in a site, a cell takes its plants from the site's own fixed draw (as far as the site holds there), else from the world's
@@ -660,6 +661,7 @@ const Wild = {
         if (st && _h2(Math.floor(sx / SP), Math.floor(sz / SP), 4401) < st.w) rng = new RNG(Math.floor(_h2(Math.floor(sx / SP), Math.floor(sz / SP), 4402) * 2147483647));
         const x = x0 + (a + rng.next()) * SP, z = z0 + (b + rng.next()) * SP, h = this.heightAt(x, z);
         if (h < SEA + 1.6) continue;
+        if (townHere && townCore(x, z) > 0.3) continue; // the town's own ground
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 10 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.34 * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
@@ -807,7 +809,7 @@ function wildRockiness(x, z, h, slope, apron = 0) {
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
 function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
 // small woods standing in open country (the copses of the plant rules), for the ground tint under them
-function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)); }
+function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)) * (1 - townCore(x, z)); }
 
 // what grows at a spot in the wild: {kind, s, small} or null. m is how wooded the land is, cult how farmed
 function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = false) {
@@ -927,6 +929,7 @@ function routeWild(from, to, seed, used, rc = null, C = TRC) {
     for (const [di, dj] of DIRS) {
       const ni = i + di, nj = j + dj, nk = key(ni, nj); if (closed.has(nk)) continue;
       const x = ni * C, z = nj * C; if (Math.abs(x) < TG.R + 12 && Math.abs(z) < TG.R + 12 && Math.hypot(x - from[0], z - from[1]) > 45) continue;
+      if (townCore(x, z) > 0.2 && Math.hypot(x - from[0], z - from[1]) > 60) continue;
       const nh = hAt(ni, nj); if (nh < SEA + 1.8 || rimDist(x, z) < 900) continue;
       const len = Math.hypot(di, dj) * C, gr = Math.abs(nh - hk) / len, rw = rc ? rc.get(ni * 8192 + nj) : 0;
       const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) * (siteWeight(x, z) > 0.6 ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops

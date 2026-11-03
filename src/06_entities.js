@@ -200,6 +200,7 @@ function updateNPC(e, dt) {
     }
     case 'wander': wanderStep(e, dt, 0.5); break;
     case 'traveller': Roads.step(e, dt); break;
+    case 'townwalker': { const T = TownOf(e.data.town); if (T) T.stepFolk(e, dt); else e.moving = false; break; }
     default: e.moving = false;
   }
 }

@@ -59,6 +59,20 @@ SITES_V = r"""(()=>{const g=__game,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(t
    const fx=S.x+Math.cos(a+0.6)*(S.rb+250), fz=S.z+Math.sin(a+0.6)*(S.rb+250); V[S.id+'_far']=[fx,fz,look(fx,fz,S.x,S.z),-0.2,260]; }
  return JSON.stringify(V);})()"""
 
+# views of a town: approach, gate, square, streets, canal, cathedral, walls, from the air (TOWNSEED=N lays out another town from the same generator)
+TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)),W=(u,v)=>T.w(u,v); const V={};
+ const at=(name,u,v,tu,tv,pitch,fly)=>{const [x,z]=W(u,v),[tx,tz]=W(tu,tv); V[name]=[x,z,look(x,z,tx,tz),pitch,fly];};
+ at('town_far',C.mainU+30,C.B+900,C.mainU,0,0.02,null);
+ at('town_gate',C.mainU+4,C.B+C.moat.off+C.moat.w+45,C.mainU,C.B,0.06,null);
+ const sq=T.square; if(sq) at('town_square',sq.u1-6,sq.v1-6,sq.uc,sq.v0-30,0.12,null);
+ const st=T.streets.filter(s=>!s.main&&!s.ring&&!s.canal).sort((a,b)=>Math.hypot((a.u0+a.u1)/2-120,(a.v0+a.v1)/2-150)-Math.hypot((b.u0+b.u1)/2-120,(b.v0+b.v1)/2-150))[0]; at('town_street',st.u0,st.v0,st.u1,st.v1,0.03,null);
+ at('town_canal',-C.A*0.35,C.canal.v+C.canal.w/2+2,C.A*0.2,C.canal.v,0.02,null);
+ const cb=T.cathedral; if(cb){const d=T.cathDims(cb); at('town_cathedral',d.cu+d.L/2+40,cb.vc+10,d.cu,cb.vc,0.22,null);}
+ at('town_commons',-C.A+C.ring.off,C.B*0.4,-C.A+C.ring.off,-C.B*0.4,0.03,null);
+ at('town_air',C.A+500,C.B+450,0,0,-0.3,260);
+ at('town_air_low',-C.A*0.2,C.mainV+60,C.A*0.3,C.canal.v-80,-0.22,70);
+ return JSON.stringify(V);})()"""
+
 # how far each view may turn to find an open outlook (radians either side of its planned heading)
 ARC = {'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
 
@@ -66,7 +80,7 @@ PLACE = r"""(()=>{const g=__game,G=g.G,P=G.player; G.time=12*60+G.time-(G.time%1
   const [x,z,yaw,pitch,fly,arc,margin,name]=ARGS; g.Wild.prime(x,z); let X=x,Z=z;
   // step off to a spot clear of trunks, rocks and walls
   const clear=(x,z)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=G.area.grid.get((Math.floor(x/8)+i)*10007+Math.floor(z/8)+j)||[]; if(l.some(c=>x>c.x0-margin&&x<c.x1+margin&&z>c.z0-margin&&z<c.z1+margin))return false;} return g.terrainH(x,z)>-0.5;};
-  if(fly===null) for(let r=0;r<60&&!clear(X,Z);r+=1.5){const a=r*2.4;X=x+Math.cos(a)*r;Z=z+Math.sin(a)*r;}
+  if(fly===null) for(let r=0;r<(name.startsWith('town')?6:60)&&!clear(X,Z);r+=1.5){const a=r*2.4;X=x+Math.cos(a)*r;Z=z+Math.sin(a)*r;}
   // how far one can see along a heading: nothing (0) if ground or a solid thing stands close in front
   const openD=(X,Z,yy,gy)=>{ const fx=-Math.sin(yy), fz=-Math.cos(yy);
     for(const sd of [-0.35,0,0.35]){ const c=Math.cos(sd),s=Math.sin(sd),ux=fx*c-fz*s,uz=fx*s+fz*c;
@@ -103,7 +117,7 @@ async def main():
     os.makedirs(OUT, exist_ok=True)
     for seed in SEEDS:
         c = CDP()
-        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}'): print('boot failed', c.errors()[:2]); c.stop(); return
+        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}' + (f'&townseed={seed}' if SET == 'town' else '')): print('boot failed', c.errors()[:2]); c.stop(); return
         await c.new_game()
         for _ in range(40):  # wait until the game is really in play (a view taken before that shows the title camera)
             if await c.ev("!!(__game.G.player && __game.G.state === 'play')"): break
@@ -111,11 +125,11 @@ async def main():
         else: print('new game never started', c.errors()[:2]); c.stop(); return
         await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
-        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else FIND))
+        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else FIND))
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
-            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
+            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 1.5 if SET == 'town' else 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
             where = await c.ev(PLACE.replace('ARGS', args))
             if not where or str(where).startswith('ERR'): print(seed, name, 'placement failed:', str(where)[:200]); continue  # never pass a stuck view off as a real one
             await asyncio.sleep(float(os.environ.get('WAIT', '6')))
@@ -123,6 +137,6 @@ async def main():
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
             print(seed, name, where, info)
         allf = [(n, f'{OUT}/s{seed}_{n}.png') for n in views if os.path.exists(f'{OUT}/s{seed}_{n}.png')] # every view taken so far, in order
-        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else ""}s{seed}.jpg')
+        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else ""}s{seed}.jpg')
         print(seed, 'errors:', [e[:300] for e in c.errors()[:3]]); c.stop()
 asyncio.run(main())

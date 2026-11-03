@@ -34,6 +34,8 @@ const Travel = {
     if (M.hillPath) line(M.hillPath);
     for (const T of Wild.tracks) line(T, 4);
     for (const S of SITES) if (S.id === 'mirrormere') line([[S.x + 126, S.z + 2], [S.x + 200, S.z - 2], [S.x + 280, S.z]]);
+    for (const Tn of TOWNS) { const b0 = X.length; for (const n of Tn.nodes) add(n.x, n.z); Tn.nodes.forEach((n, i) => { for (const j of n.n) link(b0 + i, b0 + j); }); // a town's streets, and its gates out to the roads that leave them
+      const own = new Set(Tn.nodes.map((_, i) => b0 + i)); for (const g of Tn.gates) { const j = near(g.ox, g.oz, 90, own); if (j >= 0) link(b0 + g.node, j); } }
     // a second pass: an end that found nothing (it was laid before its neighbour) tries again
     for (let k = 0; k < X.length; k++) if (A[k].length === 1) { const j = near(X[k], Z[k], 40, new Set([k, A[k][0]])); if (j >= 0 && Math.hypot(X[j] - X[k], Z[j] - Z[k]) < 40) link(k, j); }
     this.graph = { X, Z, A, near };

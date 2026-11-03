@@ -379,8 +379,9 @@ function updateTextHUD(dt) {
   let where = G.area.name;
   if (G.state === 'play' && P && G.area.kind === 'city') {
     const d = districtAt(P.pos.x, P.pos.z); const inside = insideCity(P.pos.x, P.pos.z, -2);
-    const id = inside ? d.id : 'outside'; where = inside ? `Daggerfall · ${capFirst(d.name)}` : 'Outside the walls of Daggerfall';
-    if (G.lastDistrict && G.lastDistrict !== id && !P.dead) msg(inside ? `You enter ${d.name} — ${d.blurb}.` : 'You leave the city walls behind.', 'district');
+    const T = TOWNS.find(t => t.inside(P.pos.x, P.pos.z, -1)), td = T && T.districtAt(P.pos.x, P.pos.z);
+    const id = inside ? d.id : T ? T.id + ':' + td.id : 'outside'; where = inside ? `Daggerfall · ${capFirst(d.name)}` : T ? `${T.name} · ${capFirst(td.name)}` : Math.hypot(P.pos.x, P.pos.z) < 1200 ? 'Outside the walls of Daggerfall' : 'The open country';
+    if (G.lastDistrict && G.lastDistrict !== id && !P.dead) msg(inside ? `You enter ${d.name} — ${d.blurb}.` : T ? `You enter ${td.name} of ${T.name} — ${td.blurb}.` : (G.lastDistrict.includes(':') ? `You leave the walls of ${capFirst(G.lastDistrict.split(':')[0])} behind.` : G.lastDistrict === 'outside' ? '' : 'You leave the city walls behind.'), 'district');
     G.lastDistrict = id;
   }
   $('status').textContent = G.state === 'play' && P ? `${where} · ${dateString(G.time)} · ${clockString(G.time)}${G.weather !== 'clear' && G.area.kind === 'city' ? ' · ' + G.weather : ''}${G.flying || settings.dbgStamina ? ' · debug: ' + [G.flying && 'flying', G.flying && settings.dbgNoClip && 'no clip', settings.dbgStamina && 'stamina'].filter(Boolean).join(', ') : ''}` : '';
@@ -402,7 +403,7 @@ function frame(now) {
     else if (!frozen) {
       if (Travel.cur) sdt = Travel.update(dt); else updatePlayer(dt);
       G.time += sdt * TIME_SCALE; updateWeather();
-      if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); }
+      if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); for (const T of TOWNS) T.updateFolk(G.player.pos.x, G.player.pos.z, sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
       if (G.area.kind === 'dungeon') { const D = G.area.dg; const ci = Math.floor(G.player.pos.x / D.cs), cj = Math.floor(G.player.pos.z / D.cs); for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) if (i >= 0 && j >= 0 && i < D.N && j < D.N) D.visited[i + j * D.N] = 1; }
     } else if (G.player.dead) updatePlayer(dt);
@@ -555,7 +556,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();
