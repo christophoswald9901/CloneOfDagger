@@ -116,7 +116,8 @@ const Travel = {
     let dx = tx - P.pos.x, dz = tz - P.pos.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
     if (c.detourT > 0) { c.detourT -= h; const a = c.detour, cs = Math.cos(a), sn = Math.sin(a); [dx, dz] = [dx * cs - dz * sn, dx * sn + dz * cs]; }
     // the water's edge, the sea or the mere, ends a cross-country walk
-    const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3; if (terrainH(ax, az) < SEA + 0.15 && !c.road) { this.stop('The water bars your way.'); return; }
+    const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3, ah = terrainH(ax, az), M = SITES[2];
+    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.'); return; }
     const ox = P.pos.x, oz = P.pos.z, st = spd * h;
     P.pos.x += dx * st; P.pos.z += dz * st;
     collide(G.area, P.pos, 0.38, P.pos.y, 1.75); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y);

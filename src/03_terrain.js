@@ -58,7 +58,8 @@ function riseHeight(x, z) {
   return h;
 }
 // ridged multifractal: each octave is weighted by the one above, so crests stay sharp and the valleys between them smooth
-function ridgedMF(x, z, oct, s) { let sum = 0, amp = 1, f = 1, w = 1, norm = 0; for (let i = 0; i < oct; i++) { let n = 1 - Math.abs(vnoise(x * f, z * f, s + i * 29)); n *= n * w; w = clamp(n * 1.8, 0, 1); sum += n * amp; norm += amp; amp *= 0.5; f *= 2.05; } return sum / norm; }
+// soft > 1: the big crests are rounded, not knife-edged
+function ridgedMF(x, z, oct, s, soft = 1) { let sum = 0, amp = 1, f = 1, w = 1, norm = 0; for (let i = 0; i < oct; i++) { const v = Math.abs(vnoise(x * f, z * f, s + i * 29)); let n = 1 - (i < 2 && soft > 1 ? Math.pow(v, soft) * (1 + (soft - 1) * 0.35) : v); n *= n * w; w = clamp(n * 1.8, 0, 1); sum += n * amp; norm += amp; amp *= 0.5; f *= 2.05; } return sum / norm; }
 // the valley lines of the wild: a broad field whose zero line the valleys (and the streams in them) follow
 function wildValley(x, z) {
   const s = WSEED * 131, X = x + WSEED * 7919, Z = z - WSEED * 6271;
@@ -77,7 +78,7 @@ function wildRelief(x, z) {
   const rm = (1 - smoothstep(0.04, 0.32, band)) * smoothstep(-0.5, 0.05, region);
   if (rm > 0.001) {
     const qx = wx + 110 * fbm(wx / 330, wz / 330, 2, 317 + s), qz = wz + 110 * fbm(wx / 330 + 5.2, wz / 330, 2, 318 + s); // warped, so peaks grow spurs and lopsided flanks
-    let m = rm * rm * (95 + 95 * smoothstep(0, 0.6, region)) * (0.75 * ridgedMF(qx / 760, qz / 760, 6, 306 + s) + 0.25 * ridgedMF(qx / 410, qz / 410, 4, 319 + s)) * 1.3; // massifs with shoulders and spurs, not cones
+    let m = rm * rm * (95 + 95 * smoothstep(0, 0.6, region)) * (0.75 * ridgedMF(qx / 760, qz / 760, 6, 306 + s, 1.7) + 0.25 * ridgedMF(qx / 410, qz / 410, 4, 319 + s, 1.4)) * 1.3; // massifs with shoulders and spurs, not cones
     // the high ground breaks into crags and cliff bands: sharper small ridges, and soft steps in the slope
     const hi = smoothstep(60, 190, m);
     if (hi > 0) {
@@ -92,7 +93,7 @@ function wildRelief(x, z) {
   return [h * lerp(0.2, 1, floor) - 9 * (1 - floor), floor];
 }
 // sand on the shore: wide beaches by the city, out along the coast only a strip at the water's edge (low river flats beside it stay green)
-function isBeach(x, z, h) { const w = smoothstep(900, 1500, Math.abs(x)); return h < SEA + lerp(2.4, 3.2, w) && coastZ(x) - z < lerp(140, 60, w); }
+function isBeach(x, z, h) { const w = smoothstep(900, 1500, Math.abs(x)), n = w > 0 ? fbm(x / 45, z / 45, 2, 308) : 0; return h < SEA + lerp(2.4, 3.2, w) + 1.4 * n * w && coastZ(x) - z < lerp(140, 60 + 45 * n, w); }
 // how far inside the play area's land edge a point lies (negative beyond it), along a ragged line
 function rimDist(x, z) { return Math.min(x - WORLD.x0, WORLD.x1 - x, z - WORLD.z0) - 300 + 2400 * fbm(x / 5000 + 3.3, z / 5000, 3, 390 + WSEED * 7) + 500 * fbm(x / 1300, z / 1300, 2, 391) + 120 * fbm(x / 400, z / 400, 2, 392); }
 // the mountains that close the play area: foothills, then a wall of peaks too steep to climb

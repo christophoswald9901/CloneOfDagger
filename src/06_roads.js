@@ -26,11 +26,11 @@ const Roads = {
     const T = Wild.tracks; const cand = [];
     for (let ti = 0; ti < T.length; ti++) for (let q = 0; q < T[ti].length; q += 20) { const [x, z] = T[ti][q], d = Math.hypot(x - px, z - pz); if (d > 260 && d < 560 && Math.max(Math.abs(x), Math.abs(z)) > TG.R + 20) cand.push([ti, q]); }
     if (!cand.length) return;
-    const [ti, q] = rnd.pick(cand), tot = TRAVELLER_KINDS.reduce((a, k) => a + k.w, 0); let r = rnd.next() * tot, K = TRAVELLER_KINDS[0]; for (const k of TRAVELLER_KINDS) { r -= k.w; if (r <= 0) { K = k; break; } }
+    const [ti, q] = rnd.pick(cand), tot = TRAVELLER_KINDS.reduce((a, k) => a + k.w, 0); let r = rnd.next() * tot, K = TRAVELLER_KINDS[0], ki = 0; for (const k of TRAVELLER_KINDS) { r -= k.w; if (r <= 0) { K = k; break; } ki++; } ki = Math.min(ki, TRAVELLER_KINDS.length - 1);
     const dir = rnd.chance(0.5) ? 1 : -1, n = K.pair || rnd.chance(0.15) ? 2 : 1;
     for (let m = 0; m < n; m++) {
-      const rr = new RNG(rnd.int(1, 1e9)), g = K.g || (rr.chance(0.5) ? 'f' : 'm'), qq = clamp(q - dir * m * 2, 0, T[ti].length - 1), [x, z] = T[ti][qq];
-      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: 'trav' + rnd.int(0, 1e9), data: { trade: K.trade, ti, q: qq, dir, lane: dir * 0.9 } });
+      const v = rnd.int(0, 11), rr = new RNG(9100 + ki * 53 + v), g = K.g || (rr.chance(0.5) ? 'f' : 'm'), qq = clamp(q - dir * m * 2, 0, T[ti].length - 1), [x, z] = T[ti][qq];
+      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: `trav${ki}_${v}`, data: { trade: K.trade, ti, q: qq, dir, lane: dir * 0.9 } });
       this.list.push(e);
     }
   },

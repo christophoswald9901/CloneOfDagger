@@ -23,14 +23,14 @@ def cdn_file(url):
     return f if os.path.isfile(f) else None
 
 class CDP:
-    def __init__(self, port=9333): self.port = port; self.id = 0; self.logs = []
+    def __init__(self, port=None): self.port = port or int(os.environ.get('CDP_PORT', '9333')); self.id = 0; self.logs = []  # CDP_PORT: run several tools side by side
     async def start(self, url, w=1280, h=720):
         if not CHROME: raise SystemExit('no Chrome/Chromium found: install one or set $CHROME')
-        os.makedirs(PROFILE, exist_ok=True)
+        prof = f'{PROFILE}{self.port}'; os.makedirs(prof, exist_ok=True)
         self.proc = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
                                       '--enable-unsafe-swiftshader', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',
                                       *(['--no-sandbox'] if os.getuid() == 0 else []),  # containers run as root; Chrome refuses its sandbox there
-                                      f'--user-data-dir={PROFILE}', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                      f'--user-data-dir={prof}', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         pages = []
         for _ in range(100):  # the endpoint can answer before the first tab exists, so wait for a page
             try: pages = [t for t in json.load(urllib.request.urlopen(f'http://127.0.0.1:{self.port}/json')) if t['type'] == 'page']

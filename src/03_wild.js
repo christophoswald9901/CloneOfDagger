@@ -12,6 +12,8 @@ const FAR_FOG = `#ifdef USE_FOG
         float fd = vFogDepth < 450.0 ? vFogDepth : 450.0 + (vFogDepth - 450.0) * 0.7;
         float fogFactor = smoothstep(fogNear, fogFar, fd);
         vec3 fc = fogColor * clamp(0.72 + 0.5 * dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11)), 0.8, 1.12);
+        float farK = smoothstep(700.0, 3000.0, vFogDepth); // far off, the lowland keeps a trace of its light and shade, cooler with distance (no white band below the mountains)
+        fogFactor = min(fogFactor, 1.0 - 0.15 * farK); fc = mix(fc, fc * vec3(0.88, 0.93, 1.02), farK);
         #ifdef FAR_HIGH
         float hiK = smoothstep(140.0, 460.0, vWy);
         fogFactor *= mix(1.0, 0.6, hiK); // high ground keeps its shape through the haze, so the mountains stand on the skyline,
@@ -285,7 +287,7 @@ const Wild = {
       if (o.x < x0 - 45 || o.x >= x0 + WC + 45 || o.z < z0 - 45 || o.z >= z0 + WC + 45) return no('out'); // near this chunk (it is drawn by the chunk that laid it)
       // arable strips want gentle ground; hedged pasture climbs the hillsides
       const cs = obbCorners(o), hs = cs.map(([x, z]) => hAt(x, z)), sp = Math.max(...hs) - Math.min(...hs), sl = Math.hypot(hAt(o.x + 8, o.z) - hAt(o.x - 8, o.z), hAt(o.x, o.z + 8) - hAt(o.x, o.z - 8)) / 16;
-      if (Math.min(...hs) < SEA + 1.5 || sp > 17 || sl > 0.3) return no('slope');
+      if (Math.min(...hs) < SEA + 1.5 || sp > 14 || sl > 0.24) return no('slope');
       if (cs.some(([x, z]) => siteWeight(x, z) > 0.05)) return no('site');
       if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).length) return no('poi');
       if (sp > 8 || sl > 0.13) { o.key = 'fMeadow'; o.nofill = sl > 0.19 || sp > 14; } // pasture climbs the gentler slopes: there the turf itself shows within the hedges
@@ -587,7 +589,7 @@ const Wild = {
     const has = new Set(fields.map(o => o.blk + ':' + o.r + ':' + o.k));
     for (const o of fields) {
       const sl = terrainSlope(o.x, o.z);
-      if (!o.nofill) drapePatch(gb, o.key, makeXf(o.x, o.z, o.ang), -o.hx, -o.hz, o.hx, o.hz, { cell: 5, lift: 0.05 + sl * 0.5, tw: 3, uvFrame: true });
+      drapePatch(gb, o.key, makeXf(o.x, o.z, o.ang), -o.hx, -o.hz, o.hx, o.hz, { cell: 5, lift: 0.05 + sl * 0.5, tw: 3, uvFrame: true });
       const hr = new RNG(Math.floor(_h2(Math.round(o.x), Math.round(o.z), 1960) * 2147483647)), g = o.grow;
       // its hedges: the long side towards the next strip of the block is shared (drawn by one of the two), the ends likewise between rows;
       // near the city, as there, not every side is hedged; further out the fields are closed in
@@ -644,10 +646,11 @@ const Wild = {
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 10 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.34 * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
-          if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.9, 1.5)]); continue; } }
+          if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
-        const pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
+        let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
+        if (pick && !pick.small) { const ex = 1 - smoothstep(90, 520, coastZ(x) - z); if (ex > 0 && rng.next() < ex) pick = rng.next() < 0.45 * (1 - ex) ? { kind: rng.chance(0.5) ? 'bush' : 'bushB', s: 0.6 + 0.5 * rng.next() } : null; } // the salt wind: trees thin to scrub towards the sea
         if (pick && st && st.w > 0.5 && Sites.clearAt(x, z, pick.small ? 1 : 4)) continue; // round a site's buildings and roads
         if (!pick) continue;
         if (nearTrack(x, z, pick.small ? 2.2 : 3.6) || inField(x, z, pick.small ? 0.5 : 2.5)) continue;
@@ -731,7 +734,8 @@ const Wild = {
     for (const R of this.rivers) { if (R.box[0] > x1 || R.box[2] < ox || R.box[1] > z1 || R.box[3] < oz) continue; const wmin = inner ? 4 : 7; if (Math.max(...R.w) < wmin) continue;
       const keep = R.P.map((_, q) => (q % step === 0 || q === R.P.length - 1)), pts = R.P.filter((_, q) => keep[q]), ws = R.w.filter((_, q) => keep[q]);
       let run = []; const flush = () => { if (run.length > 1) strip(run.map(q => pts[q]), k => inner ? Math.max(ws[run[k]], 4) : Math.max(ws[run[k]] * 1.4, 9), wc, inner ? 1.0 : 3.0); run = []; }; // the small headwaters are left to the chunks
-      for (let q = 0; q < pts.length; q++) { if (ws[q] >= wmin) run.push(q); else flush(); } flush(); }
+      const ok = ws.map(w => w >= wmin); for (let q = 0; q < ok.length; q++) if (!ok[q]) { let e = q; while (e < ok.length && !ok[e]) e++; if (q > 0 && e < ok.length && e - q < 5) for (let k = q; k < e; k++) ok[k] = true; q = e; } // short dips below the cut-off are bridged
+      for (let q = 0; q < pts.length; q++) { if (ok[q]) run.push(q); else flush(); } flush(); }
     for (const T of this.tracks) strip(T.filter((_, q) => q % (inner ? 5 : 12) === 0), () => inner ? 4 : 8, dc, inner ? 0.9 : 2.6);
     yield;
     const group = new THREE.Group(); group.add(groupMesh(g, inner ? E.mats.wFar : E.mats.wFarO)); if (r.i.length) group.add(groupMesh(r, inner ? E.mats.wFarR : E.mats.wFarRO));
@@ -777,7 +781,8 @@ function wildRockiness(x, z, h, slope, apron = 0) {
   const nz = fbm(x / 36, z / 36, 2, 333), TL = wildTreeLine(x, z);
   const sea = 0.35 * smoothstep(160, 40, coastZ(x) - z) + 0.3 * smoothstep(1800, 300, rimDist(x, z)); // the sea keeps its cliffs bare, and the great mountains theirs
   const qr = smoothstep(1.0, 1.4, slope + 0.32 * nz + 0.15 * smoothstep(TL, TL + 60, h) + sea); // bare rock in outcrops on the steepest ground; turf and trees hold the rest
-  const alpine = smoothstep(TL + 70, TL + 150, h + 22 * nz) * smoothstep(0.42, 0.75, slope + 0.12 * nz); // above the trees alpine grass first, scree higher up and on the steeper ground
+  const patch = smoothstep(-0.15, 0.25, fbm(x / 140, z / 140, 2, 334) + 0.35 * nz); // scree lies in tongues and fans, not over whole hills
+  const alpine = smoothstep(TL + 90, TL + 190, h + 22 * nz) * smoothstep(0.55, 0.9, slope + 0.12 * nz) * patch; // above the trees alpine grass first, scree higher up on the steeper ground
   return [qr, (1 - qr) * Math.max(alpine, apron)];
 }
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
@@ -793,8 +798,8 @@ function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = fa
   if (h > TL + 20 || qs > 0.6) return r < 0.02 && sl < 0.9 ? { kind: 'bush', s: 0.5 + r2 * 0.4 } : r < 0.14 && qs < 0.8 ? { kind: 'tufts', small: true, s: 0.7 + r2 * 0.4 } : null;
   const alp = smoothstep(TL - 45, TL + 12, h);                     // woods thin out and turn to pine towards the tree line
   const copse = fbm(x / 34, z / 34, 2, 88);
-  m = clamp(m + 0.14 * fbm(x / 38, z / 38, 2, 369), 0, 1);          // ragged wood edges: bays and tongues
-  if (m > 0.004 && m < 0.12 && r < 0.2 * m / 0.12 && h < TL) return r2 < 0.55 ? { kind: r3 < 0.5 ? 'bush' : 'bushB', s: 0.6 + r3 * 0.6 } : { kind: n[1] > 0.9 && r3 < 0.7 ? 'oak' + Math.floor(r3 * 3) % 3 : 'pine', s: 0.45 + r3 * 0.35 }; // scrub and saplings thinning out from the wood
+  m = clamp(m + 0.22 * fbm(x / 30, z / 30, 2, 369) + 0.1 * fbm(x / 9, z / 9, 1, 370), 0, 1); // ragged wood edges: bays, tongues and outliers
+  if (m > 0.004 && m < 0.16 && r < 0.36 * Math.min(1, m / 0.1) && h < TL) return r2 < 0.55 ? { kind: r3 < 0.5 ? 'bush' : 'bushB', s: 0.6 + r3 * 0.6 } : { kind: n[1] > 0.9 && r3 < 0.7 ? 'oak' + Math.floor(r3 * 3) % 3 : 'pine', s: 0.45 + r3 * 0.35 }; // scrub and saplings thinning out from the wood
   let p = m > 0.06 ? 0.95 * smoothstep(0.12, 0.45, m) * (1 - 0.5 * smoothstep(0.3, 0.6, cult)) : copse > lerp(0.36, 0.48, smoothstep(0.15, 0.5, cult)) ? 0.45 : 0.0004; // woods, copses (fewer in farmland), the odd lone tree
   p = Math.min(1, p * dens * (0.45 + smoothstep(-0.3, 0.35, fbm(x / 16, z / 16, 2, 361)))) * (m > 0.3 ? 0.1 + 0.9 * smoothstep(-0.5, -0.22, fbm(x / 80, z / 80, 2, 386)) : 1) * (1 - 0.85 * alp) * (1 - 0.85 * smoothstep(0.7, 1.15, sl)); // trees stand in clumps, with glades between; few cling to steep faces
   const edge = m > 0.03 && m < 0.35;
