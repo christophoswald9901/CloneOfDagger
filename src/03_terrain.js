@@ -59,7 +59,7 @@ function riseHeight(x, z) {
 }
 // ridged multifractal: each octave is weighted by the one above, so crests stay sharp and the valleys between them smooth
 // soft > 1: the big crests are rounded, not knife-edged
-function ridgedMF(x, z, oct, s, soft = 1) { let sum = 0, amp = 1, f = 1, w = 1, norm = 0; for (let i = 0; i < oct; i++) { const v = Math.abs(vnoise(x * f, z * f, s + i * 29)); let n = 1 - (i < 2 && soft > 1 ? Math.pow(v, soft) * (1 + (soft - 1) * 0.35) : v); n *= n * w; w = clamp(n * 1.8, 0, 1); sum += n * amp; norm += amp; amp *= 0.5; f *= 2.05; } return sum / norm; }
+function ridgedMF(x, z, oct, s, soft = 1) { let sum = 0, amp = 1, f = 1, w = 1, norm = 0; for (let i = 0; i < oct; i++) { const v = Math.abs(vnoise(x * f, z * f, s + i * 29)); let n = 1 - (i < 2 && soft > 1 ? Math.pow(v, soft) * (1 + (soft - 1) * 0.35) : v); n *= n * w; w = clamp(n * 1.8, 0, 1) * (soft > 1 ? 1 - 0.75 * smoothstep(0.55, 0.95, n) : 1); sum += n * amp; norm += amp; amp *= 0.5; f *= 2.05; } return sum / norm; }
 // the valley lines of the wild: a broad field whose zero line the valleys (and the streams in them) follow
 function wildValley(x, z) {
   const s = WSEED * 131, X = x + WSEED * 7919, Z = z - WSEED * 6271;

@@ -25,7 +25,7 @@ FIND = r"""(()=>{const g=__game,W=g.Wild,h=g.terrainH,R=g.LAND.rivers,T=W.tracks
  // the highest ground 3-8 km out, looking out over the country
  { let best=null; for(let a=0;a<64;a++)for(const r of [3000,4500,6000,7500]){const x=Math.cos(a/64*6.283)*r,z=-Math.abs(Math.sin(a/64*6.283))*r*1.4-500; if(g.rimDist&&0)continue; const hh=h(x,z); if(hh>300)continue; if(!best||hh>best[0])best=[hh,x,z];}
    let [hh,x,z]=best; for(const st of [30,12]) for(let it=0;it<100;it++){let mv=false; for(let a=0;a<12;a++){const nx=x+Math.cos(a/12*6.283)*st,nz=z+Math.sin(a/12*6.283)*st,nh=h(nx,nz); if(nh>hh+0.05&&nh<320){hh=nh;x=nx;z=nz;mv=true;}} if(!mv)break;}
-   { const a=look(x,z,0,-6000); x-=-Math.sin(a)*45; z-=-Math.cos(a)*45; } // a little below the top, on its outward side
+   // on the top itself, looking out (the outlook search below turns to the open side)
    V.upland=[x,z,look(x,z,0,-6000),-0.1,null]; }
  // on the coast 4 km west of the city, looking along the shore
  { let x=-4200,z=-600; while(h(x,z)>1.5&&z<3000) z+=6; z-=12; for(let k=0;k<60;k++){ const sl=Math.hypot(h(x+3,z)-h(x-3,z),h(x,z+3)-h(x,z-3))/6; if(sl<0.25&&h(x,z)>0.5) break; z-=5; } z-=8; V.coast=[x,z,Math.atan2(1,-0.25),-0.1,null]; }
@@ -108,7 +108,7 @@ async def main():
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
-            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 5, name])
+            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
             where = await c.ev(PLACE.replace('ARGS', args))
             await asyncio.sleep(float(os.environ.get('WAIT', '6')))
             f = f'{OUT}/s{seed}_{name}.png'; await c.shot(f); files.append((name, f))

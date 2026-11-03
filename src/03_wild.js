@@ -251,7 +251,7 @@ const Wild = {
     if (!this.inCity(i, j)) {
       for (const f of this.endFarms) if (f.x >= x0 && f.x < x0 + WC && f.z >= z0 && f.z < z0 + WC) farm = { x: f.x, z: f.z, ang: f.ang, sg: f.sg, end: true };
       const rng = new RNG(Math.floor(_h2(i, j, 77 + WSEED) * 2147483647)), cu = wildCult(x0 + WC / 2, z0 + WC / 2);
-      if (!farm && cu > 0.25 && rng.chance(0.25 + 0.55 * cu)) {
+      if (!farm && cu > 0.2 && rng.chance(0.35 + 0.6 * cu)) {
         const tp = this.trackPtsNear(x0 - 170, z0 - 170, x0 + WC + 170, z0 + WC + 170, 4);
         for (let t = 0; t < 20 && !farm && tp.length > 2; t++) {
           const fx = x0 + rng.range(34, WC - 34), fz = z0 + rng.range(34, WC - 34); let q = -1, bd = 1e9; for (let k = 1; k < tp.length - 1; k++) { const d = Math.hypot(tp[k][0] - fx, tp[k][1] - fz); if (d < bd) { bd = d; q = k; } }
@@ -457,7 +457,7 @@ const Wild = {
       }
     }
     for (const { R, q0, q1 } of rivRuns) for (let q = q0 + 1; q <= q1; q++) {
-      const [ax, az] = R.P[q - 1], [bx, bz] = R.P[q], m = R.w[q] / 2 + 22;
+      const [ax, az] = R.P[q - 1], [bx, bz] = R.P[q], m = R.w[q] / 2 + 70;
       const a0 = Math.max(0, Math.floor((Math.min(ax, bx) - m - x0) / WCELL) + B), a1 = Math.min(S - 1, Math.ceil((Math.max(ax, bx) + m - x0) / WCELL) + B);
       const b0 = Math.max(0, Math.floor((Math.min(az, bz) - m - z0) / WCELL) + B), b1 = Math.min(S - 1, Math.ceil((Math.max(az, bz) + m - z0) / WCELL) + B);
       for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const k = b * S + a, sq = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), hw = lerp(R.w[q - 1], R.w[q], sq.t) / 2; if (sq.d - hw < rD[k] - rW[k]) { rD[k] = sq.d; rW[k] = hw; rL[k] = lerp(R.wl[q - 1], R.wl[q], sq.t); } }
@@ -467,11 +467,11 @@ const Wild = {
       for (let b = 0; b < S; b++) for (let a = 0; a < S; a++) { const k = b * S + a, d = Math.hypot(x0 + (a - B) * WCELL - px, z0 + (b - B) * WCELL - pz); if (d - hw < rD[k] - rW[k]) { rD[k] = d; rW[k] = hw; rL[k] = R.wl[R.wl.length - 1]; } }
     }
     for (let k = 0; k < S * S; k++) {
-      if (rD[k] > rW[k] + 22) continue; const hw = rW[k], d = rD[k], wl = rL[k], br = brs.length && onBridge(x0 + (k % S - B) * WCELL, z0 + (Math.floor(k / S) - B) * WCELL, 3), ford = best[k] < 6 && !br;
+      if (rD[k] > rW[k] + 70) continue; const hw = rW[k], d = rD[k], wl = rL[k], br = brs.length && onBridge(x0 + (k % S - B) * WCELL, z0 + (Math.floor(k / S) - B) * WCELL, 3), ford = best[k] < 6 && !br;
       const cw = Math.max(hw + 1.6, 6.2); // the bed is cut well over a ground cell wider than the water, so no triangle of bank rises through it
       if (d < cw) Hb[k] = Math.min(Hb[k], ford ? wl - 0.25 : wl - (0.35 + hw * 0.08) * (1 - 0.6 * (d / cw) ** 2) - 0.08);
       else if (br) continue; // the bridge's approaches keep the height of its deck
-      else { const bank = wl + 0.3 + 0.5 * smoothstep(2, 6, hw), raise = bank - Hb[k]; if (raise > 0) Hb[k] += raise * (1 - smoothstep(cw, cw + 6, d)); else Hb[k] = Math.min(Hb[k], bank + (d - cw) * (0.32 + 0.1 * fbm((x0 + (k % S) * WCELL) / 30, (z0 + Math.floor(k / S) * WCELL) / 30, 1, 373))); } // cut banks lie back at an easy slope
+      else { const bank = wl + 0.3 + 0.5 * smoothstep(2, 6, hw), raise = bank - Hb[k]; if (raise > 0) Hb[k] += raise * (1 - smoothstep(cw, cw + 6, d)); else { const e = d - cw; Hb[k] = Math.min(Hb[k], bank + e * (0.32 + 0.1 * fbm((x0 + (k % S) * WCELL) / 30, (z0 + Math.floor(k / S) * WCELL) / 30, 1, 373)) + 0.03 * Math.max(0, e - 14) ** 2); } } // cut banks lie back at an easy slope, steepening away from the water into the valley side (never a wall)
     }
     const hb = (a, b) => Hb[(b + B) * S + a + B];
     // bare rock over the whole bordered grid first, so scree can gather in aprons below it
@@ -479,7 +479,7 @@ const Wild = {
     for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, gx = (Hb[k + 1] - Hb[k - 1]) / (2 * WCELL), gz = (Hb[k + S] - Hb[k - S]) / (2 * WCELL); RK[k] = best[k] < 16 ? 0 : wildRockiness(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, Hb[k], Math.hypot(gx, gz))[0]; }
     let anyRock = false; for (let k = 0; k < S * S; k++) if (RK[k] > 0.01) { anyRock = true; break; }
     const apronAt = (a, b) => { if (!anyRock) return 0; const k0 = (b + B) * S + a + B, h0 = Hb[k0]; let m = 0; for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) { const aa = a + B + di, bb = b + B + dj; if (aa < 0 || bb < 0 || aa >= S || bb >= S) continue; const k = bb * S + aa; if (Hb[k] > h0 + 1.5) m = Math.max(m, RK[k] * (1 - Math.hypot(di, dj) / 4.5)); } return m * 0.9; };
-    const H = c.H = new Float32Array(N1 * N1), col = new Float32Array(N1 * N1 * 3), lit = new Float32Array(N1 * N1 * 3), colR = new Float32Array(N1 * N1 * 3), qR = new Float32Array(N1 * N1), qS = new Float32Array(N1 * N1), qW = new Float32Array(N1 * N1), qE = new Float32Array(N1 * N1);
+    const H = c.H = new Float32Array(N1 * N1), col = new Float32Array(N1 * N1 * 3), lit = new Float32Array(N1 * N1 * 3), colR = new Float32Array(N1 * N1 * 3), qR = new Float32Array(N1 * N1), qS = new Float32Array(N1 * N1), qW = new Float32Array(N1 * N1), qE = new Float32Array(N1 * N1), qF = new Float32Array(N1 * N1);
     this.chunks.set(this.key(i, j), c); // heights are known: tracks and plants below can sit on them
     for (let b = 0; b <= WN; b++) {
       for (let a = 0; a <= WN; a++) {
@@ -496,6 +496,7 @@ const Wild = {
         colR[k] = sh[0] * cav * rt * lerp(0.94, 1.85, snow); colR[k + 1] = sh[1] * cav * rt * lerp(0.97, 1.87, snow); colR[k + 2] = sh[2] * cav * rt * lerp(1.03, 1.95, snow); // grey stone out here
         const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 ? 0 : q[1];
         qE[v] = (1 - smoothstep(3.5, 10, best[kb])) * smoothstep(0.22, 0.5, Math.hypot(gx, gz)); // the raw earth of a track's cutting
+        qF[v] = coastZ(x) - z < 220 ? smoothstep(SEA + 1.9 + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
         { const kr = (b + B) * S + a + B, mw = 0.3 + 4 * smoothstep(-0.35, 0.45, fbm(x / 24, z / 24, 2, 372)); qW[v] = rD[kr] < 90 ? 1 - smoothstep(rW[kr] + 0.2, rW[kr] + mw, rD[kr]) : 0; } // wet mud along the banks, of uneven width
       }
       if (b % 8 === 7) yield;
@@ -530,6 +531,7 @@ const Wild = {
       if (sMin > 0.98) put('tScree', steepUV, colR); else put('tGrass', steepUV, col);
       if (sMax > 0.02 && sMin <= 0.98) put('wScreeO', flat, colR, qS);
       if (Math.max(...vs.map(v => qE[v])) > 0.02) put('wEarthO', flat, col, qE);
+      if (Math.max(...vs.map(v => qF[v])) > 0.02) put('wScreeO', flat, colR, qF);
       if (rMax > 0.02) put('wRockO', rockUV, colR, qR);
       if (Math.max(...vs.map(v => qW[v])) > 0.02 && Math.min(...vs.map(v => qW[v])) < 0.97) put('wMudO', flat, col, qW); // only the banks: under the water it would show through from afar
       // the sea's edge: wet sand, and a fringe of foam where the water is shallow
@@ -695,7 +697,7 @@ const Wild = {
         const gx = (hb(a + 1, b) - hb(a - 1, b)) / (2 * C), gz = (hb(a, b + 1) - hb(a, b - 1)) / (2 * C);
         const nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), t = E.tintOf(x, z, h, nn), k = (b * (n + 1) + a) * 3;
         const avg = (hb(a - 1, b) + hb(a + 1, b) + hb(a, b - 1) + hb(a, b + 1)) / 4, cav = clamp(1 + (h - avg) * 0.03, 0.72, 1.1), sh = terrainShade(nn).map(v => v * cav);
-        const [qr, qs] = wildRockiness(x, z, h, Math.hypot(gx, gz) * (inner ? 1.25 : 1.6)), qg = 1 - qr - qs;
+        const [qr, qs] = wildRockiness(x, z, h, Math.hypot(gx, gz) * (inner ? 1.2 : 1.3)), qg = 1 - qr - qs;
         const sand = isBeach(x, z, h) && Math.hypot(gx, gz) < 0.3;
         const SL = wildSnowLine(x, z), snow = smoothstep(SL, SL + 50, h) * smoothstep(0.35, 0.75, nn[1]), sn = [1.85, 1.87, 1.95];
         // farmland reads from afar as a patchwork of strips
@@ -730,7 +732,7 @@ const Wild = {
     const strip = (pts, wf, cl, lift) => { for (let q = 1; q < pts.length; q++) { const [ax, az] = pts[q - 1], [bx, bz] = pts[q]; if (!inBox(ax, az) || !inBox(bx, bz)) continue; const l = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / l, nz = (bx - ax) / l, wa = wf(q - 1) / 2, wb = wf(q) / 2, base = r.p.length / 3;
       for (const [x, z] of [[ax + nx * wa, az + nz * wa], [bx + nx * wb, bz + nz * wb], [bx - nx * wb, bz - nz * wb], [ax - nx * wa, az - nz * wa]]) { r.p.push(x, hAt(x, z) + lift, z); r.u.push(x / 6, z / 6); r.c.push(...cl); }
       r.i.push(base, base + 1, base + 2, base, base + 2, base + 3, base, base + 2, base + 1, base, base + 3, base + 2); } };
-    const wc = M.water.map((v, q) => v * 1.15 / M.noise[q]), dc = M.dirt.map((v, q) => v * 0.95 / M.noise[q]), step = inner ? 4 : 10;
+    const wc = M.water.map((v, q) => v * [0.72, 0.84, 0.86][q] / M.noise[q]), dc = M.dirt.map((v, q) => v * 0.95 / M.noise[q]), step = inner ? 4 : 10;
     for (const R of this.rivers) { if (R.box[0] > x1 || R.box[2] < ox || R.box[1] > z1 || R.box[3] < oz) continue; const wmin = inner ? 4 : 7; if (Math.max(...R.w) < wmin) continue;
       const keep = R.P.map((_, q) => (q % step === 0 || q === R.P.length - 1)), pts = R.P.filter((_, q) => keep[q]), ws = R.w.filter((_, q) => keep[q]);
       let run = []; const flush = () => { if (run.length > 1) strip(run.map(q => pts[q]), k => inner ? Math.max(ws[run[k]], 4) : Math.max(ws[run[k]] * 1.4, 9), wc, inner ? 1.0 : 3.0); run = []; }; // the small headwaters are left to the chunks
