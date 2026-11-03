@@ -214,7 +214,7 @@ const SITE_BUILD = {
     { const kx = S.x + 30, kz = S.z + 22, y = H(kx, kz) - 0.8; gb.tint = [1.3, 1.28, 1.2]; gb.setXf(kx, kz, 0.6, y); gb.box(-1.5, 0, -0.7, 1.5, 10, 0.7, 'rock', 2, 2); gb.box(-1.1, 10, -0.5, 1.0, 10.6, 0.5, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, kx, kz, 0.6, 1.5, 0.7, y - 1, y + 10.6); } // the king stone, standing apart
     for (const q of [3, 6]) { const [mx, mz] = S.road[q], [nx, nz] = S.road[q + 1], l = Math.hypot(nx - mx, nz - mz), ox = -(nz - mz) / l * 4, oz = (nx - mx) / l * 4, y = H(mx + ox, mz + oz) - 0.5; gb.tint = [1.4, 1.38, 1.3]; gb.setXf(mx + ox, mz + oz, 0.3 * q, y); gb.box(-0.5, 0, -0.3, 0.5, 2.6, 0.3, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, mx + ox, mz + oz, 0.3 * q, 0.5, 0.3, y - 1, y + 2.6); } // marker stones beside the way up
     { const y = H(S.x, S.z) - 0.3; gb.setXf(S.x, S.z, 0.4, y); gb.box(-1.3, 0, -0.75, 1.3, 0.85, 0.75, 'rock', 2, 2); gb.xf = null; siteCol(area, S.x, S.z, 0.4, 1.3, 0.75, y - 1, y + 0.85); }
-    for (let q = 0; q < 8; q++) { const a = rng.range(0, 6.283), r = rng.range(30, 120), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 1.0), rng); }
+    // (the crown is kept clear: nothing to confuse with the stones)
   },
   // the hamlet: cottages along a lane from the jetty, a chapel, gardens; a jetty out over the water
   mirrormere(gb, S, H, area) {

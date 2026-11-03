@@ -724,7 +724,7 @@ function buildCity() {
     const heath = smoothstep(60, 110, h); r = lerp(r, 1.12, heath * 0.5); b = lerp(b, 0.78, heath * 0.5);
     if (outK > 0) { const vale = (1 - smoothstep(40, 380, riverD(x, z))) * outK, rough = smoothstep(0.05, 0.45, fbm(x / 340 + 7, z / 340, 2, 48)) * outK * (1 - fm0), dry = smoothstep(-0.1, 0.5, fbm(x / 900, z / 900, 2, 49)) * outK;
       r = lerp(r, 0.86, vale * 0.45); g = lerp(g, 1.04, vale * 0.45); b = lerp(b, 0.66, vale * 0.45); // lush meadow along the rivers
-      r = lerp(r, 1.2, rough * 0.4); g = lerp(g, 0.93, rough * 0.4); b = lerp(b, 0.66, rough * 0.4); // rough grazing, tawny
+      r = lerp(r, 1.14, rough * 0.25); g = lerp(g, 0.95, rough * 0.25); b = lerp(b, 0.7, rough * 0.25); // rough grazing, tawny
       r *= 1 + 0.07 * dry; b *= 1 - 0.08 * dry; }
     { const hw = wildHeath(x, z, h) * (1 - fm); if (hw > 0) { r = lerp(r, h > 70 ? 1.02 : 1.12, hw * 0.92); g = lerp(g, h > 70 ? 0.72 : 0.82, hw * 0.92); b = lerp(b, h > 70 ? 0.84 : 0.58, hw * 0.92); } } // heather purples the uplands, bracken browns the lower heath
     if (Math.max(Math.abs(x), Math.abs(z)) <= TG.R) { const bare = smoothstep(118, 165, h); r = lerp(r, 1.05, bare); g = lerp(g, 1.0, bare); b = lerp(b, 1.02, bare); } // thin turf and bare rock above the tree line

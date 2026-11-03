@@ -28,7 +28,7 @@ FIND = r"""(()=>{const g=__game,W=g.Wild,h=g.terrainH,R=g.LAND.rivers,T=W.tracks
    // on the top itself, looking out (the outlook search below turns to the open side)
    V.upland=[x,z,look(x,z,0,-6000),-0.1,null]; }
  // on the coast 4 km west of the city, looking along the shore
- { let best=null; for(let x=-5200;x<=-3200;x+=100){ let z=-600; while(h(x,z)>1.5&&z<3000) z+=6; let zz=z; for(let k=0;k<40&&h(x,zz)<3.5;k++) zz-=3; const sl=Math.hypot(h(x+3,zz)-h(x-3,zz),h(x,zz+3)-h(x,zz-3))/6; if(sl<0.3&&(!best||Math.abs(x+4200)<Math.abs(best[0]+4200))) best=[x,zz]; } const [x,z]=best||[-4200,0]; V.coast=[x,z,Math.atan2(1,-0.25),-0.08,null]; } // at the shore, a few metres above the water
+ { let best=null; for(let x=-5200;x<=-3200;x+=100){ const cz=g.coastZ(x); let z=cz-200; while(h(x,z)>1.5&&z<cz+300) z+=4; if(Math.abs(z-cz)>120) continue; let zz=z; for(let k=0;k<40&&h(x,zz)<3.5;k++) zz-=3; const sl=Math.hypot(h(x+3,zz)-h(x-3,zz),h(x,zz+3)-h(x,zz-3))/6; if(sl<0.3&&(!best||Math.abs(x+4200)<Math.abs(best[0]+4200))) best=[x,zz]; } const [x,z]=best||[-4200,0]; V.coast=[x,z,Math.atan2(1,-0.25),-0.08,null]; } // at the shore, a few metres above the water
  // in the foothills of the mountains that close the world to the north, looking at them
  { let x=1500,z=-12000; while(h(x,z)<260&&z>-19000) z-=40; z+=700; for(let k=0;k<40&&fm(x,z,h(x,z))>0.15;k++){ x+=(k%2?1:-1)*k*60; } V.rim=[x,z,0,0.08,null]; }
  // from the air: over a river valley, high over the interior, and over the edge of the city's own country looking out
