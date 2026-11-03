@@ -57,8 +57,13 @@ New cities should use the town generator. Daggerfall stays as it is, but it is w
 - **One tree can hide a town.** From the road 1 km out, a single roadside oak covered the belfry exactly. Across a town's own farmland the roads are kept open (no trees within about 45 m), which is also how lowland approach roads look.
 - **Shader and one-line code edits break silently.** A `//` comment inside a one-line statement commented out the rest of it, and the whole game failed to load. `build.py` now refuses to write a build whose JavaScript doesn't parse.
 
+- **Open spaces must be sized to what faces them.** A whole grid block left open as the cathedral's forecourt was about 80 m deep, and the church looked small and far away across it. The forecourt now takes about 30 m of the block, and the rest is lots whose houses face it. Squares need the same care: a block-sized square needs many stalls and people, or it reads as a car park.
+- **Openings must read as openings.** A gate passage lit like the street beyond it doesn't show from 100 m; it needs a dark soffit and side walls and a dressed-stone arch round it. A see-through grille over the canal's water gate looked like a rendering bug, so the water gate is now a dark vault under a band of dressed stone.
+- **Landmarks need forms, not just positions.** Moving the same belfry around between seeds doesn't make towns feel different. The belfry now has three forms (an octagon under a spire, a stone tower under a pyramid roof, and an octagon with a lantern), chosen by the town's seed. More landmark forms are the cheapest way to add variety between cities.
+
 ## Open problems
 
-- From the ground, the cathedral's west front reads as one mass; its spires are too high to see from the forecourt.
+- Every town has the same rectangular wall. An outline that follows the water, or a polygon, would do most for variety between cities.
+- From 600 m out the town is low on the horizon, and only the tallest towers stand out.
 - Ordinary streets still repeat the same window rhythm; more facade types (shop fronts, arcades, wider guild houses) would help.
 - With some 300–500k triangles while the player is in town, it is heavier than Daggerfall. Watch the frame rate on the iPad, and consider simpler houses for chunks beyond about 250 m.
