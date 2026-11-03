@@ -65,5 +65,8 @@ New cities should use the town generator. Daggerfall stays as it is, but it is w
 
 - Every town has the same rectangular wall. An outline that follows the water, or a polygon, would do most for variety between cities.
 - From 600 m out the town is low on the horizon, and only the tallest towers stand out.
+- The plan is a straight grid. The critics' top complaint in the last round was long dead-straight streets; bends, forks and closed vistas would make it read as grown rather than planned.
+- The Grand Square and market take whole blocks and still look too big for the stalls in them. The cathedral sometimes backs onto the wall with an empty apron in front.
+- Trees placed on paving look tilted, and wall stairs don't quite meet the wall-walk.
 - Ordinary streets still repeat the same window rhythm; more facade types (shop fronts, arcades, wider guild houses) would help.
 - With some 300–500k triangles while the player is in town, it is heavier than Daggerfall. Watch the frame rate on the iPad, and consider simpler houses for chunks beyond about 250 m.
