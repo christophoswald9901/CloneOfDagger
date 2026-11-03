@@ -235,13 +235,33 @@ const UI = {
   openVictory() {
     this.openStory('The Ghost Is at Rest', `<p>King Lysandus no longer walks the streets of Daggerfall. The Emperor's letter is in royal hands, and whatever it says will set the Iliac Bay on a new course — but that is a story for another city.</p><p>For now, Daggerfall sleeps soundly for the first time in months. Its taverns, guilds and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Daggerfall: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
   },
+  // fast travel on foot: straight on, along the road underfoot, or to a place you know of (by road or across country)
+  openFoot() {
+    const P = G.player; if (G.area !== G.city) { msg('You can only travel this way out in the open.'); return; }
+    const goals = Travel.goals(), road = Travel.roadAhead(P.pos.x, P.pos.z, P.yaw), dir = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((Math.atan2(-Math.sin(P.yaw), Math.cos(P.yaw)) * 180 / Math.PI) + 360) % 360 / 45) % 8];
+    const s = nearestStop(P.pos.x, P.pos.z), km = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m';
+    const render = () => `<h2>Travel on foot</h2><p class="dim">The world runs faster while you travel. Any key, or a tap on the banner, stops you; so does anything worth stopping for.</p>
+      <div class="btns col"><button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
+      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)} · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
+      <div class="btns"><span class="dim">Speed</span>${Travel.SPEEDS.map(v => `<button class="db sm${Travel.rate() === v ? ' primary' : ''}" data-a="v${v}">×${v}</button>`).join('')}</div>
+      ${s && insideCity(P.pos.x, P.pos.z, -40) ? `<p class="note">Inside the walls the carriages are quicker: the nearest stop is at ${esc(s.name)}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}.</p>` : ''}
+      <div class="btns"><button class="db" data-a="close">Stay here</button></div>`;
+    this.open('foot', render, { cls: 'mid', onAct: (a) => {
+      if (a[0] === 'v') { settings.travelSpeed = +a.slice(1); saveSettings(); this.render(); return; }
+      if (a === 'map') { this.close(true); MapView.open(true); return; }
+      const go = () => { this.close(true); };
+      if (a === 'ahead') { go(); Travel.ahead(false); return; }
+      if (a === 'road') { go(); Travel.ahead(true); return; }
+      const g = goals[+a.slice(1)]; if (!g) return; go(); Travel.toward(g.x, g.z, g.name, a[0] === 'r');
+    } });
+  },
   openTravel(stop) {
     const P = G.player;
     if (G.area.kind !== 'city') { msg('There are no carriages in here.'); return; }
     if (!stop) {
       const s = nearestStop(P.pos.x, P.pos.z);
       if (s && Math.hypot(s.x - P.pos.x, s.z - P.pos.z) < 8) stop = s;
-      else { if (s) msg(`The nearest carriage stop is at ${s.name}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}. Look for the signpost with the wheel.`); return; }
+      else { this.openFoot(); return; }
     }
     if (G.wanted) { msg('The coachman takes one look at you and shakes his head. "Not with the guard after you."', 'bad'); return; }
     if (nearbyHostiles(18)) { msg('The horses shy away. You cannot board with enemies nearby.', 'bad'); return; }
@@ -249,8 +269,8 @@ const UI = {
     const routes = carriageRoutes(stop);
     const render = () => `<h2>Daggerfall Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
       <div class="list scroll">${routes.map((r, i) => `<div class="row"><div class="nm">${esc(capFirst(r.stop.name))}<small>${esc(capFirst(districtAt(r.stop.x, r.stop.z).name))} · about ${r.mins} minutes${r.via.length ? ' · via ' + esc(r.via.join(', ')) : ''}</small></div><div class="pr">${r.fare * (night ? 2 : 1)} g</div><button class="db sm" data-a="t${i}" ${P.gold < r.fare * (night ? 2 : 1) ? 'disabled' : ''}>Travel</button></div>`).join('')}</div>
-      <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Stay here</button></div>`;
-    this.open('travel', render, { cls: 'mid', onAct: (a) => { const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
+      <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="foot">Travel on foot</button><button class="db" data-a="close">Stay here</button></div>`;
+    this.open('travel', render, { cls: 'mid', onAct: (a) => { if (a === 'foot') { this.openFoot(); return; } const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
   },
   openArrest() {
     const P = G.player; const fine = G.wanted.fine;
@@ -267,26 +287,71 @@ function isEquipped(it) { const e = G.player.equip; return e.weapon === it || e.
 
 /* ---------------- map ---------------- */
 const MapView = {
-  zoom: 1,
-  open() {
+  zoom: 1, view: null, dest: null, ZMIN: 0.035, ZMAX: 6,
+  // pick: opened to choose where to travel (starts zoomed out over the country)
+  open(pick = false) {
     if (G.area.kind === 'interior') { msg(`You are inside ${G.area.name}. There is no need for a map here.`); return; }
-    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.draw();
+    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = null; this.dest = null; $('mapdest').hidden = true;
+    const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
+    this.draw();
   },
-  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; if (G.state === 'play') requestLock(false); },
+  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
+  setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
+  // the whole country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow
+  worldImage() {
+    if (this._world) return this._world; const N = 300, [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = WORLD.x1 - WORLD.x0, Hd = WORLD.z1 - WORLD.z0, fm = G.city.forestMask;
+    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(WORLD.x0 + (i + 0.5) / N * Wd, WORLD.z0 + (j + 0.5) / N * Hd);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const wx = WORLD.x0 + (i + 0.5) / N * Wd, wz = WORLD.z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+      if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
+      const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
+      const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
+      if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
+      if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }
+      else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
+      else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
+      a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); return (this._world = c);
+  },
+  // screen → world on the map as last drawn
+  toWorld(px, py) { const t = this.tf; if (!t) return null; return [t.cx + (px * t.dpr - t.W / 2) / t.scale, t.cz + (py * t.dpr - t.H / 2) / t.scale]; },
+  pick(px, py) {
+    const w = this.toWorld(px, py); if (!w || G.area !== G.city) return; const t = this.tf, P = G.player; let best = null, bd = 22 * t.dpr;
+    for (const g of Travel.goals()) { const d = Math.hypot((g.x - w[0]) * t.scale, (g.z - w[1]) * t.scale); if (d < bd) { bd = d; best = g; } }
+    for (const S of SITES) { const d = Math.hypot((S.x - w[0]) * t.scale, (S.z - w[1]) * t.scale); if (d < bd && ((G.flags.found || {})[S.id] || (G.flags.heard || {})[S.id])) { bd = d; best = { name: S.name, x: S.road[0][0], z: S.road[0][1] }; } }
+    this.dest = best ? { ...best } : { name: 'the place you marked', x: w[0], z: w[1] };
+    const d = Math.hypot(this.dest.x - P.pos.x, this.dest.z - P.pos.z), el = $('mapdest');
+    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))} · ${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
+    el.hidden = false; this.draw();
+  },
+  go(how) {
+    const D = this.dest; if (how === 'clear' || !D) { this.dest = null; $('mapdest').hidden = true; this.draw(); return; }
+    this.close(); Travel.toward(D.x, D.z, D.name, how === 'road');
+  },
   draw() {
-    const c = $('mapc'); const W = c.width = Math.floor(innerWidth * Math.min(devicePixelRatio, 2)), H = c.height = Math.floor(innerHeight * Math.min(devicePixelRatio, 2));
+    const c = $('mapc'); const dpr = Math.min(devicePixelRatio, 2), W = c.width = Math.floor(innerWidth * dpr), H = c.height = Math.floor(innerHeight * dpr);
     const x = c.getContext('2d'); x.fillStyle = '#1b1712'; x.fillRect(0, 0, W, H); const P = G.player;
     const legend = $('maplegend');
     if (G.area.kind === 'dungeon') { this.drawDungeon(x, W, H); legend.textContent = 'The Catacombs — explored passages. The door marks the way out. (M or Esc to close)'; return; }
-    const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2);
-    const cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
+    let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    if (region) { cx = P.pos.x; cz = P.pos.z; }
+    if (this.view) { cx = this.view[0]; cz = this.view[1]; }
+    cx = clamp(cx, WORLD.x0, WORLD.x1); cz = clamp(cz, WORLD.z0, WORLD.z1 + 1000);
+    this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
     const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
     const poly = (pts, col, stroke) => { x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.closePath(); if (col) { x.fillStyle = col; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.stroke(); } };
     const circ = (px, pz, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(X(px), Z(pz), Math.max(1, r * scale), 0, 7); x.fill(); };
     const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
     if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
-    rect(-2000, -2000, 2000, 2000, '#1d3446'); x.imageSmoothingEnabled = true; x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
+    x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
+    if (this.zoom < 1.6) x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+    x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
+    // out in the country: rivers, tracks and the roads to the landmarks
+    for (const R of LAND.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const T of Wild.tracks) { x.strokeStyle = '#8a7350'; x.lineWidth = Math.max(1.5, 4 * scale); x.setLineDash(region ? [] : [6, 4]); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); x.setLineDash([]); }
     const FCOL = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' };
     for (const f of M.fields) poly(f.poly, FCOL[f.key] || '#5a5a30');
     poly(WALL_PTS, 'rgba(74,69,60,0.86)');
@@ -311,8 +376,8 @@ const MapView = {
     x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(2, 3 * scale); x.lineCap = 'butt'; x.beginPath(); WALL_PTS.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke();
     { const xs = [WALL_PTS[0][0], ...M.piers.flatMap(p => [p - 4.5, p + 4.5]), WALL_PTS[WALL_PTS.length - 1][0]]; x.beginPath(); for (let i = 0; i < xs.length; i += 2) { x.moveTo(X(xs[i]), Z(SHORE + 0.5)); x.lineTo(X(xs[i + 1]), Z(SHORE + 0.5)); } x.stroke(); } // the sea wall, open at each pier
     for (const [px, pz] of WALL_PTS) circ(px, pz, 4.6, '#8a8070');
-    for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
-    for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
+    if (this.zoom >= 0.45) for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
+    if (this.zoom >= 0.45) for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
     for (const d of M.labels) labels.push([d.name.toUpperCase(), X(d.x), Z(d.z), 'rgba(232,216,168,0.55)', Math.round(fs * 1.25)]);
     for (const l of G.city.landmarks) if (!l.id.endsWith('gate') || this.zoom >= 1.5) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 8, '#d8cca8', Math.round(fs * 0.9)]);
     // quest markers
@@ -329,11 +394,21 @@ const MapView = {
       else markers.push([bld('mausoleum').door, q.title]);
     }
     const t = performance.now() / 300;
-    for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
+    if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
+    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
+    // the landmarks you know of, the places you have come upon, the way you are going
+    const found = G.flags.found || {}, heard = G.flags.heard || {};
+    for (const S of SITES) { if (!found[S.id] && !heard[S.id]) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
+      x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
+      labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
+    for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    if (Travel.cur) { const pts = Travel.cur.pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
+    if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
     this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind === 'city' ? 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −.' : 'Wheel or + / − to zoom. (M or Esc to close)') : '';
+    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Daggerfall — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+      : 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
   },
   drawDungeon(x, W, H) {
     const D = G.area.dg; const cell = Math.floor(Math.min(W, H) * 0.9 / D.N); const ox = (W - cell * D.N) / 2, oz = (H - cell * D.N) / 2; const P = G.player;

@@ -47,7 +47,7 @@ function wildCult(x, z) {
   const ring = (0.62 - 0.27 * smoothstep(700, 1700, r)) * (1 - smoothstep(1900, 3800, r)) * smoothstep(0, 220, sd);
   const belt = (1 - smoothstep(80, 440, Wild.trackD(x, z))) * 0.8 * (1 - smoothstep(7000, 17000, r));
   const vale = (1 - smoothstep(80, 520, riverD(x, z))) * 0.6 * (1 - smoothstep(6000, 15000, r)) * smoothstep(250, 600, sd); // the broad river valleys are farmed too
-  return Math.max(band, ring, belt, vale) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360));
+  return Math.max(band, ring, belt, vale) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWeight(x, z)); // (no generated farmland in a site)
 }
 
 // a pool of billboards that turn to the camera on the graphics card, so thousands cost nothing per frame
@@ -130,13 +130,15 @@ const Wild = {
       this.hR = { C, R, N, D, A, FD }; }
     this.farmCache = new Map(); this.candCache = new Map(); this.fieldCache = new Map();
     this.rivers = LAND.rivers;
+    Sites.build(area, env.mats); // the landmarks' buildings, kept for good (each is seen from far off)
+    POI.plan(); // the small places out in the country
     this.buildFarNow(this.FAR[0], 0, 0); this.FAR[1].job = this.genFar(this.FAR[1], 0, 0); // the coarse ring is built over the first frames
     this.buildHorizon();
   },
   // the whole country, very coarsely, behind the far rings: from anywhere the mountains round its edge stand on the skyline
   buildHorizon() {
     const C = 200, X0 = WORLD.x0 - 2600, Z0 = WORLD.z0 - 2600, NI = Math.round((WORLD.x1 - WORLD.x0 + 5200) / C), NJ = Math.round((WORLD.z1 - WORLD.z0 + 3800) / C), M = this.mean;
-    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = terrainBase(X0 + i * C, Z0 + j * C);
+    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = siteFix(X0 + i * C, Z0 + j * C, terrainBase(X0 + i * C, Z0 + j * C));
     const hb = (i, j) => H[clamp(j, 0, NJ) * (NI + 1) + clamp(i, 0, NI)], col = new Float32Array((NI + 1) * (NJ + 1) * 3);
     for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) {
       const x = X0 + i * C, z = Z0 + j * C, h = hb(i, j), gx = (hb(i + 1, j) - hb(i - 1, j)) / (2 * C), gz = (hb(i, j + 1) - hb(i, j - 1)) / (2 * C), nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), sh = terrainShade(nn), k = (j * (NI + 1) + i) * 3;
@@ -164,6 +166,16 @@ const Wild = {
     rc.near = rn;
     for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q], r = R.w[q] / 2 + 3; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) { const k = i * 8192 + j; rc.set(k, Math.max(rc.get(k) || 0, R.hand ? 99 : R.w[q])); } }
     from.forEach(({ pre, aims }, i) => { const t = wildTrack(pre, aims, 700 + i * 31 + WSEED * 97, used, this.tracks, rc); if (t.length > 1) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } });
+    // each site's road: its own fixed way out, then on over the country to the nearest track, which it joins
+    SITES.forEach((S, si) => {
+      const pre = S.road.map(p => p.slice()), [sx, sz] = pre[pre.length - 1];
+      let tp = null, bd = 1e9; for (const T of this.tracks) for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - sx, T[q][1] - sz); if (d < bd) { bd = d; tp = T[q]; } }
+      let pts = pre;
+      if (tp) { const r = routeWild([sx, sz], tp, 900 + si * 17 + WSEED * 97, used, rc);
+        if (r) { pts = pts.concat(r.path.slice(1)); const [ex, ez] = pts[pts.length - 1]; let bp = tp, bb = 1e9; for (const T of this.tracks) for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bb) { bb = d; bp = q; } } pts.push(bp.slice()); } }
+      const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.site = S.id; S.track = this.tracks.length; this.tracks.push(out);
+      for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); }
+    });
     // a farmstead where a track ends: its yard a little beyond the end, well inside one chunk, its front to the way
     this.endFarms = this.trackEnds.map(({ ti }) => { const T = this.tracks[ti], L = T.length, [ex, ez] = T[L - 1], [px, pz] = T[Math.max(0, L - 8)], l = Math.hypot(ex - px, ez - pz) || 1, ux = (ex - px) / l, uz = (ez - pz) / l;
       let fx = ex + ux * 24, fz = ez + uz * 24; const i0 = this.ci(fx), j0 = this.ci(fz), cx0 = -TG.R + i0 * WC, cz0 = -TG.R + j0 * WC;
@@ -244,7 +256,7 @@ const Wild = {
           if (q < 0 || bd > 170 || bd < 30) continue; // within a short lane of a track
           const [ax, az] = tp[q - 1], [bx, bz] = tp[q + 1], nx = (fx - tp[q][0]) / bd, nz = (fz - tp[q][1]) / bd;
           const hs = []; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) hs.push(terrainRaw(fx + a * 7, fz + b * 7));
-          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
+          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWeight(fx, fz) > 0 || POI.near(fx, fz, 40).length || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
           farm = { x: fx, z: fz, ang: Math.atan2(-nx, -nz), sg: [ax, az, bx, bz] };
         }
       }
@@ -274,6 +286,8 @@ const Wild = {
       // arable strips want gentle ground; hedged pasture climbs the hillsides
       const cs = obbCorners(o), hs = cs.map(([x, z]) => hAt(x, z)), sp = Math.max(...hs) - Math.min(...hs), sl = Math.hypot(hAt(o.x + 8, o.z) - hAt(o.x - 8, o.z), hAt(o.x, o.z + 8) - hAt(o.x, o.z - 8)) / 16;
       if (Math.min(...hs) < SEA + 1.5 || sp > 17 || sl > 0.3) return no('slope');
+      if (cs.some(([x, z]) => siteWeight(x, z) > 0.05)) return no('site');
+      if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).length) return no('poi');
       if (sp > 8 || sl > 0.13) { o.key = 'fMeadow'; o.nofill = sl > 0.19 || sp > 14; } // pasture climbs the gentler slopes: there the turf itself shows within the hedges
       for (const [x, z] of [...cs, [o.x, o.z]]) if (E.forestMask(x, z, hAt(x, z)) > 0.5) return no('wood');
       for (const p of tp) if (circleObb(p[0], p[1], 12, o)) return no('track');                                   // clear of the tracks' cuttings
@@ -365,7 +379,7 @@ const Wild = {
     // the far rings follow the camera; while one has fallen well behind (fast travel) it gets a share of every frame even when chunks are waiting
     for (const L of this.FAR) if (!L.job && (!L.at || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move)) L.job = this.genFar(L, x, z);
     for (const L of this.FAR) if (L.job && Math.hypot(L.at ? L.at[0] - x : 1e9, L.at ? L.at[1] - z : 1e9) > L.R * 0.45) { const t1 = performance.now(); while (L.job && performance.now() - t1 < 2) { if (L.job.next().done) L.job = null; } }
-    while (performance.now() - t0 < WILD.budget) {
+    while (performance.now() - t0 < (this.fast ? 13 : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling)
       if (!this.job) {
         const w = this.wanted(x, z);
         if (w.length) { const { i, j } = w[0]; this.jobKey = [i, j]; this.job = this.genChunk(i, j); }
@@ -550,7 +564,7 @@ const Wild = {
     for (const b of brs) if (b.x >= x0 && b.x < x0 + WC && b.z >= z0 && b.z < z0 + WC) bridgeMesh(gb, b, c.cols);
     const nearTrack = (x, z, r) => trackSegs.some(s => segDist(x, z, s[0], s[1], s[2], s[3]).d < r);
     for (const T of this.tracks) if (T.joined) { const [jx, jz] = T[T.length - 1]; if (jx >= x0 && jx < x0 + WC && jz >= z0 && jz < z0 + WC) { drapeDisc(gb, 'rDirt', jx, jz, 5.5, { segs: 12, rings: 2, lift: 0.066 }); } } // the gore where tracks meet is trodden bare
-    const rng = new RNG(Math.floor(_h2(i, j, 900 + WSEED) * 2147483647)), fl = c.fl;
+    const rngW = new RNG(Math.floor(_h2(i, j, 900 + WSEED) * 2147483647)), fl = c.fl; let rng = rngW;
     const blocks = []; // ground kept clear of plants: yards and buildings
     if (farm) {
       const FX = makeXf(farm.x, farm.z, farm.ang, farm.y), saved = this.area.colliders; this.area.colliders = [];
@@ -565,6 +579,7 @@ const Wild = {
       if (farm.spur) { const spur = resampleEven(farm.spur, 3); drapeStrip(gb, 'rDirt', spur, 2.4, { lift: 0.068 }); drapeFeather(gb, 'rDirtF', spur, 2.4, 0.7, { seed: i + j }); for (let k = 1; k < spur.length; k++) trackSegs.push([spur[k - 1][0], spur[k - 1][1], spur[k][0], spur[k][1], 0, 0]); }
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
+    for (const p of POI.list) if (p.x >= x0 && p.x < x0 + WC && p.z >= z0 && p.z < z0 + WC) POI.build(p, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
     // the farmed strips laid from here (they may reach a little into the chunks beside), each hedged all round, sheep in the pasture.
     // Working out the neighbours' layouts is spread over frames
     for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) if (!this.candCache.has(this.key(i + di, j + dj))) { this.fieldCand(i + di, j + dj); yield; }
@@ -618,8 +633,12 @@ const Wild = {
     // plants: one chance on a jittered 5.5 m grid, as dense as the woods round the city
     const SP = 5.5, DENS = (SP / 5) * (SP / 5);
     const tree = (kind, x, z, h, s) => { const def = WILD_KINDS[kind]; fl[kind].push([x, h - 0.15, z, s]); if (def[4]) c.cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: h - 1, y1: h + def[4] * s }); };
+    const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400);
     for (let b = 0; b < WC / SP; b++) {
       for (let a = 0; a < WC / SP; a++) {
+        // in a site, a cell takes its plants from the site's own fixed draw (as far as the site holds there), else from the world's
+        let rng = rngW; const sx = x0 + (a + 0.5) * SP, sz = z0 + (b + 0.5) * SP, st = siteHere ? siteAt(sx, sz) : null;
+        if (st && _h2(Math.floor(sx / SP), Math.floor(sz / SP), 4401) < st.w) rng = new RNG(Math.floor(_h2(Math.floor(sx / SP), Math.floor(sz / SP), 4402) * 2147483647));
         const x = x0 + (a + rng.next()) * SP, z = z0 + (b + rng.next()) * SP, h = this.heightAt(x, z);
         if (h < SEA + 1.6) continue;
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
@@ -628,7 +647,8 @@ const Wild = {
           if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.9, 1.5)]); continue; } }
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
-        const pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h));
+        const pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
+        if (pick && st && st.w > 0.5 && Sites.clearAt(x, z, pick.small ? 1 : 4)) continue; // round a site's buildings and roads
         if (!pick) continue;
         if (nearTrack(x, z, pick.small ? 2.2 : 3.6) || inField(x, z, pick.small ? 0.5 : 2.5)) continue;
         if (pick.kind === 'flowers') { const fk = 'flowers' + rng.int(0, 3); for (let q = 0; q < 8; q++) { const fx = x + rng.range(-3.5, 3.5), fz = z + rng.range(-3.5, 3.5); if (!inField(fx, fz, 0.3)) fl[fk].push([fx, this.heightAt(fx, fz) - 0.03, fz, rng.range(0.7, 1.1)]); } continue; }
@@ -640,6 +660,7 @@ const Wild = {
     // stones: outcrops at the breaks of slope, blocks among the scree, the odd boulder in the grass
     for (let q = 0; q < 80; q++) {
       const x = x0 + rng.next() * WC, z = z0 + rng.next() * WC, h = this.heightAt(x, z); if (h < SEA + 1) continue;
+      if (siteHere && siteWeight(x, z) > 0.3) continue; // a site has its own stones
       const qr = qAt(qR, x, z), qs = qAt(qS, x, z), sl = terrainSlope(x, z);
       const p = qr > 0.15 && qr < 0.9 ? 0.5 : qs > 0.3 ? 0.35 : sl > 0.35 ? 0.12 : 0.03;
       if (!rng.chance(p) || nearTrack(x, z, 3) || inField(x, z, 3)) continue;
@@ -760,12 +781,13 @@ function wildRockiness(x, z, h, slope, apron = 0) {
   return [qr, (1 - qr) * Math.max(alpine, apron)];
 }
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
-function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); return smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); } // broad tracts on the high dry ground
+function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
 // small woods standing in open country (the copses of the plant rules), for the ground tint under them
-function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))); }
+function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)); }
 
 // what grows at a spot in the wild: {kind, s, small} or null. m is how wooded the land is, cult how farmed
-function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0) {
+function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = false) {
+  const WS = fixed ? 0 : WSEED; // a site's own plants are the same in every world
   const r = rng.next(), r2 = rng.next(), r3 = rng.next();
   const TL = wildTreeLine(x, z);
   if (h > TL + 20 || qs > 0.6) return r < 0.02 && sl < 0.9 ? { kind: 'bush', s: 0.5 + r2 * 0.4 } : r < 0.14 && qs < 0.8 ? { kind: 'tufts', small: true, s: 0.7 + r2 * 0.4 } : null;
@@ -779,7 +801,7 @@ function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0) {
   if (r < p) {
     if (r2 < (edge ? 0.3 : 0.07) + alp * 0.25) return { kind: 'bush', s: 0.7 + r3 * 0.7 };
     // each stand has a leading species: pine on high and north-facing ground, broadleaf in the lowlands, mixed between
-    const conif = 1.6 * fbm(x / 260 + WSEED * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp; // stands of one kind or the other, few mixed
+    const conif = 1.6 * fbm(x / 260 + WS * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp; // stands of one kind or the other, few mixed
     let kind;
     if (conif > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
     else if (conif < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
@@ -883,7 +905,7 @@ function routeWild(from, to, seed, used, rc = null, C = TRC) {
       const x = ni * C, z = nj * C; if (Math.abs(x) < TG.R + 12 && Math.abs(z) < TG.R + 12 && Math.hypot(x - from[0], z - from[1]) > 45) continue;
       const nh = hAt(ni, nj); if (nh < SEA + 1.8 || rimDist(x, z) < 900) continue;
       const len = Math.hypot(di, dj) * C, gr = Math.abs(nh - hk) / len, rw = rc ? rc.get(ni * 8192 + nj) : 0;
-      const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops
+      const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) * (siteWeight(x, z) > 0.6 ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops
       const ng = g.get(k) + c; if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, k); push(nk, ng + Math.hypot(ti - ni, tj - nj) * C * 2.2); } // greedy enough to stay quick; the grade cost still bends it round the hills
     }
   }

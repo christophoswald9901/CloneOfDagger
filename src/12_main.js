@@ -397,14 +397,16 @@ function frame(now) {
   else if (G.state === 'play' && G.player) {
     const frozen = G.uiOpen || G.fading || (!Input.locked && !Input.fallback && !Input.touch);
     G.paused = frozen || !!G.resting;
+    let sdt = dt; // the world's own time step: faster while travelling
     if (G.resting) updateRest(dt);
     else if (!frozen) {
-      G.time += dt * TIME_SCALE; updateWeather(); updatePlayer(dt);
-      if (G.area.kind === 'city') cityTick(G.area, dt);
+      if (Travel.cur) sdt = Travel.update(dt); else updatePlayer(dt);
+      G.time += sdt * TIME_SCALE; updateWeather();
+      if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
       if (G.area.kind === 'dungeon') { const D = G.area.dg; const ci = Math.floor(G.player.pos.x / D.cs), cj = Math.floor(G.player.pos.z / D.cs); for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) if (i >= 0 && j >= 0 && i < D.N && j < D.N) D.visited[i + j * D.N] = 1; }
     } else if (G.player.dead) updatePlayer(dt);
-    updateEntities(dt); updateFX(dt); pickMusic(false);
+    updateEntities(sdt); updateFX(dt); pickMusic(false);
     G.dmgFlash = Math.max(0, G.dmgFlash - dt); G.shake = Math.max(0, G.shake - dt);
     $('dmg').style.opacity = G.dmgFlash * 1.6;
     if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw();
@@ -449,6 +451,7 @@ function onKey(e) {
     return;
   }
   if (G.resting) { if (c === 'Escape' || c === 'KeyR') stopRest('You stop resting.'); return; }
+  if (Travel.cur && !['F5', 'F9', 'KeyN'].includes(c)) { Travel.stop('You stop.'); if (['Escape', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space', 'KeyT', 'KeyV'].includes(c)) return; }
   if (G.player.dead || G.fading) return;
   switch (c) {
     case 'Escape': UI.openPause(); break;
@@ -518,11 +521,20 @@ function bindInput() {
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { MapView.zoom = clamp(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8), 1, 6); MapView.draw(); e.preventDefault(); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { MapView.setZoom(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8)); e.preventDefault(); }, { passive: false });
+  // the map: drag to look around it, tap or click a place to travel there
+  { let drag = null; const mc = $('mapc');
+    mc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } });
+    mc.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
+      const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
+    mc.addEventListener('pointerup', e => { if (drag && !drag.moved && G.area === G.city) MapView.pick(e.clientX, e.clientY); drag = null; });
+    mc.addEventListener('pointercancel', () => { drag = null; });
+    $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }
   $('mapclose').addEventListener('click', () => MapView.close());
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
-  for (const [id, k] of [['mapzin', 1.25], ['mapzout', 0.8]]) $(id).addEventListener('click', () => { MapView.zoom = clamp(MapView.zoom * k, 1, 6); MapView.draw(); });
+  for (const [id, k] of [['mapzin', 1.25], ['mapzout', 0.8]]) $(id).addEventListener('click', () => MapView.setZoom(MapView.zoom * k));
   $('restinfo').addEventListener('click', () => { if (G.resting) stopRest('You stop resting.'); });
+  $('travelinfo').addEventListener('click', () => { if (Travel.cur) Travel.stop('You stop.'); });
   addEventListener('resize', () => { resize(); if (G.mapOpen) MapView.draw(); });
 }
 function boot(hotData) {
@@ -543,7 +555,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { Wild, LAND, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Wild, LAND, SITES, Sites, siteWeight, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

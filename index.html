@@ -30,6 +30,9 @@
   #hint { position: fixed; left: 50%; bottom: 15%; transform: translateX(-50%); font-size: 25px; text-shadow: 2px 2px 0 #000; white-space: nowrap; pointer-events: none; z-index: 5; }
   #hint.dim { color: var(--dim); font-size: 21px; }
   #status { position: fixed; right: 16px; top: calc(8px + env(safe-area-inset-top, 0px)); font-size: 20px; color: var(--dim); text-shadow: 2px 2px 0 #000; pointer-events: none; text-align: right; z-index: 5; max-width: calc(100% - 32px); }
+  #travelinfo { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 22; font-size: 22px; white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  #mapdest { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(52px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; max-width: calc(100vw - 32px); background: rgba(20,16,12,.85); padding: 8px 12px; border: 2px solid #5a4a36; }
+  #mapdest .nm { color: #efe2b8; font-size: 22px; margin-right: 6px; }
   #restinfo { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; font-size: 26px; white-space: nowrap; }
   #resume { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .35); z-index: 15; cursor: pointer; padding: 16px; }
   #resume p { margin: 4px 0 0; color: var(--dim); }
@@ -175,10 +178,11 @@
 <div id="hint"></div>
 <div id="status"></div>
 <div id="restinfo" class="panel" hidden></div>
+<div id="travelinfo" class="panel" hidden></div>
 <div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Daggerfall</p></div></div>
 <div id="backdrop" hidden></div>
 <div id="panel" class="panel" hidden role="dialog" aria-modal="true"></div>
-<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
+<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
 <div id="touch" aria-hidden="true"></div>
 <div id="title" hidden>
   <div class="title-wrap">
@@ -277,7 +281,7 @@ const G = {
 };
 const SETTINGS_KEY = 'onecity_daggerfall_settings';
 const SAVE_KEY = 'onecity_daggerfall_save';
-const settings = { pixelScale: 0, sens: 1, music: 0.5, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
+const settings = { pixelScale: 0, sens: 1, music: 0.5, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, travelSpeed: 20, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
 // the minimalist interface hides character stats and combat until Settings → Interface turns them back on
 const rpgUI = () => !!settings.showRPG;
 function loadSettings() {
@@ -1545,6 +1549,368 @@ function worldMats(area, defs) {
 }
 
 /* =====================================================================
+   Points of interest: small places out in the generated country that a
+   traveller stumbles on — wayside shrines, an abandoned cottage, a
+   hunters' camp, a cairn on the tops, a broken cart by the track. They
+   are planned for the whole country at load (so the map and the road
+   know of them) and built with the ground chunk they stand in.
+   ===================================================================== */
+const POI_KINDS = {
+  shrine: { name: 'a wayside shrine', r: 7 }, cart: { name: 'a broken-down cart', r: 6 }, camp: { name: "a hunters' camp", r: 9 },
+  hut: { name: "a woodcutter's hut", r: 9 }, ruin: { name: 'an abandoned cottage', r: 10 }, well: { name: 'an old well', r: 5 },
+  cairn: { name: 'a burial cairn', r: 6 }, dolmen: { name: 'an ancient dolmen', r: 6 }, stone: { name: 'a lone standing stone', r: 4 }, oak: { name: 'a great old oak', r: 9 },
+};
+const POI = {
+  list: [], hash: new Map(), HC: 700, discR: 55,
+  // one chance in each cell of a coarse grid; what stands there follows the ground
+  plan() {
+    this.list = []; this.hash = new Map(); const C = this.HC;
+    for (let i = Math.floor(WORLD.x0 / C); i <= Math.floor(WORLD.x1 / C); i++) for (let j = Math.floor(WORLD.z0 / C); j <= Math.floor(WORLD.z1 / C); j++) {
+      if (_h2(i, j, 6001 + WSEED) > 0.42) continue;
+      for (let t = 0; t < 4; t++) {
+        const x = (i + 0.15 + 0.7 * _h2(i, j, 6002 + t + WSEED)) * C, z = (j + 0.15 + 0.7 * _h2(i, j, 6010 + t + WSEED)) * C;
+        if (Math.hypot(x, z) < 1100 || rimDist(x, z) < 1600 || coastZ(x) - z < 80 || siteWeight(x, z) > 0) continue;
+        const h = terrainRaw(x, z); if (h < SEA + 3) continue;
+        const sl = Math.hypot(terrainRaw(x + 6, z) - terrainRaw(x - 6, z), terrainRaw(x, z + 6) - terrainRaw(x, z - 6)) / 12; if (sl > 0.22) continue;
+        if (riverNear(x, z, 40)) continue;
+        const tD = Wild.trackD(x, z), fm = Wild.env.forestMask(x, z, h), TL = wildTreeLine(x, z), u = _h2(i, j, 6020 + WSEED);
+        if (tD < 14) continue; // not on the track itself
+        let kind;
+        if (h > TL - 30) kind = u < 0.55 ? 'cairn' : u < 0.8 ? 'stone' : 'dolmen';
+        else if (tD < 70) kind = u < 0.45 ? 'shrine' : u < 0.75 ? 'cart' : 'well';
+        else if (fm > 0.5) kind = u < 0.5 ? 'hut' : 'camp';
+        else if (wildHeath(x, z, h) > 0.4) kind = u < 0.5 ? 'dolmen' : u < 0.8 ? 'stone' : 'cairn';
+        else kind = u < 0.35 ? 'ruin' : u < 0.55 ? 'oak' : u < 0.7 ? 'camp' : u < 0.85 ? 'well' : 'stone';
+        const p = { id: `p${i}_${j}`, kind, name: POI_KINDS[kind].name, x, z, ang: _h2(i, j, 6030) * Math.PI * 2, r: POI_KINDS[kind].r };
+        if (kind === 'cart' || kind === 'shrine') { const tp = Wild.trackPtsNear(x - 90, z - 90, x + 90, z + 90, 2); let bd = 1e9, b = null; for (const q of tp) { const d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; b = q; } } if (b) p.ang = Math.atan2(b[0] - x, b[1] - z); } // facing the way
+        this.list.push(p); const k = i * 100003 + j; this.hash.set(k, p); break;
+      }
+    }
+  },
+  near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r) / C); i <= Math.floor((x + r) / C); i++) for (let j = Math.floor((z - r) / C); j <= Math.floor((z + r) / C); j++) { const p = this.hash.get(i * 100003 + j); if (p && Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
+  found(p) { return !!(G.flags.poi && G.flags.poi[p.id]); },
+  update(x, z) {
+    if (!G.player || G.area !== G.city) return null; let hit = null;
+    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    return hit;
+  },
+  // what a chunk builds for the places within it: geometry, colliders (cols), plants (fl), and ground kept clear (blocks)
+  build(p, gb, cols, fl, blocks, hAt) {
+    const rng = new RNG(Math.floor(_h2(Math.round(p.x), Math.round(p.z), 6100) * 2147483647)), area = { colliders: cols };
+    const at = (lx, lz) => xfP(makeXf(p.x, p.z, p.ang), lx, lz), y0 = Math.min(hAt(p.x - 3, p.z - 3), hAt(p.x + 3, p.z - 3), hAt(p.x - 3, p.z + 3), hAt(p.x + 3, p.z + 3), hAt(p.x, p.z));
+    const box = (lx, lz, ang, y, x0, yb, z0, x1, yt, z1, k, tw = 2) => { const [wx, wz] = at(lx, lz); gb.setXf(wx, wz, p.ang + ang, y); gb.box(x0, yb, z0, x1, yt, z1, k, tw, tw); gb.xf = null; };
+    const col = (lx, lz, ang, hx, hz, yb, yt) => { const [wx, wz] = at(lx, lz); siteCol(area, wx, wz, p.ang + ang, hx, hz, yb, yt); };
+    blocks.push(mkObb(p.x, p.z, p.ang, p.r, p.r));
+    switch (p.kind) {
+      case 'shrine': // a little stone shrine under a pent roof, flowers left at its foot
+        box(0, 0, 0, y0 - 0.3, -0.8, 0, -0.6, 0.8, 1.1, 0.6, { side: 'stone', top: 'stoneLight' }); box(0, 0, 0, y0 + 0.8, -0.45, 0, -0.35, 0.45, 1.5, 0.35, 'stoneLight');
+        box(0, 0, 0, y0 + 2.3, -0.75, 0, -0.6, 0.75, 0.18, 0.6, { side: 'woodDark', top: 'roofSlate' }); col(0, 0, 0, 0.8, 0.6, y0 - 1, y0 + 2.5);
+        for (let k = 0; k < 6; k++) { const [fx, fz] = at(rng.range(-1.6, 1.6), rng.range(0.8, 1.8)); fl['flowers' + rng.int(0, 3)].push([fx, hAt(fx, fz) - 0.03, fz, rng.range(0.7, 1)]); }
+        break;
+      case 'cart': { // a cart off the track with a broken wheel, its load spilled
+        const y = y0 + 0.1; box(0, 0, 0.1, y + 0.55, -0.9, 0, -1.7, 0.9, 0.5, 1.7, { side: 'woodDark', top: 'wood' }); box(0, 0, 0.1, y + 1.05, -0.95, 0, -1.7, -0.85, 0.5, 1.7, 'woodDark'); box(0, 0, 0.1, y + 1.05, 0.85, 0, -1.7, 0.95, 0.5, 1.7, 'woodDark');
+        box(0, -2.8, 0.1, y + 0.75, -0.06, 0, 0, 0.06, 0.1, 1.2, 'woodDark'); box(0.4, -2.8, 0.1, y + 0.75, -0.06, 0, 0, 0.06, 0.1, 1.2, 'woodDark'); // the shafts
+        for (const [lx, up] of [[-1.05, true], [1.05, false]]) { const [wx, wz] = at(lx, 0.4); gb.setXf(wx, wz, p.ang + 0.1, y); if (up) gb.box(-0.08, 0, -0.55, 0.08, 1.1, 0.55, 'woodDark', 1, 1); else gb.box(-0.55, -0.1, -0.55, 0.55, 0.06, 0.55, 'woodDark', 1, 1); gb.xf = null; }
+        for (let k = 0; k < 3; k++) box(rng.range(1.5, 3), rng.range(-1, 1.5), rng.range(0, 3), y - 0.05, -0.4, 0, -0.3, 0.4, 0.6, 0.3, { side: 'wood', top: 'woodDark' }); // crates
+        col(0, 0, 0.1, 1, 1.8, y - 1, y + 1.2); break;
+      }
+      case 'camp': // two tents, a ring of stones round a cold fire, a log to sit on
+        for (const [lx, lz, a] of [[-3.5, -1, 0.3], [2.8, -2.5, -0.5]]) { const [wx, wz] = at(lx, lz), y = hAt(wx, wz); gb.setXf(wx, wz, p.ang + a, y);
+          gb.quad4('cloth', [-1.2, 0, -1.4], [-1.2, 0, 1.4], [0, 1.5, 1.4], [0, 1.5, -1.4], [0, 0], [1, 0], [1, 1], [0, 1], [-1, 0.6, 0]); gb.quad4('cloth', [1.2, 0, 1.4], [1.2, 0, -1.4], [0, 1.5, -1.4], [0, 1.5, 1.4], [0, 0], [1, 0], [1, 1], [0, 1], [1, 0.6, 0]);
+          gb.xf = null; col(lx, lz, a, 1.2, 1.4, y - 1, y + 1.5); }
+        for (let k = 0; k < 7; k++) { const a = k / 7 * 6.283, [fx, fz] = at(Math.cos(a) * 0.8, 1.8 + Math.sin(a) * 0.8); boulder(gb, 'boulder', fx, hAt(fx, fz), fz, 0.22, rng); }
+        { const [fx, fz] = at(0, 1.8); gb.disc('woodDark', fx, hAt(fx, fz) + 0.05, fz, 0.5, 6, 1); }
+        box(0, 3.4, 1.4, y0, -0.2, 0, -1.1, 0.2, 0.35, 1.1, 'woodDark'); break;
+      case 'hut': { const [wx, wz] = at(0, 0); gb.setXf(wx, wz, p.ang, y0 + 0.1);
+        makeBuilding(area, gb, rng, { fp: { x0: -3, z0: -2.5, x1: 3, z1: 2.5 }, stories: 1, h: 2.7, style: 'wood', roof: 'gable', roofKey: 'roofThatch', roofTint: [0.9, 0.85, 0.75], doorT: 0.5, found: 0.8, chimney: 1, winRate: 0.5, wealth: 0.4 });
+        gb.xf = null; for (let k = 0; k < 4; k++) box(rng.range(4, 6), rng.range(-2, 2), rng.range(0, 3), y0 - 0.1, -0.25, 0, -1.2, 0.25, 0.5, 1.2, 'woodDark'); // a log pile
+        break; }
+      case 'ruin': { const pts = [[-4, -3], [4, -3], [4, 3], [-4, 3]].map(([a, b]) => at(a, b)); for (let k = 0; k < 4; k++) ruinWall(gb, area, hAt, ...pts[k], ...pts[(k + 1) % 4], 0.6, 3.6, 0.7, k * 3.3 + p.x, rng, k === 2 ? 1 : -1);
+        const [tx, tz] = at(rng.range(-6, 6), rng.range(5, 8)); fl.dead.push([tx, hAt(tx, tz) - 0.15, tz, rng.range(0.9, 1.2)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: y0 - 1, y1: y0 + 8 });
+        for (let k = 0; k < 6; k++) { const [bx, bz] = at(rng.range(-6, 6), rng.range(-5, 5)); fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([bx, hAt(bx, bz) - 0.1, bz, rng.range(0.6, 1)]); }
+        break; }
+      case 'well': { const [wx, wz] = at(0, 0); gb.cyl('stone', wx, wz, 0.95, y0 - 0.4, y0 + 0.8, 9, 2, 2); gb.disc('water', wx, y0 + 0.4, wz, 0.8, 9, 2);
+        box(-1.1, 0, 0, y0, -0.08, 0, -0.08, 0.08, 2.2, 0.08, 'woodDark'); box(1.1, 0, 0, y0, -0.08, 0, -0.08, 0.08, 2.2, 0.08, 'woodDark'); box(0, 0, 0, y0 + 2.1, -1.2, 0, -0.07, 1.2, 0.12, 0.07, 'woodDark');
+        box(0, 0, 0, y0 + 2.2, -1.3, 0, -0.75, 1.3, 0.12, 0.75, { side: 'woodDark', top: 'roofThatch' }); siteCol(area, wx, wz, 0, 1, 1, y0 - 1, y0 + 0.8); break; }
+      case 'cairn': for (let k = 0; k < 9; k++) { const s = 1.5 - k * 0.13, a = k * 2.4, r = k < 6 ? 0.9 * (1 - k / 6) : 0; boulder(gb, 'boulder', p.x + Math.cos(a) * r, y0 + k * 0.32, p.z + Math.sin(a) * r, s * 0.65, rng); }
+        siteCol(area, p.x, p.z, 0, 1.2, 1.2, y0 - 1, y0 + 2.6); break;
+      case 'dolmen': box(-1.1, 0, 0, y0 - 0.4, -0.35, 0, -0.7, 0.35, 2.0, 0.7, 'rock'); box(1.1, 0, 0, y0 - 0.4, -0.35, 0, -0.7, 0.35, 2.0, 0.7, 'rock'); box(0, -0.6, 0, y0 - 0.4, -0.4, 0, -0.5, 0.4, 1.7, 0.5, 'rock');
+        box(0, 0, 0.08, y0 + 1.6, -1.7, 0, -1.1, 1.7, 0.55, 1.1, 'rock'); col(-1.1, 0, 0, 0.35, 0.7, y0 - 1, y0 + 2.2); col(1.1, 0, 0, 0.35, 0.7, y0 - 1, y0 + 2.2); col(0, -0.6, 0, 0.4, 0.5, y0 - 1, y0 + 2.2); break;
+      case 'stone': box(0, 0, 0, y0 - 0.5, -0.6, 0, -0.35, 0.6, 3.6, 0.35, 'rock'); box(0, 0, 0, y0 + 3.1, -0.45, 0, -0.28, 0.4, 0.45, 0.28, 'rock'); col(0, 0, 0, 0.6, 0.35, y0 - 1, y0 + 3.5); break;
+      case 'oak': { fl.oak0.push([p.x, y0 - 0.2, p.z, 2.1]); cols.push({ x0: p.x - 0.8, z0: p.z - 0.8, x1: p.x + 0.8, z1: p.z + 0.8, y0: y0 - 1, y1: y0 + 18 });
+        for (let k = 0; k < 7; k++) { const a = rng.range(0, 6.283), r = rng.range(5, 8), bx = p.x + Math.cos(a) * r, bz = p.z + Math.sin(a) * r; fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([bx, hAt(bx, bz) - 0.1, bz, rng.range(0.6, 0.9)]); }
+        break; }
+    }
+  },
+};
+
+/* =====================================================================
+   Sites: the great landmarks of the country. Their ground, their plants
+   and their buildings are fixed, the same in every world (?seed=N only
+   changes the country between them). Round each one the generated land
+   blends into the fixed ground over some hundreds of metres, along a
+   ragged line, so nothing marks where one ends and the other begins.
+   Each is joined to the tracks by a road of its own.
+   ===================================================================== */
+
+// rc: wholly fixed within this radius; rb: wholly generated beyond it. road: from the site out to where the generated tracks take over
+const SITES = [
+  { id: 'greywatch', name: 'Greywatch', kind: 'ruin', x: -2400, z: -2900, rc: 280, rb: 820, discR: 240,
+    blurb: 'the broken keep of Greywatch on its crag, abandoned since the War of Betony',
+    road: [[26, 26], [52, 50], [92, 82], [140, 112], [196, 140], [262, 168], [330, 202], [400, 246], [470, 300], [540, 360]] },
+  { id: 'stones', name: 'the Ninefold Stones', kind: 'stones', x: 3600, z: -5600, rc: 300, rb: 860, discR: 200,
+    blurb: 'a ring of nine standing stones on a bare hilltop, older than any kingdom of the Bay',
+    road: [[-14, 18], [-40, 52], [-80, 92], [-130, 128], [-196, 160], [-270, 196], [-344, 240], [-420, 290], [-500, 344]] },
+  { id: 'mirrormere', name: 'Mirrormere', kind: 'hamlet', x: -4600, z: -8200, rc: 560, rb: 1050, discR: 330, wl: 96,
+    blurb: 'a fishing hamlet on the shore of a still mountain lake',
+    road: [[280, 0], [318, 22], [350, 58], [372, 104], [396, 158], [430, 214], [474, 268], [530, 322], [596, 372], [670, 420]] },
+  { id: 'kestrel', name: 'Kestrel Tower', kind: 'tower', x: 1400, z: -11800, rc: 420, rb: 1100, discR: 260,
+    blurb: 'a lonely watchtower that keeps the high pass between two peaks',
+    road: [[14, 20], [8, 70], [-6, 130], [-14, 200], [-6, 280], [12, 360], [24, 440], [20, 530], [4, 620], [-10, 720], [-4, 820]] },
+  { id: 'gullscar', name: 'Gullscar Light', kind: 'light', x: 5400, z: 430, rc: 330, rb: 1100, discR: 260,
+    blurb: 'the lighthouse on the Gullscar headland, which guides ships into the eastern bay',
+    road: [[0, 130], [-10, 90], [-22, 50], [-40, 4], [-62, -50], [-80, -110], [-92, -180], [-96, -260], [-90, -340], [-70, -420]] },
+];
+for (const S of SITES) S.road = S.road.map(([x, z]) => [S.x + x, S.z + z]);
+
+// the distance to a site's centre, warped so its edge is not a circle (fixed noise: the same in every world)
+function siteDist(S, x, z) { const dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz); if (r > S.rb + 260) return r; return r + 0.16 * S.rb * fbm(x / (S.rb * 0.6) + 31.7, z / (S.rb * 0.6), 2, 940 + S.x % 7); }
+function siteW(S, x, z) { if (Math.abs(x - S.x) > S.rb + 260 || Math.abs(z - S.z) > S.rb + 260) return 0; return 1 - smoothstep(S.rc, S.rb, siteDist(S, x, z)); }
+// the site a point lies in (or nearest to), with how far its fixed ground holds there (0..1)
+function siteAt(x, z) { let best = null, bw = 0; for (const S of SITES) { const w = siteW(S, x, z); if (w > bw) { bw = w; best = S; } } return best ? { S: best, w: bw } : null; }
+function siteWeight(x, z) { let w = 0; for (const S of SITES) w = Math.max(w, siteW(S, x, z)); return w; }
+// rivers are not planned through a site or the land blending into it
+function siteZone(x, z, m = 0) { for (const S of SITES) if (Math.abs(x - S.x) < S.rb + m + 260 && Math.abs(z - S.z) < S.rb + m + 260 && siteDist(S, x, z) < S.rb + m) return true; return false; }
+
+/* ---------------- the fixed ground ---------------- */
+const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
+// Greywatch: a crag with cliffs on three sides and a long slope on the fourth (south-east), where the road climbs; rolling ground round it
+function greywatchH(x, z) {
+  const S = SITES[0], dx = x - S.x, dz = z - S.z, H0 = 46;
+  const gentle = smoothstep(1.05, 0.25, angDiff(Math.atan2(dz, dx), Math.PI / 4));
+  const r = Math.hypot(dx, dz) + 7 * fbm(x / 40, z / 40, 2, 901), re = r / lerp(1, 2.0, gentle);
+  const t = clamp((re - 44) / 105, 0, 1), prof = 1 - smoothstep(0, 1, Math.pow(t, lerp(0.5, 0.85, gentle))); // sheer near the top on three sides
+  let h = H0 + 60 * prof + 1.4 * fbm(x / 16, z / 16, 2, 902) * prof;
+  h += (1 - 0.8 * prof) * (7 * fbm(x / 210, z / 210, 3, 903) + 2.5 * fbm(x / 55, z / 55, 2, 904));
+  h -= 10 * smoothstep(260, 560, r) * smoothstep(-0.1, 0.5, fbm(x / 300 + 4, z / 300, 2, 906)); // a hollow or two in the land round about
+  return h;
+}
+// the Ninefold Stones: a broad bare dome with a level crown
+function stonesH(x, z) {
+  const S = SITES[1], dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz) + 10 * fbm(x / 80, z / 80, 2, 911), H0 = 70;
+  const dome = Math.exp(-Math.pow(r / 240, 2)), crown = 1 - smoothstep(18, 40, r);
+  return H0 + 36 * dome + crown * 0.3 * (1 - dome) + (1 - crown) * (5 * fbm(x / 170, z / 170, 3, 912) + 1.6 * fbm(x / 40, z / 40, 2, 913));
+}
+// Mirrormere: a lake in a bowl of hills, open to the south-east where its outflow would run; the hamlet on a terrace on the east shore
+const MERE = { wl: 96 };
+function mereR(x, z) { const S = SITES[2], a = Math.atan2(z - S.z, x - S.x); return 128 + 30 * fbm(Math.cos(a) * 1.4 + 5, Math.sin(a) * 1.4, 2, 921); }
+function mirrormereH(x, z) {
+  const S = SITES[2], dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz), R = mereR(x, z), WL = MERE.wl;
+  if (r < R) return WL - 0.35 - Math.min(4.2, (R - r) * 0.075);
+  const a = Math.atan2(dz, dx), gap = smoothstep(0.75, 0.2, angDiff(a, 0.62)); // the bowl opens to the south-east
+  let h = WL + 0.25 + Math.min(6, (r - R) * 0.055) + 2.2 * fbm(x / 60, z / 60, 2, 922) * smoothstep(R, R + 40, r);
+  h += (62 * smoothstep(240, 560, r) + 20 * smoothstep(560, 900, r)) * (0.55 + 0.45 * fbm(x / 240, z / 240, 3, 923)) * (1 - 0.85 * gap);
+  // the hamlet's terrace: level ground on the east shore
+  const tx = Math.max(0, Math.abs(dx - 220) - 80), tz = Math.max(0, Math.abs(dz) - 75), td = Math.hypot(tx, tz);
+  return lerp(h, WL + 3.2, 1 - smoothstep(0, 45, td));
+}
+// Kestrel Tower: a saddle between two peaks; the pass runs north and south, the tower stands at its crest
+function kestrelH(x, z) {
+  const S = SITES[3], dx = x - S.x, dz = z - S.z, H0 = 232;
+  const pk = Math.exp(-Math.pow((Math.abs(dx) - 380) / 210, 2)), wall = smoothstep(60, 260, Math.abs(dx));
+  let h = H0 + 200 * pk * (0.7 + 0.45 * ridgedMF(x / 260, z / 260, 4, 931)) + 70 * wall * (1 - pk) * (0.6 + 0.5 * fbm(x / 200, z / 200, 2, 932));
+  h -= 55 * smoothstep(90, 900, Math.abs(dz)) * (1 - 0.7 * pk); // the pass falls away to north and south
+  h += 3 * fbm(x / 50, z / 50, 2, 933) - 2 * (1 - smoothstep(0, 40, Math.abs(dx + 4 * fbm(z / 90, 1.3, 2, 934)))); // the road worn a little into its floor
+  return h;
+}
+// Gullscar: a headland of sheer cliffs pushing south into the bay; the coast itself is fixed for some way either side
+const GULL = { x: 5400 };
+function gullCoast(x) { return 360 + 240 * Math.exp(-Math.pow((x - GULL.x) / 190, 2)) + 14 * fbm(x / 70, 4.4, 2, 941) + 40 * fbm(x / 600, 2.2, 2, 942); }
+function siteCoast(x, z) { const w = 1 - smoothstep(650, 1600, Math.abs(x - GULL.x)); return w > 0 ? lerp(z, gullCoast(x), w) : z; }
+function gullscarH(x, z) {
+  const d = gullCoast(x) - z;
+  if (d < 0) return SEA - 0.3 - Math.min(9, -d * 0.09);
+  return SEA + 0.3 + 24 * smoothstep(0, 16, d) + 0.025 * Math.max(0, d - 16) + 3.5 * fbm(x / 90, z / 90, 2, 943) * smoothstep(8, 40, d);
+}
+const SITE_H = { greywatch: greywatchH, stones: stonesH, mirrormere: mirrormereH, kestrel: kestrelH, gullscar: gullscarH };
+// the ground with the sites laid in: their fixed shape where they hold, blended into whatever lies round them
+function siteFix(x, z, h) {
+  for (const S of SITES) { const w = siteW(S, x, z); if (w > 0) return lerp(h, SITE_H[S.id](x, z), w); }
+  return h;
+}
+
+/* ---------------- what grows there: woods (0..1) and heath (0..1), fixed ---------------- */
+function siteForest(S, x, z, h) {
+  const dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz), n = fbm(x / 150, z / 150, 2, 950), n2 = fbm(x / 60, z / 60, 2, 951);
+  switch (S.id) {
+    case 'greywatch': return smoothstep(0.0, 0.3, n + 0.15 * n2) * smoothstep(150, 240, r) * smoothstep(40, -160, dz + dx * 0.4); // an oakwood under the north cliffs
+    case 'stones': return 0;
+    case 'mirrormere': { const tr = Math.max(0, Math.abs(dx - 260) - 150), tz = Math.max(0, Math.abs(dz) - 130); return smoothstep(-0.05, 0.25, n + 0.2 * n2) * smoothstep(170, 260, r) * smoothstep(20, 80, Math.hypot(tr, tz)); } // pinewoods on the hills round the lake, the hamlet's fields kept clear
+    case 'kestrel': return smoothstep(0.1, 0.4, n) * (1 - smoothstep(250, 300, h)) * smoothstep(60, 140, Math.abs(dx));
+    case 'gullscar': return 0;
+  }
+  return 0;
+}
+function siteHeath(S, x, z, h) {
+  const r = Math.hypot(x - S.x, z - S.z), n = fbm(x / 90, z / 90, 2, 955);
+  switch (S.id) {
+    case 'greywatch': return 0.6 * smoothstep(0.0, 0.3, n) * (1 - smoothstep(60, 140, r));
+    case 'stones': return smoothstep(-0.15, 0.2, n) * (1 - smoothstep(30, 60, -r + 60)) * (1 - smoothstep(500, 700, r)) + 0.0;
+    case 'mirrormere': return 0.5 * smoothstep(0.05, 0.35, n) * smoothstep(300, 450, r);
+    case 'kestrel': return 0.7 * smoothstep(-0.1, 0.25, n);
+    case 'gullscar': return 0.55 * smoothstep(-0.05, 0.3, n) * smoothstep(30, 80, gullCoast(x) - z);
+  }
+  return 0;
+}
+
+/* ---------------- the buildings, built once and kept: each can be seen from far off ---------------- */
+const Sites = {
+  group: null, cols: [], glows: [], spawned: {}, lights: [],
+  build(area, mats) {
+    const gb = new GB(), saved = area.colliders; area.colliders = [];
+    const H = (x, z) => terrainRaw(x, z);
+    for (const S of SITES) SITE_BUILD[S.id](gb, S, H, area);
+    this.cols = area.colliders; area.colliders = saved;
+    const G2 = area.grid; for (const col of this.cols) for (let ix = Math.floor(col.x0 / CELL); ix <= Math.floor(col.x1 / CELL); ix++) for (let iz = Math.floor(col.z0 / CELL); iz <= Math.floor(col.z1 / CELL); iz++) { const k = ix * 10007 + iz; let l = G2.get(k); if (!l) G2.set(k, l = []); l.push(col); }
+    this.group = gb.build(mats); this.group.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); }); area.scene.add(this.group);
+    if (this.glows.length) { const b = new SpriteBatch(area, TEX.glow, 3.2, 3.2, this.glows, { additive: true, lit: false, fog: false }); this.glowMat = b.mat; }
+  },
+  // true where a site keeps the ground clear: its solids (for any plant), its yards and courts (for trees and bushes)
+  clearAt(x, z, r) {
+    for (const c of this.near(x, z)) if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+    if (r >= 2) for (const S of SITES) if (S.clear && Math.abs(x - S.x) < 400 && Math.abs(z - S.z) < 400) for (const [cx, cz, cr] of S.clear) if (Math.hypot(x - cx, z - cz) < cr) return true;
+    return false;
+  },
+  near(x, z) { if (!this.hash) { this.hash = new SHash(32); for (const c of this.cols) this.hash.add(c, [c.x0, c.z0, c.x1, c.z1]); } return this.hash.query(x - 6, z - 6, x + 6, z + 6); },
+  // the player comes within sight of a site: it goes on the map
+  update(x, z) {
+    if (!G.player || G.area !== G.city) return null;
+    const found = G.flags.found || (G.flags.found = {}); let hit = null;
+    for (const S of SITES) if (!found[S.id] && Math.hypot(x - S.x, z - S.z) < S.discR) { found[S.id] = dayOf(G.time) + 1; hit = S; msg(`You have found ${S.name}: ${S.blurb}.`, 'district'); bigMsg(S.name.replace(/^the /, 'The '), 2.2); }
+    if (this.glowMat) this.glowMat.opacity = isNight(G.time) ? 1 : 0;
+    // the people of Mirrormere, about their doors by day
+    const M = SITES[2], dm = Math.hypot(x - M.x, z - M.z);
+    if (this.vill && this.vill[0].removed) this.vill = null;
+    if (dm < 450 && !this.vill && M.villagers) this.vill = M.villagers.map(([vx, vz], k) => { const r = new RNG(7350 + k), g = r.chance(0.5) ? 'f' : 'm';
+      return spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 0.7), gender: g, x: vx, z: vz, role: 'wander', wanderR: 8, speed: 1.0, dialog: 'villager', spriteKey: 'mere' + k, data: { site: 'mirrormere' } }); });
+    else if (dm > 700 && this.vill) { for (const e of this.vill) if (!e.removed) e.remove(); this.vill = null; }
+    if (this.vill) { const night = isNight(G.time); for (const e of this.vill) if (!e.dead) e.active = !night; }
+    return hit;
+  },
+};
+
+// a solid that blocks the way: an oriented box at (x, z), turned by ang, from y0 to y1
+function siteCol(area, x, z, ang, hx, hz, y0, y1) { const e = Math.hypot(hx, hz) + 0.2; area.colliders.push({ x0: x - e, z0: z - e, x1: x + e, z1: z + e, y0, y1, o: { x, z, c: Math.cos(ang), s: Math.sin(ang), hx, hz } }); }
+// a ruined wall run between two points: lengths of masonry of uneven height with breaches, rubble at its foot
+function ruinWall(gb, area, H, ax, az, bx, bz, hmin, hmax, th, seed, rng, gapAt = -1) {
+  const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 2.6)), ang = Math.atan2(bx - ax, bz - az), seg = L / n;
+  for (let k = 0; k < n; k++) {
+    const f0 = k / n, f1 = (k + 1) / n, mx = lerp(ax, bx, (f0 + f1) / 2), mz = lerp(az, bz, (f0 + f1) / 2);
+    const v = 0.5 + 0.5 * vnoise(seed + k * 0.41, 1.3, 960);
+    if (v < 0.2 || Math.abs(k - gapAt) < 1) { if (v < 0.2 && rng.chance(0.8)) for (let q = 0; q < 3; q++) boulder(gb, 'boulder', mx + rng.range(-2, 2), H(mx, mz) - 0.1, mz + rng.range(-2, 2), rng.range(0.35, 0.8), rng); continue; } // a breach, its stones fallen
+    const y = Math.min(H(lerp(ax, bx, f0), lerp(az, bz, f0)), H(lerp(ax, bx, f1), lerp(az, bz, f1)), H(mx, mz)) - 0.7, top = lerp(hmin, hmax, v * v) + rng.range(-0.4, 0.4);
+    gb.setXf(mx, mz, ang, y); gb.box(-th / 2, 0, -seg / 2 - 0.04, th / 2, top + 0.7, seg / 2 + 0.04, { side: 'stone', top: 'stone' }, 3, 3); gb.xf = null;
+    siteCol(area, mx, mz, ang, th / 2, seg / 2, y - 1, y + top + 0.7);
+    if (rng.chance(0.25)) boulder(gb, 'boulder', mx + rng.range(-2.5, 2.5), H(mx, mz) - 0.1, mz + rng.range(-2.5, 2.5), rng.range(0.3, 0.6), rng);
+  }
+}
+// a round tower of rough stone, its top broken off unevenly (ruined) or crenellated
+function roundTower(gb, area, cx, cz, y, r, h, rng, ruined, key = 'stone') {
+  const segs = 10;
+  for (let i = 0; i < segs; i++) {
+    const a0 = i / segs * Math.PI * 2, a1 = (i + 1) / segs * Math.PI * 2, top = ruined ? h * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(i * 2.3 + cx))) + rng.range(-0.6, 0.6) : h;
+    const p0 = [cx + Math.cos(a0) * r, y, cz + Math.sin(a0) * r], p1 = [cx + Math.cos(a1) * r, y, cz + Math.sin(a1) * r], c = 2 * Math.PI * r;
+    gb.quad4(key, p0, p1, [p1[0], y + top, p1[2]], [p0[0], y + top, p0[2]], [i / segs * c / 3, y / 3], [(i + 1) / segs * c / 3, y / 3], [(i + 1) / segs * c / 3, (y + top) / 3], [i / segs * c / 3, (y + top) / 3], [Math.cos((a0 + a1) / 2), 0, Math.sin((a0 + a1) / 2)]);
+    gb.quad4(key, [p0[0], y + top, p0[2]], [p1[0], y + top, p1[2]], [cx + Math.cos(a1) * (r - 1), y + top, cz + Math.sin(a1) * (r - 1)], [cx + Math.cos(a0) * (r - 1), y + top, cz + Math.sin(a0) * (r - 1)], [0, 0], [1, 0], [1, 0.3], [0, 0.3], [0, 1, 0]);
+    if (!ruined && i % 2 === 0) { const am = (a0 + a1) / 2; gb.setXf(cx + Math.cos(am) * (r - 0.5), cz + Math.sin(am) * (r - 0.5), -am, y + h); gb.box(-0.5, 0, -0.9, 0.5, 1.1, 0.9, key, 2, 2); gb.xf = null; }
+  }
+  if (!ruined) gb.disc('flag', cx, y + h - 0.2, cz, r - 0.5, segs, 3);
+  siteCol(area, cx, cz, 0, r * 0.9, r * 0.9, y - 2, y + h);
+}
+const SITE_BUILD = {
+  // the broken keep: a ring of curtain wall round the crown of the crag with a gate on the road side, a tall shell of a keep, fallen towers
+  greywatch(gb, S, H, area) {
+    const rng = new RNG(7101), cx = S.x - 4, cz = S.z - 4, R = 33, n = 9, pts = []; S.clear = [[cx, cz, 42]];
+    for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2 + 0.2, rr = R * (0.92 + 0.16 * (0.5 + 0.5 * Math.sin(k * 1.9))); pts.push([cx + Math.cos(a) * rr, cz + Math.sin(a) * rr]); }
+    const gate = pts.reduce((b, p, k) => { const q = pts[(k + 1) % n], mx = (p[0] + q[0]) / 2, mz = (p[1] + q[1]) / 2, sc = (mx - cx) + (mz - cz); return sc > b[0] ? [sc, k] : b; }, [-1e9, 0])[1]; // the side facing the road (south-east)
+    for (let k = 0; k < n; k++) { const [ax, az] = pts[k], [bx, bz] = pts[(k + 1) % n], L = Math.hypot(bx - ax, bz - az); ruinWall(gb, area, H, ax, az, bx, bz, 2.2, 7.5, 2.2, 13 + k * 7, rng, k === gate ? Math.round(L / 2.6 / 2) - 0.5 : -1); }
+    pts.forEach(([x, z], k) => { if (k % 2) return; const y = H(x, z) - 0.8; roundTower(gb, area, x, z, y, 3.6, rng.range(6, 11), rng, true); });
+    // the keep: four walls with their tops broken off, a doorway on the south side, open to the sky
+    { const kx = cx - 6, kz = cz - 8, hw = 6.5, th = 1.6, y = Math.min(H(kx - hw, kz - hw), H(kx + hw, kz - hw), H(kx - hw, kz + hw), H(kx + hw, kz + hw)) - 0.8;
+      const wall = (ax, az, bx, bz, door) => { const L = Math.hypot(bx - ax, bz - az), n2 = Math.round(L / 1.6), ang = Math.atan2(bx - ax, bz - az);
+        for (let q = 0; q < n2; q++) { const f = (q + 0.5) / n2, mx = lerp(ax, bx, f), mz = lerp(az, bz, f); if (door && Math.abs(f - 0.5) < 0.12) { gb.setXf(mx, mz, ang, y); gb.box(-th / 2, 3.6, -L / n2 / 2, th / 2, 7, L / n2 / 2, 'stone', 3, 3); gb.xf = null; siteCol(area, mx, mz, ang, th / 2, L / n2 / 2, y + 3.6, y + 7); continue; }
+          const top = 12 + 9 * (0.5 + 0.5 * Math.sin(q * 1.7 + ax)) * (0.6 + 0.4 * (0.5 + 0.5 * Math.cos(q * 0.6))) + rng.range(-1, 1);
+          gb.setXf(mx, mz, ang, y); gb.box(-th / 2, 0, -L / n2 / 2 - 0.02, th / 2, top, L / n2 / 2 + 0.02, 'stone', 3, 3); gb.xf = null; siteCol(area, mx, mz, ang, th / 2, L / n2 / 2, y - 1, y + top);
+          if (q % 3 === 1 && top > 8) for (let wy = 4.5; wy < top - 2; wy += 4.2) { const [nx, nz] = [Math.cos(ang), -Math.sin(ang)]; for (const s of [1, -1]) gb.quad('winB', [mx + nx * (th / 2 + 0.03) * s - Math.sin(ang) * 0.35 * s, y + wy, mz + nz * (th / 2 + 0.03) * s - Math.cos(ang) * 0.35 * s], [Math.sin(ang) * s, 0, Math.cos(ang) * s], [0, 1, 0], 0.7, 1.3, 1, 1, { fixedUV: true }); } } };
+      wall(kx - hw, kz + hw, kx + hw, kz + hw, true); wall(kx + hw, kz + hw, kx + hw, kz - hw); wall(kx + hw, kz - hw, kx - hw, kz - hw); wall(kx - hw, kz - hw, kx - hw, kz + hw);
+      for (let q = 0; q < 10; q++) boulder(gb, 'boulder', kx + rng.range(-hw + 1.5, hw - 1.5), H(kx, kz), kz + rng.range(-hw + 1.5, hw - 1.5), rng.range(0.4, 1.0), rng); }
+    for (let q = 0; q < 26; q++) { const a = rng.range(0, 6.283), r = rng.range(36, 70), x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 1.4), rng); } // masonry tumbled down the slopes
+  },
+  // nine stones in a ring on the crown of the hill, two of them fallen, a flat stone at the heart
+  stones(gb, S, H, area) {
+    const rng = new RNG(7201); S.clear = [[S.x, S.z, 22]];
+    for (let k = 0; k < 9; k++) {
+      const a = k / 9 * Math.PI * 2 + 0.3, r = 13 + rng.range(-0.6, 0.6), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r, y = H(x, z) - 0.6, ang = a + Math.PI / 2 + rng.range(-0.2, 0.2);
+      if (k === 3 || k === 7) { gb.setXf(x, z, ang + 1.3, y + 0.2); gb.box(-0.55, 0, -1.6, 0.55, 0.85, 1.6, 'rock', 2, 2); gb.xf = null; siteCol(area, x, z, ang + 1.3, 0.55, 1.6, y - 1, y + 1.05); continue; } // fallen
+      const h = rng.range(2.6, 3.8), w = rng.range(0.55, 0.75);
+      gb.setXf(x, z, ang, y); gb.box(-w, 0, -0.32, w, h, 0.32, 'rock', 2, 2); gb.box(-w * 0.7, h, -0.25, w * 0.6, h + 0.35, 0.25, 'rock', 2, 2); gb.xf = null; siteCol(area, x, z, ang, w, 0.35, y - 1, y + h + 0.35);
+    }
+    { const y = H(S.x, S.z) - 0.3; gb.setXf(S.x, S.z, 0.4, y); gb.box(-1.3, 0, -0.75, 1.3, 0.85, 0.75, 'rock', 2, 2); gb.xf = null; siteCol(area, S.x, S.z, 0.4, 1.3, 0.75, y - 1, y + 0.85); }
+    for (let q = 0; q < 8; q++) { const a = rng.range(0, 6.283), r = rng.range(30, 120), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 1.0), rng); }
+  },
+  // the hamlet: cottages along a lane from the jetty, a chapel, gardens; a jetty out over the water
+  mirrormere(gb, S, H, area) {
+    const rng = new RNG(7301), WL = MERE.wl, y0 = WL + 3.2, o = (lx, lz) => [S.x + lx, S.z + lz]; S.clear = [[140, 0, 30], [175, 0, 30], [210, 0, 30], [245, 0, 30], [274, -24, 22]].map(([a, b, r]) => [...o(a, b), r]);
+    // the lane, laid as a dirt strip
+    const lane = [[126, 2], [160, 0], [200, -2], [240, 0], [280, 0]].map(([a, b]) => o(a, b)); drapeStrip(gb, 'rDirt', resampleEven(lane, 3), 4, { lift: 0.07 });
+    const homes = [[150, -14, 0], [178, -14, 0], [214, -15, 0], [252, -14, 0], [162, 15, Math.PI], [198, 16, Math.PI], [236, 15, Math.PI]];
+    homes.forEach(([lx, lz, rot], k) => {
+      const [x, z] = o(lx, lz), r2 = new RNG(7310 + k); gb.setXf(x, z, rot, y0 - 0.1);
+      makeBuilding(area, gb, r2, { fp: { x0: -4.5, z0: -3.2, x1: 4.5, z1: 3.2 }, stories: 1, style: r2.pick(['timber2', 'plaster', 'stone']), roof: 'gable', roofKey: 'roofThatch', roofTint: [1, 0.95, 0.85], doorT: 0.5, found: 0.6, chimney: 0.9, wealth: 0.8 });
+      gb.xf = null; const [gx, gz] = xfP(makeXf(x, z, rot), 0, -9); drapePatch(gb, k % 3 ? 'fGreens' : 'fPlowed', makeXf(gx, gz, rot), -4, -3, 4, 3, { cell: 3, lift: 0.05, uvFrame: true }); // a kitchen garden behind
+    });
+    // the chapel, at the head of the lane, its little bell-cote over the door
+    { const [x, z] = o(274, -26), r2 = new RNG(7320); gb.setXf(x, z, 0, y0 - 0.1);
+      makeBuilding(area, gb, r2, { fp: { x0: -4, z0: -7, x1: 4, z1: 7 }, h: 5.2, style: 'stone', roof: 'gable', roofKey: 'roofSlate', doorT: 0.5, found: 0.6, chimney: 0, alongX: false, winRate: 0.8 });
+      gb.box(-1, 5.2, 5.6, 1, 9.6, 6.8, { side: 'stone', top: 'stone' }, 2, 2); gb.cone('roofSlate', 0, 6.2, 1.3, 9.6, 2, 4, 2); gb.xf = null; siteCol(area, x, z + 6.2, 0, 1, 0.6, y0 + 5, y0 + 11); }
+    // the jetty and two boats drawn up beside it
+    { const [x, z] = o(128, 2), ang = -Math.PI / 2; gb.setXf(x, z, ang, WL);
+      gb.box(-1.4, 0.35, 0, 1.4, 0.6, 26, { side: 'woodDark', top: 'wood' }, 2, 2);
+      for (let t = 2; t < 26; t += 4) for (const s of [-1.2, 1.2]) gb.box(s - 0.14, -3.5, t - 0.14, s + 0.14, 0.6, t + 0.14, 'woodDark', 1, 1);
+      for (const [bx, bz] of [[3, 8], [-3.2, 17]]) gb.box(bx - 0.8, -0.2, bz - 2.2, bx + 0.8, 0.45, bz + 2.2, { side: 'woodDark', top: 'wood' }, 1, 1);
+      gb.xf = null; const [jx, jz] = xfP(makeXf(x, z, ang), 0, 13); siteCol(area, jx, jz, ang, 1.4, 13, WL - 5, WL + 0.6); }
+    // the lake itself
+    { const g = gb.grp('wStream'), base = g.p.length / 3, n = 72; g.p.push(S.x, WL, S.z); g.u.push(S.x / 6, S.z / 6); g.c.push(0.74, 0.86, 0.9);
+      for (let k = 0; k <= n; k++) { const a = k / n * Math.PI * 2, rr = mereR(S.x + Math.cos(a) * 100, S.z + Math.sin(a) * 100) + 3, x = S.x + Math.cos(a) * rr, z = S.z + Math.sin(a) * rr; g.p.push(x, WL, z); g.u.push(x / 6, z / 6); g.c.push(0.8, 0.9, 0.92); if (k) g.i.push(base, base + k, base + k + 1, base, base + k + 1, base + k); } }
+    // an orchard on the slope above the hamlet, and a few rocks along the shore
+    for (let q = 0; q < 6; q++) { const a = rng.range(-1.6, 1.6), r = mereR(S.x + Math.cos(a) * 100, S.z + Math.sin(a) * 100) + rng.range(2, 6), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 0.9), rng); }
+    S.villagers = homes.map(([lx, lz, rot]) => { const [x, z] = xfP(makeXf(S.x + lx, S.z + lz, rot), 0, 6.5); return [x, z]; });
+  },
+  // the watchtower at the crest of the pass, with a walled yard and a beacon on its roof
+  kestrel(gb, S, H, area) {
+    const rng = new RNG(7401), tx = S.x - 24, tz = S.z + 6; S.clear = [[tx, tz, 20]]; const y = Math.min(H(tx - 4, tz - 4), H(tx + 4, tz - 4), H(tx - 4, tz + 4), H(tx + 4, tz + 4)) - 0.4;
+    gb.setXf(tx, tz, Math.PI / 2, y); makeBuilding(area, gb, rng, { fp: { x0: -4, z0: -4, x1: 4, z1: 4 }, h: 17, style: 'stone', roof: 'flat', doorT: 0.5, found: 1.2, winRate: 0.35, chimney: 0 }); gb.xf = null;
+    this.glowAt(S, tx, y + 18.2, tz);
+    // the yard wall, with a gate to the road
+    const yw = [[-12, -10], [12, -10], [12, 12], [-12, 12]].map(([a, b]) => [tx + a, tz + b]);
+    for (let k = 0; k < 4; k++) { const [ax, az] = yw[k], [bx, bz] = yw[(k + 1) % 4]; ruinWall(gb, area, H, ax, az, bx, bz, 2.2, 2.6, 0.8, 50 + k, new RNG(7410 + k), k === 1 ? 4 : -1); }
+    const hy = H(tx + 8, tz + 8); gb.setXf(tx + 7, tz + 7, 0, hy); makeBuilding(area, gb, rng, { fp: { x0: -3, z0: -2.5, x1: 3, z1: 2.5 }, stories: 1, style: 'stone', roof: 'gable', roofKey: 'roofSlate', doorT: 0.5, found: 0.6, chimney: 1 }); gb.xf = null;
+  },
+  // the lighthouse at the tip of the headland, its keeper's cottage beside it
+  gullscar(gb, S, H, area) {
+    const rng = new RNG(7501), lx = GULL.x, lz = gullCoast(GULL.x) - 34, y = H(lx, lz) - 0.5; S.clear = [[lx, lz, 12], [lx - 4, lz - 22, 12]];
+    gb.tint = [1.15, 1.15, 1.12]; gb.cyl('plaster', lx, lz, 4.2, y, y + 21, 14, 4, 4); gb.tint = null;
+    gb.cyl('stone', lx, lz, 4.6, y - 1.5, y + 1.2, 14, 3, 3); gb.cyl('iron', lx, lz, 3.0, y + 21, y + 24, 10, 2, 2); gb.cone('roofRed', lx, lz, 4.2, y + 24, 4.5, 12, 3); gb.disc('flag', lx, y + 21, lz, 4.25, 14, 3);
+    for (let wy = 4; wy < 20; wy += 5) gb.quad('winB', [lx - 0.45, y + wy, lz + 4.23], [1, 0, 0], [0, 1, 0], 0.9, 1.4, 1, 1, { fixedUV: true });
+    siteCol(area, lx, lz, 0, 4.4, 4.4, y - 2, y + 28);
+    this.glowAt(S, lx, y + 22.5, lz, 7);
+    const cx = lx - 4, cz = lz - 22, cy = H(cx, cz); gb.setXf(cx, cz, 0.15, cy - 0.1); makeBuilding(area, gb, rng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: 'plaster', roof: 'gable', roofKey: 'roofSlate', doorT: 0.4, found: 0.8, chimney: 1 }); gb.xf = null;
+    drapeStrip(gb, 'rDirt', resampleEven([[cx + 1, cz + 4], [lx - 1, lz - 6]], 3), 2.4, { lift: 0.07 });
+  },
+  glowAt(S, x, y, z, s = 5) { Sites.glows.push([x, y, z, s]); },
+};
+
+/* =====================================================================
    Terrain: one heightfield for the city and the countryside.
    The land rises from the harbour to the castle and on into rolling hills;
    Pilgrim's Rise is a crag north-east of the walls; headlands close the bay.
@@ -1580,9 +1946,9 @@ function coastZ(x) {
   if (ax < 158) return SHORE;
   const k = smoothstep(158, 200, ax);
   const wild = smoothstep(900, 1500, ax); // further along, the coast runs on in bays and headlands
-  return SHORE + k * (6 + 16 * fbm(x / 70, 3.7, 3, 5)) + 85 * smoothstep(230, 470, ax) + 30 * smoothstep(500, 800, ax) * (x < 0 ? 1.2 : 0.8)
+  return siteCoast(x, SHORE + k * (6 + 16 * fbm(x / 70, 3.7, 3, 5)) + 85 * smoothstep(230, 470, ax) + 30 * smoothstep(500, 800, ax) * (x < 0 ? 1.2 : 0.8)
     + (wild > 0 ? wild * (150 * fbm(x / 900 + WSEED * 3.1, 7.3, 3, 306) + 40 * fbm(x / 160, 2.9, 2, 307)) : 0)
-    + smoothstep(1800, 4000, ax) * 650 * fbm(x / 5200 + WSEED * 1.9, 13.7, 3, 309); // and at the scale of the whole bay, in broad bights and capes
+    + smoothstep(1800, 4000, ax) * 650 * fbm(x / 5200 + WSEED * 1.9, 13.7, 3, 309)); // and at the scale of the whole bay, in broad bights and capes (fixed where a site holds the coast)
 }
 // Pilgrim's Rise: a crag whose steep face looks down on the city from the north-east
 const RISE = { a: [115, -290], b: [295, -150], H: 85, wIn: 46, wOut: 150 };
@@ -2039,7 +2405,7 @@ function landCarve(x, z, h) {
   return h1 + (floor - h1) * fw;
 }
 function riverD(x, z) { const T = LAND.rd; if (!T) return 9999; const fx = (x - T.X0) / T.C, fz = (z - T.Z0) / T.C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= T.NI - 1 || j >= T.NJ - 1) return 9999; const u = fx - i, v = fz - j, k = j * T.NI + i, D = T.D; return lerp(lerp(D[k], D[k + 1], u), lerp(D[k + T.NI], D[k + T.NI + 1], u), v); }
-function terrainRaw(x, z) { const h = terrainBase(x, z); return LAND.ready ? landCarve(x, z, h) : h; }
+function terrainRaw(x, z) { const h = terrainBase(x, z); return siteFix(x, z, LAND.ready ? landCarve(x, z, h) : h); } // the sites' fixed ground last: no river is cut through it
 // the nearest river to a point within reach r: { d, w } (distance to the middle of the water, its width), or null
 function riverNear(x, z, r = 40) {
   const L = LAND; if (!L.ready) return null; const list = L.hash.get((Math.floor(x / L.HC) + 4096) * 8192 + Math.floor(z / L.HC) + 4096); if (!list) return null;
@@ -2057,7 +2423,7 @@ function planLand() {
   const t0 = performance.now(), C = LAND_C, M = 480, X0 = WORLD.x0 - M, Z0 = WORLD.z0 - M;
   const NI = Math.round((WORLD.x1 - WORLD.x0 + 2 * M) / C) + 1, NJ = Math.round((WORLD.z1 - WORLD.z0 + 2 * M) / C) + 1, n = NI * NJ;
   const H = new Float32Array(n), F = new Float32Array(n), rec = new Int32Array(n).fill(-1), st = new Uint8Array(n); // st: 0 unseen, 1 reached, 2 kept out
-  for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z)) st[k] = 2; else H[k] = terrainBase(x, z); }
+  for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); }
   const tGrid = performance.now();
   // flood up from the sea and from the edge of the grid (beyond the mountains), lowest first
   const hk = new Float64Array(n), hv = new Int32Array(n); let hn = 0;
@@ -2208,7 +2574,7 @@ function wildCult(x, z) {
   const ring = (0.62 - 0.27 * smoothstep(700, 1700, r)) * (1 - smoothstep(1900, 3800, r)) * smoothstep(0, 220, sd);
   const belt = (1 - smoothstep(80, 440, Wild.trackD(x, z))) * 0.8 * (1 - smoothstep(7000, 17000, r));
   const vale = (1 - smoothstep(80, 520, riverD(x, z))) * 0.6 * (1 - smoothstep(6000, 15000, r)) * smoothstep(250, 600, sd); // the broad river valleys are farmed too
-  return Math.max(band, ring, belt, vale) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360));
+  return Math.max(band, ring, belt, vale) * (0.8 + 0.3 * fbm(x / 300, z / 300, 2, 360)) * (1 - siteWeight(x, z)); // (no generated farmland in a site)
 }
 
 // a pool of billboards that turn to the camera on the graphics card, so thousands cost nothing per frame
@@ -2291,13 +2657,15 @@ const Wild = {
       this.hR = { C, R, N, D, A, FD }; }
     this.farmCache = new Map(); this.candCache = new Map(); this.fieldCache = new Map();
     this.rivers = LAND.rivers;
+    Sites.build(area, env.mats); // the landmarks' buildings, kept for good (each is seen from far off)
+    POI.plan(); // the small places out in the country
     this.buildFarNow(this.FAR[0], 0, 0); this.FAR[1].job = this.genFar(this.FAR[1], 0, 0); // the coarse ring is built over the first frames
     this.buildHorizon();
   },
   // the whole country, very coarsely, behind the far rings: from anywhere the mountains round its edge stand on the skyline
   buildHorizon() {
     const C = 200, X0 = WORLD.x0 - 2600, Z0 = WORLD.z0 - 2600, NI = Math.round((WORLD.x1 - WORLD.x0 + 5200) / C), NJ = Math.round((WORLD.z1 - WORLD.z0 + 3800) / C), M = this.mean;
-    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = terrainBase(X0 + i * C, Z0 + j * C);
+    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = siteFix(X0 + i * C, Z0 + j * C, terrainBase(X0 + i * C, Z0 + j * C));
     const hb = (i, j) => H[clamp(j, 0, NJ) * (NI + 1) + clamp(i, 0, NI)], col = new Float32Array((NI + 1) * (NJ + 1) * 3);
     for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) {
       const x = X0 + i * C, z = Z0 + j * C, h = hb(i, j), gx = (hb(i + 1, j) - hb(i - 1, j)) / (2 * C), gz = (hb(i, j + 1) - hb(i, j - 1)) / (2 * C), nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), sh = terrainShade(nn), k = (j * (NI + 1) + i) * 3;
@@ -2325,6 +2693,16 @@ const Wild = {
     rc.near = rn;
     for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q], r = R.w[q] / 2 + 3; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) { const k = i * 8192 + j; rc.set(k, Math.max(rc.get(k) || 0, R.hand ? 99 : R.w[q])); } }
     from.forEach(({ pre, aims }, i) => { const t = wildTrack(pre, aims, 700 + i * 31 + WSEED * 97, used, this.tracks, rc); if (t.length > 1) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } });
+    // each site's road: its own fixed way out, then on over the country to the nearest track, which it joins
+    SITES.forEach((S, si) => {
+      const pre = S.road.map(p => p.slice()), [sx, sz] = pre[pre.length - 1];
+      let tp = null, bd = 1e9; for (const T of this.tracks) for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - sx, T[q][1] - sz); if (d < bd) { bd = d; tp = T[q]; } }
+      let pts = pre;
+      if (tp) { const r = routeWild([sx, sz], tp, 900 + si * 17 + WSEED * 97, used, rc);
+        if (r) { pts = pts.concat(r.path.slice(1)); const [ex, ez] = pts[pts.length - 1]; let bp = tp, bb = 1e9; for (const T of this.tracks) for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bb) { bb = d; bp = q; } } pts.push(bp.slice()); } }
+      const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.site = S.id; S.track = this.tracks.length; this.tracks.push(out);
+      for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); }
+    });
     // a farmstead where a track ends: its yard a little beyond the end, well inside one chunk, its front to the way
     this.endFarms = this.trackEnds.map(({ ti }) => { const T = this.tracks[ti], L = T.length, [ex, ez] = T[L - 1], [px, pz] = T[Math.max(0, L - 8)], l = Math.hypot(ex - px, ez - pz) || 1, ux = (ex - px) / l, uz = (ez - pz) / l;
       let fx = ex + ux * 24, fz = ez + uz * 24; const i0 = this.ci(fx), j0 = this.ci(fz), cx0 = -TG.R + i0 * WC, cz0 = -TG.R + j0 * WC;
@@ -2405,7 +2783,7 @@ const Wild = {
           if (q < 0 || bd > 170 || bd < 30) continue; // within a short lane of a track
           const [ax, az] = tp[q - 1], [bx, bz] = tp[q + 1], nx = (fx - tp[q][0]) / bd, nz = (fz - tp[q][1]) / bd;
           const hs = []; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) hs.push(terrainRaw(fx + a * 7, fz + b * 7));
-          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
+          if (Math.max(...hs) - Math.min(...hs) > 6 || Math.min(...hs) < SEA + 3 || siteWeight(fx, fz) > 0 || POI.near(fx, fz, 40).length || riverNear(fx, fz, 45) || this.trackD(fx, fz) < 26 || this.handHash.query(fx - 30, fz - 30, fx + 30, fz + 30).some(o => circleObb(fx, fz, 26, o))) continue;
           farm = { x: fx, z: fz, ang: Math.atan2(-nx, -nz), sg: [ax, az, bx, bz] };
         }
       }
@@ -2435,6 +2813,8 @@ const Wild = {
       // arable strips want gentle ground; hedged pasture climbs the hillsides
       const cs = obbCorners(o), hs = cs.map(([x, z]) => hAt(x, z)), sp = Math.max(...hs) - Math.min(...hs), sl = Math.hypot(hAt(o.x + 8, o.z) - hAt(o.x - 8, o.z), hAt(o.x, o.z + 8) - hAt(o.x, o.z - 8)) / 16;
       if (Math.min(...hs) < SEA + 1.5 || sp > 17 || sl > 0.3) return no('slope');
+      if (cs.some(([x, z]) => siteWeight(x, z) > 0.05)) return no('site');
+      if (POI.near(o.x, o.z, Math.max(o.hx, o.hz) + 14).length) return no('poi');
       if (sp > 8 || sl > 0.13) { o.key = 'fMeadow'; o.nofill = sl > 0.19 || sp > 14; } // pasture climbs the gentler slopes: there the turf itself shows within the hedges
       for (const [x, z] of [...cs, [o.x, o.z]]) if (E.forestMask(x, z, hAt(x, z)) > 0.5) return no('wood');
       for (const p of tp) if (circleObb(p[0], p[1], 12, o)) return no('track');                                   // clear of the tracks' cuttings
@@ -2526,7 +2906,7 @@ const Wild = {
     // the far rings follow the camera; while one has fallen well behind (fast travel) it gets a share of every frame even when chunks are waiting
     for (const L of this.FAR) if (!L.job && (!L.at || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move)) L.job = this.genFar(L, x, z);
     for (const L of this.FAR) if (L.job && Math.hypot(L.at ? L.at[0] - x : 1e9, L.at ? L.at[1] - z : 1e9) > L.R * 0.45) { const t1 = performance.now(); while (L.job && performance.now() - t1 < 2) { if (L.job.next().done) L.job = null; } }
-    while (performance.now() - t0 < WILD.budget) {
+    while (performance.now() - t0 < (this.fast ? 13 : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling)
       if (!this.job) {
         const w = this.wanted(x, z);
         if (w.length) { const { i, j } = w[0]; this.jobKey = [i, j]; this.job = this.genChunk(i, j); }
@@ -2711,7 +3091,7 @@ const Wild = {
     for (const b of brs) if (b.x >= x0 && b.x < x0 + WC && b.z >= z0 && b.z < z0 + WC) bridgeMesh(gb, b, c.cols);
     const nearTrack = (x, z, r) => trackSegs.some(s => segDist(x, z, s[0], s[1], s[2], s[3]).d < r);
     for (const T of this.tracks) if (T.joined) { const [jx, jz] = T[T.length - 1]; if (jx >= x0 && jx < x0 + WC && jz >= z0 && jz < z0 + WC) { drapeDisc(gb, 'rDirt', jx, jz, 5.5, { segs: 12, rings: 2, lift: 0.066 }); } } // the gore where tracks meet is trodden bare
-    const rng = new RNG(Math.floor(_h2(i, j, 900 + WSEED) * 2147483647)), fl = c.fl;
+    const rngW = new RNG(Math.floor(_h2(i, j, 900 + WSEED) * 2147483647)), fl = c.fl; let rng = rngW;
     const blocks = []; // ground kept clear of plants: yards and buildings
     if (farm) {
       const FX = makeXf(farm.x, farm.z, farm.ang, farm.y), saved = this.area.colliders; this.area.colliders = [];
@@ -2726,6 +3106,7 @@ const Wild = {
       if (farm.spur) { const spur = resampleEven(farm.spur, 3); drapeStrip(gb, 'rDirt', spur, 2.4, { lift: 0.068 }); drapeFeather(gb, 'rDirtF', spur, 2.4, 0.7, { seed: i + j }); for (let k = 1; k < spur.length; k++) trackSegs.push([spur[k - 1][0], spur[k - 1][1], spur[k][0], spur[k][1], 0, 0]); }
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
+    for (const p of POI.list) if (p.x >= x0 && p.x < x0 + WC && p.z >= z0 && p.z < z0 + WC) POI.build(p, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
     // the farmed strips laid from here (they may reach a little into the chunks beside), each hedged all round, sheep in the pasture.
     // Working out the neighbours' layouts is spread over frames
     for (let di = -2; di <= 2; di++) for (let dj = -2; dj <= 2; dj++) if (!this.candCache.has(this.key(i + di, j + dj))) { this.fieldCand(i + di, j + dj); yield; }
@@ -2779,8 +3160,12 @@ const Wild = {
     // plants: one chance on a jittered 5.5 m grid, as dense as the woods round the city
     const SP = 5.5, DENS = (SP / 5) * (SP / 5);
     const tree = (kind, x, z, h, s) => { const def = WILD_KINDS[kind]; fl[kind].push([x, h - 0.15, z, s]); if (def[4]) c.cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: h - 1, y1: h + def[4] * s }); };
+    const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400);
     for (let b = 0; b < WC / SP; b++) {
       for (let a = 0; a < WC / SP; a++) {
+        // in a site, a cell takes its plants from the site's own fixed draw (as far as the site holds there), else from the world's
+        let rng = rngW; const sx = x0 + (a + 0.5) * SP, sz = z0 + (b + 0.5) * SP, st = siteHere ? siteAt(sx, sz) : null;
+        if (st && _h2(Math.floor(sx / SP), Math.floor(sz / SP), 4401) < st.w) rng = new RNG(Math.floor(_h2(Math.floor(sx / SP), Math.floor(sz / SP), 4402) * 2147483647));
         const x = x0 + (a + rng.next()) * SP, z = z0 + (b + rng.next()) * SP, h = this.heightAt(x, z);
         if (h < SEA + 1.6) continue;
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
@@ -2789,7 +3174,8 @@ const Wild = {
           if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.9, 1.5)]); continue; } }
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
-        const pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h));
+        const pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
+        if (pick && st && st.w > 0.5 && Sites.clearAt(x, z, pick.small ? 1 : 4)) continue; // round a site's buildings and roads
         if (!pick) continue;
         if (nearTrack(x, z, pick.small ? 2.2 : 3.6) || inField(x, z, pick.small ? 0.5 : 2.5)) continue;
         if (pick.kind === 'flowers') { const fk = 'flowers' + rng.int(0, 3); for (let q = 0; q < 8; q++) { const fx = x + rng.range(-3.5, 3.5), fz = z + rng.range(-3.5, 3.5); if (!inField(fx, fz, 0.3)) fl[fk].push([fx, this.heightAt(fx, fz) - 0.03, fz, rng.range(0.7, 1.1)]); } continue; }
@@ -2801,6 +3187,7 @@ const Wild = {
     // stones: outcrops at the breaks of slope, blocks among the scree, the odd boulder in the grass
     for (let q = 0; q < 80; q++) {
       const x = x0 + rng.next() * WC, z = z0 + rng.next() * WC, h = this.heightAt(x, z); if (h < SEA + 1) continue;
+      if (siteHere && siteWeight(x, z) > 0.3) continue; // a site has its own stones
       const qr = qAt(qR, x, z), qs = qAt(qS, x, z), sl = terrainSlope(x, z);
       const p = qr > 0.15 && qr < 0.9 ? 0.5 : qs > 0.3 ? 0.35 : sl > 0.35 ? 0.12 : 0.03;
       if (!rng.chance(p) || nearTrack(x, z, 3) || inField(x, z, 3)) continue;
@@ -2921,12 +3308,13 @@ function wildRockiness(x, z, h, slope, apron = 0) {
   return [qr, (1 - qr) * Math.max(alpine, apron)];
 }
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
-function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); return smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); } // broad tracts on the high dry ground
+function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
 // small woods standing in open country (the copses of the plant rules), for the ground tint under them
-function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))); }
+function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)); }
 
 // what grows at a spot in the wild: {kind, s, small} or null. m is how wooded the land is, cult how farmed
-function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0) {
+function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = false) {
+  const WS = fixed ? 0 : WSEED; // a site's own plants are the same in every world
   const r = rng.next(), r2 = rng.next(), r3 = rng.next();
   const TL = wildTreeLine(x, z);
   if (h > TL + 20 || qs > 0.6) return r < 0.02 && sl < 0.9 ? { kind: 'bush', s: 0.5 + r2 * 0.4 } : r < 0.14 && qs < 0.8 ? { kind: 'tufts', small: true, s: 0.7 + r2 * 0.4 } : null;
@@ -2940,7 +3328,7 @@ function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0) {
   if (r < p) {
     if (r2 < (edge ? 0.3 : 0.07) + alp * 0.25) return { kind: 'bush', s: 0.7 + r3 * 0.7 };
     // each stand has a leading species: pine on high and north-facing ground, broadleaf in the lowlands, mixed between
-    const conif = 1.6 * fbm(x / 260 + WSEED * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp; // stands of one kind or the other, few mixed
+    const conif = 1.6 * fbm(x / 260 + WS * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp; // stands of one kind or the other, few mixed
     let kind;
     if (conif > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
     else if (conif < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
@@ -3044,7 +3432,7 @@ function routeWild(from, to, seed, used, rc = null, C = TRC) {
       const x = ni * C, z = nj * C; if (Math.abs(x) < TG.R + 12 && Math.abs(z) < TG.R + 12 && Math.hypot(x - from[0], z - from[1]) > 45) continue;
       const nh = hAt(ni, nj); if (nh < SEA + 1.8 || rimDist(x, z) < 900) continue;
       const len = Math.hypot(di, dj) * C, gr = Math.abs(nh - hk) / len, rw = rc ? rc.get(ni * 8192 + nj) : 0;
-      const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops
+      const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) * (siteWeight(x, z) > 0.6 ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops
       const ng = g.get(k) + c; if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, k); push(nk, ng + Math.hypot(ti - ni, tj - nj) * C * 2.2); } // greedy enough to stay quick; the grade cost still bends it round the hills
     }
   }
@@ -3846,7 +4234,9 @@ function buildCity() {
     // out in the wild the woods come and go with the lie of the land: clearings, heaths and open valley floors
     if (wild > 0) f += wild * (0.22 * fbm(x / 520 + WSEED * 1.7, z / 520, 3, 78) - 0.06 * smoothstep(90, 150, h - 0.6 * (wildTreeLine(x, z) - 150)) - 0.9 * smoothstep(wildTreeLine(x, z) - 35, wildTreeLine(x, z), h));
     f -= 1.1 * wildCult(x, z); // farmed land: the woods are cleared back to copses
-    return smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd);
+    const m = smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd), st = r > 1500 ? siteAt(x, z) : null;
+    return st ? lerp(m, siteForest(st.S, x, z, h), st.w) : m; // a site's own woods, the same in every world
+
   };
   area.forestMask = forestMask;
   const matOf = (x, z, h, slope) => {
@@ -5163,6 +5553,7 @@ function updateNPC(e, dt) {
       break;
     }
     case 'wander': wanderStep(e, dt, 0.5); break;
+    case 'traveller': Roads.step(e, dt); break;
     default: e.moving = false;
   }
 }
@@ -5307,6 +5698,52 @@ function clearWanted(reason) {
   G.wanted = null; msg(reason, 'good');
   if (G.city) for (const e of G.city.entities) if (e.role === 'guard') { e.state = 'idle'; e.aggro = false; if (e.data.temp) e.data.leave = true; }
 }
+
+/* =====================================================================
+   Travellers on the roads: merchants, pilgrims, farmers, a patrol, a
+   wandering knight. They walk the tracks out in the country, a few at a
+   time round the player, appearing and leaving well out of sight, and
+   stop for a word if spoken to.
+   ===================================================================== */
+const TRAVELLER_KINDS = [
+  { trade: 'A travelling merchant', w: 3, speed: 1.15, look: r => ({ ...lookByWealth(r, 'm', 2), cape: '#5a3a1e', hat: '#3a2a1a' }), g: 'm' },
+  { trade: 'A pilgrim on the road to the shrines', w: 2, speed: 1.0, look: (r, g) => ({ ...lookByWealth(r, g, 0.8), robe: '#6a5a46', hat: null }) },
+  { trade: 'A farmer on the way to market', w: 3, speed: 1.1, look: (r, g) => lookByWealth(r, g, 0.7) },
+  { trade: 'A courier of the Daggerfall court', w: 1, speed: 1.55, look: r => ({ ...lookByWealth(r, 'm', 2.2), cape: '#2a4a8a' }), g: 'm' },
+  { trade: 'A soldier of the road patrol', w: 1.5, speed: 1.2, look: () => LOOKS.guard, g: 'm', pair: true },
+  { trade: 'A wandering knight', w: 0.6, speed: 1.2, look: r => ({ ...lookByWealth(r, 'm', 3), cape: '#7a1e1e' }), g: 'm' },
+  { trade: 'A peddler of pots and ribbons', w: 1.5, speed: 1.0, look: (r, g) => ({ ...lookByWealth(r, g, 1.2), apron: '#8a7a5a' }) },
+];
+const Roads = {
+  list: [], t: 0,
+  want() { const n = isNight(G.time) ? 1 : 4; return n; },
+  update(dt) {
+    if (!Wild.on || G.area !== G.city || !G.player) return;
+    const P = G.player, px = P.pos.x, pz = P.pos.z;
+    this.list = this.list.filter(e => { if (e.removed) return false; const d = Math.hypot(e.pos.x - px, e.pos.z - pz); if (d > 700 || e.data.done) { e.remove(); return false; } return true; });
+    this.t -= dt; if (this.t > 0) return; this.t = 3 + rnd.next() * 4;
+    if (this.list.length >= this.want() || Math.max(Math.abs(px), Math.abs(pz)) < TG.R - 60) return;
+    // a point on a track some way off (not under the player's nose), outside the surveyed land
+    const T = Wild.tracks; const cand = [];
+    for (let ti = 0; ti < T.length; ti++) for (let q = 0; q < T[ti].length; q += 20) { const [x, z] = T[ti][q], d = Math.hypot(x - px, z - pz); if (d > 260 && d < 560 && Math.max(Math.abs(x), Math.abs(z)) > TG.R + 20) cand.push([ti, q]); }
+    if (!cand.length) return;
+    const [ti, q] = rnd.pick(cand), tot = TRAVELLER_KINDS.reduce((a, k) => a + k.w, 0); let r = rnd.next() * tot, K = TRAVELLER_KINDS[0]; for (const k of TRAVELLER_KINDS) { r -= k.w; if (r <= 0) { K = k; break; } }
+    const dir = rnd.chance(0.5) ? 1 : -1, n = K.pair || rnd.chance(0.15) ? 2 : 1;
+    for (let m = 0; m < n; m++) {
+      const rr = new RNG(rnd.int(1, 1e9)), g = K.g || (rr.chance(0.5) ? 'f' : 'm'), qq = clamp(q - dir * m * 2, 0, T[ti].length - 1), [x, z] = T[ti][qq];
+      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: 'trav' + rnd.int(0, 1e9), data: { trade: K.trade, ti, q: qq, dir, lane: dir * 0.9 } });
+      this.list.push(e);
+    }
+  },
+  // a traveller walks the track, keeping to its side of the way, and stops when spoken to or at the end
+  step(e, dt) {
+    const D = e.data, T = Wild.tracks[D.ti]; if (!T) { e.moving = false; return; }
+    if (G.uiOpen && UI.is('dialog')) { e.moving = false; return; }
+    const q = clamp(D.q + D.dir * 3, 0, T.length - 1), a = T[Math.max(0, q - 1)], b = T[Math.min(T.length - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const tx = T[q][0] - (b[1] - a[1]) / l * D.lane, tz = T[q][1] + (b[0] - a[0]) / l * D.lane;
+    if (moveEnt(e, tx, tz, e.speed, dt) || Math.hypot(tx - e.pos.x, tz - e.pos.z) < 2) { D.q = q; if (q === 0 || q === T.length - 1) D.done = true; }
+  },
+};
 
 /* =====================================================================
    Building interiors — generated on entry, lit with baked vertex light
@@ -5798,7 +6235,9 @@ function playerAC() { const p = G.player; let ac = 0; for (const s of ['body', '
 // a step is refused (or slides along) if it climbs ground steeper than about 50°, or goes on into the high peaks
 function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
-  const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z); return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
+  const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
+    if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
+    return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
   if (!bad(p.pos.x, oz)) p.pos.z = oz; else if (!bad(ox, p.pos.z)) p.pos.x = ox; else { p.pos.x = ox; p.pos.z = oz; }
 }
@@ -6226,6 +6665,15 @@ function whereIs(npc, type) {
   return `${best.name} is ${describeDir(origin.x, origin.z, best.door.x, best.door.z)}${q ? ', in ' + q.name : ''}. I'll mark it on your map.${extra}${bd > 150 ? ' It is a long walk: take a carriage.' : ''}`;
 }
 
+// out on the road: what is there to see? The nearest landmark you have not found yet, marked on the map as a rumour
+function siteRumor(npc) {
+  return { label: 'Anything worth seeing out here?', fn: () => {
+    const found = G.flags.found || {}, heard = G.flags.heard || (G.flags.heard = {}), x = npc.pos.x, z = npc.pos.z;
+    const left = SITES.filter(S => !found[S.id]).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+    const S = left[0] || SITES.slice().sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
+    const km = Math.hypot(S.x - x, S.z - z) / 1000; heard[S.id] = true;
+    return `"${capFirst(S.name)}? ${capFirst(S.blurb)}. It lies ${describeDir(x, z, S.x, S.z)}, ${km < 1 ? 'not far at all' : `a good ${Math.round(km)} kilometre${Math.round(km) === 1 ? '' : 's'}`}${S.track != null ? '. There is a road' : ''}." (Marked on your map.)`; } };
+}
 /* ---------------- dialogue ---------------- */
 // Returns { title, sub, text, opts:[{label, fn}] }. fn returns new text or null (panel handled elsewhere).
 function dialogFor(npc) {
@@ -6312,6 +6760,12 @@ function dialogFor(npc) {
       text = rnd.pick(['"Where to? Anywhere inside the walls, if you have the coin."', '"Climb aboard. Mind the horse, he bites."', '"Kingsward, the Docks, the Warrens if you are brave. Name it."']);
       opts.push({ label: 'Travel by carriage', fn: () => { UI.openTravel(stop); return null; } }, rumor, where); break;
     }
+    case 'villager': sub = 'A villager of Mirrormere';
+      text = rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Daggerfall, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
+      opts.push(siteRumor(npc), rumor); break;
+    case 'traveler': sub = npc.data.trade || 'A traveller on the road';
+      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Daggerfall, the gates shut at no hour, but the guards ask questions after dark."']);
+      opts.push(siteRumor(npc), rumor); break;
     case 'bard': sub = 'Traveling bard'; text = '"Care for a song? No? A rumor, then — bards hear everything."'; opts.push(rumor); break;
     case 'resident':
       text = night ? '"What are you doing in my house?! Get out!"' : rnd.pick(['"Can I help you? This is a private home."', '"Did you knock? I didn\'t hear a knock."']); opts.push(rumor, where); break;
@@ -6320,7 +6774,7 @@ function dialogFor(npc) {
       opts.push(where, rumor); break;
     default: opts.push(where, rumor);
   }
-  if (!['king', 'ghost'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
+  if (!['king', 'ghost', 'villager', 'traveler'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
   return { title: npc.name, sub, text, opts };
 }
 
@@ -6460,6 +6914,171 @@ const Touch = {
       else { const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root); if (r && r.catch) r.catch(() => {}); }
     } catch (err) { msg('Full screen is not available here.'); }
     this.sig = '';
+  },
+};
+
+/* =====================================================================
+   Fast travel on foot. The whole game runs faster while you travel: you
+   walk the real way there (the world streams past), time and the people
+   around you speed up with you. Three ways to go:
+   - by road to a place picked on the map (city streets, gate roads,
+     tracks and the roads to the landmarks form one network)
+   - straight towards a place picked on the map, across country
+   - straight ahead, or along the road you stand on, until something stops you.
+   Any key, a tap on the banner, a landmark or a find on the way, danger,
+   water or a wall ends the journey.
+   ===================================================================== */
+const Travel = {
+  cur: null, graph: null, lookT: 0,
+  SPEEDS: [5, 10, 20, 40],
+  rate() { return settings.travelSpeed || 20; },
+
+  /* ---------- the road network ---------- */
+  buildGraph() {
+    const X = [], Z = [], A = [], hash = new Map(), HC = 40;
+    const key = (x, z) => Math.floor(x / HC) * 100003 + Math.floor(z / HC);
+    const add = (x, z) => { const k = X.length; X.push(x); Z.push(z); A.push([]); const hk = key(x, z); let l = hash.get(hk); if (!l) hash.set(hk, l = []); l.push(k); return k; };
+    const link = (a, b) => { if (a === b || A[a].includes(b)) return; A[a].push(b); A[b].push(a); };
+    const near = (x, z, r, skip) => { let best = -1, bd = r; for (let i = Math.floor((x - r) / HC); i <= Math.floor((x + r) / HC); i++) for (let j = Math.floor((z - r) / HC); j <= Math.floor((z + r) / HC); j++) { const l = hash.get(i * 100003 + j); if (l) for (const k of l) { if (skip && skip.has(k)) continue; const d = Math.hypot(X[k] - x, Z[k] - z); if (d < bd) { bd = d; best = k; } } } return best; };
+    const city = G.city, M = city.map;
+    // the streets of the city as they are
+    const base = X.length; for (const n of city.nodes) add(n.x, n.z); city.nodes.forEach((n, i) => { for (const j of n.n) link(base + i, base + j); });
+    // a polyline joins where it starts and ends to whatever lies nearest (the streets, a gate road, another track)
+    const line = (pts, step = 1) => { if (!pts || pts.length < 2) return; const own = new Set(), ks = [];
+      for (let q = 0; q < pts.length; q += step) { const k = add(pts[q][0], pts[q][1]); own.add(k); ks.push(k); }
+      if ((pts.length - 1) % step) { const k = add(pts[pts.length - 1][0], pts[pts.length - 1][1]); own.add(k); ks.push(k); }
+      for (let q = 1; q < ks.length; q++) link(ks[q - 1], ks[q]);
+      for (const k of [ks[0], ks[ks.length - 1]]) { const j = near(X[k], Z[k], 40, own); if (j >= 0) link(k, j); } };
+    for (const pts of M.outside || []) line(pts);
+    if (M.hillPath) line(M.hillPath);
+    for (const T of Wild.tracks) line(T, 4);
+    for (const S of SITES) if (S.id === 'mirrormere') line([[S.x + 126, S.z + 2], [S.x + 200, S.z - 2], [S.x + 280, S.z]]);
+    // a second pass: an end that found nothing (it was laid before its neighbour) tries again
+    for (let k = 0; k < X.length; k++) if (A[k].length === 1) { const j = near(X[k], Z[k], 40, new Set([k, A[k][0]])); if (j >= 0 && Math.hypot(X[j] - X[k], Z[j] - Z[k]) < 40) link(k, j); }
+    this.graph = { X, Z, A, near };
+  },
+  nearestNode(x, z, r = 600) { const g = this.graph; let k = g.near(x, z, r); if (k < 0) k = g.near(x, z, 4000); return k; },
+  // the way by road between two points: off the road to the nearest node, along the network, off it again to the goal
+  route(x0, z0, x1, z1) {
+    if (!this.graph) this.buildGraph(); const g = this.graph, N = g.X.length;
+    const s = this.nearestNode(x0, z0), t = this.nearestNode(x1, z1); if (s < 0 || t < 0) return null;
+    const dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), heap = [[0, s]]; dist[s] = 0;
+    const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    while (heap.length) { const [d, i] = pop(); if (d > dist[i]) continue; if (i === t) break; for (const j of g.A[i]) { const nd = d + Math.hypot(g.X[j] - g.X[i], g.Z[j] - g.Z[i]); if (nd < dist[j]) { dist[j] = nd; prev[j] = i; push(nd, j); } } }
+    if (!isFinite(dist[t])) return null;
+    const pts = [[x0, z0]]; const path = []; for (let k = t; k >= 0; k = prev[k]) path.push(k); path.reverse();
+    for (const k of path) pts.push([g.X[k], g.Z[k]]); pts.push([x1, z1]);
+    const len = pts.reduce((a, p, q) => q ? a + Math.hypot(p[0] - pts[q - 1][0], p[1] - pts[q - 1][1]) : 0, 0), straight = Math.hypot(x1 - x0, z1 - z0);
+    if (straight < 60 || len > straight * 6 && straight < 400) return { pts: [[x0, z0], [x1, z1]], len: straight, road: false }; // close by: just walk there
+    return { pts, len, road: true, off: Math.hypot(g.X[s] - x0, g.Z[s] - z0) };
+  },
+  // the road you stand on, onwards in the direction you face, to the next fork or its end
+  roadAhead(x, z, yaw) {
+    if (!this.graph) this.buildGraph(); const g = this.graph, k0 = g.near(x, z, 25); if (k0 < 0) return null;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw); let best = -1, bs = -0.2;
+    for (const j of g.A[k0]) { const dx = g.X[j] - g.X[k0], dz = g.Z[j] - g.Z[k0], l = Math.hypot(dx, dz) || 1, s = (dx * fx + dz * fz) / l; if (s > bs) { bs = s; best = j; } }
+    if (best < 0) return null;
+    const pts = [[x, z], [g.X[k0], g.Z[k0]]]; let prev = k0, cur = best, len = 0;
+    for (let n = 0; n < 6000; n++) {
+      pts.push([g.X[cur], g.Z[cur]]); len += Math.hypot(g.X[cur] - g.X[prev], g.Z[cur] - g.Z[prev]);
+      const next = g.A[cur].filter(j => j !== prev); if (next.length !== 1 || len > 30000) break; // a fork, a junction, or the end
+      prev = cur; cur = next[0];
+    }
+    return pts.length > 2 ? { pts, len, road: true } : null;
+  },
+
+  /* ---------- the journey ---------- */
+  start(o) {
+    const P = G.player; if (!P || P.dead || G.area !== G.city) { msg('You can only travel this way out in the open.'); return false; }
+    if (G.flying) setFlying(false);
+    if (rpgUI() && nearbyHostiles(30)) { msg('You cannot travel with enemies nearby.', 'bad'); return false; }
+    const pts = o.pts.map(p => p.slice()), cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]));
+    this.cur = { ...o, pts, cum, s: 0, seg: 0, t0: G.time, moved: 0, chk: { s: 0, t: 0 }, stuck: 0, detour: 0, detourT: 0 };
+    $('travelinfo').hidden = false; this.lookT = 0; this.banner();
+    msg(o.mode === 'ahead' ? 'You set off.' : `You set off ${o.road ? 'by road' : 'across country'} towards ${o.name}.`);
+    return true;
+  },
+  stop(text, cls) {
+    if (!this.cur) return; const c = this.cur; this.cur = null; $('travelinfo').hidden = true; Wild.fast = false;
+    const mins = Math.round(G.time - c.t0), d = Math.round(c.moved);
+    if (text !== null) msg(`${text || 'You stop.'} (${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : d + ' m'} in ${mins >= 120 ? Math.floor(mins / 60) + ' hours' + (mins % 60 ? ' ' + (mins % 60) + ' min' : '') : mins + ' minutes'})`, cls);
+  },
+  // how much faster than life the world runs this frame: slower while the ground ahead is still being built
+  k() {
+    const c = this.cur; if (!c) return 1; const P = G.player; let k = this.rate();
+    const w = Wild.wanted(P.pos.x, P.pos.z); if (w.length) { const d = w[0].d; if (d < 100) k = Math.min(k, 3); else if (d < 200) k = Math.min(k, k * 0.5); }
+    return Math.max(1, k);
+  },
+  // one frame of travel: dt is real seconds; returns the game seconds that passed
+  update(dt) {
+    const c = this.cur, P = G.player;
+    if (Input.stick.x || Input.stick.y) { this.stop('You stop.'); return dt; }
+    if (Input.mdx || Input.mdy) this.lookT = 2; this.lookT -= dt;
+    const k = this.k(), sdt = dt * k; Wild.fast = true;
+    let left = sdt; while (left > 1e-4 && this.cur) { const h = Math.min(0.2, left); left -= h; this.step(h); }
+    updatePlayer(0); // the view: free to look about, else it turns to the way ahead
+    if (this.cur) this.banner();
+    return sdt - left;
+  },
+  step(h) {
+    const c = this.cur, P = G.player, spd = playerSpeed() * 1.15;
+    // where along the way we are: the nearest point on the next few legs
+    let bs = c.s, bq = c.seg, bd = 1e9;
+    for (let q = c.seg; q < Math.min(c.pts.length - 1, c.seg + 6); q++) { const [ax, az] = c.pts[q], [bx, bz] = c.pts[q + 1], r = segDist(P.pos.x, P.pos.z, ax, az, bx, bz); if (r.d < bd) { bd = r.d; bq = q; bs = c.cum[q] + r.t * (c.cum[q + 1] - c.cum[q]); } }
+    c.seg = bq; c.s = Math.max(c.s, bs);
+    const L = c.cum[c.cum.length - 1];
+    if (c.mode !== 'ahead' && L - c.s < 2.5) { this.stop(c.arrive || `You arrive at ${c.name}.`, 'good'); return; }
+    // aim a few paces ahead along the way, so the bends are walked round, not cut zig-zag
+    const look = Math.min(L, c.s + 7); let q = c.seg; while (q < c.cum.length - 2 && c.cum[q + 1] < look) q++;
+    const f = (look - c.cum[q]) / ((c.cum[q + 1] - c.cum[q]) || 1), tx = lerp(c.pts[q][0], c.pts[q + 1][0], f), tz = lerp(c.pts[q][1], c.pts[q + 1][1], f);
+    let dx = tx - P.pos.x, dz = tz - P.pos.z; const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+    if (c.detourT > 0) { c.detourT -= h; const a = c.detour, cs = Math.cos(a), sn = Math.sin(a); [dx, dz] = [dx * cs - dz * sn, dx * sn + dz * cs]; }
+    // the water's edge, the sea or the mere, ends a cross-country walk
+    const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3; if (terrainH(ax, az) < SEA + 0.15 && !c.road) { this.stop('The water bars your way.'); return; }
+    const ox = P.pos.x, oz = P.pos.z, st = spd * h;
+    P.pos.x += dx * st; P.pos.z += dz * st;
+    collide(G.area, P.pos, 0.38, P.pos.y, 1.75); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y);
+    if (Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R) wildFooting(P, ox, oz);
+    P.pos.y = groundAt(G.area, P.pos.x, P.pos.z, 0.38, P.pos.y + 0.6); P.vy = 0; P.onGround = true;
+    const moved = Math.hypot(P.pos.x - ox, P.pos.z - oz); c.moved += moved; P.bob += moved * 0.4;
+    P.stepT -= moved / 1.15; if (P.stepT <= 0) { P.stepT = 1.9 * 3; SFX.play('step'); } // (fewer steps heard at speed)
+    if (this.lookT <= 0) { const want = Math.atan2(-dx, -dz); let d = want - P.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; P.yaw += d * Math.min(1, h * 1.5); P.pitch = lerp(P.pitch, -0.03, Math.min(1, h)); }
+    // blocked: try to step round it, then give up
+    c.chk.t += h; if (c.chk.t > 2.5) { const prog = c.moved - c.chk.s; c.chk = { s: c.moved, t: 0 };
+      if (prog < spd * 2.5 * 0.3) { c.stuck++; if (c.stuck > 4) { this.stop('Your way is blocked.'); return; } c.detour = (c.stuck % 2 ? 1 : -1) * (0.6 + 0.3 * c.stuck); c.detourT = 3; } else c.stuck = Math.max(0, c.stuck - 1); }
+    // something worth stopping for
+    const site = Sites.update(P.pos.x, P.pos.z); if (site && this.cur) { this.stop(`You come upon ${site.name}.`, 'good'); return; }
+    const poi = POI.update(P.pos.x, P.pos.z); if (poi && this.cur) { this.stop(`You come upon ${poi.name}.`, 'good'); return; }
+    if (rpgUI() && nearbyHostiles(35)) { this.stop('Something stirs nearby. You stop.', 'bad'); return; }
+    if (c.mode === 'ahead' && (rimDist(P.pos.x, P.pos.z) < 300)) { this.stop('The mountains rise sheer ahead of you.'); }
+  },
+  banner() {
+    const c = this.cur; if (!c) return; const L = c.cum[c.cum.length - 1], left = Math.max(0, L - c.s);
+    const where = c.mode === 'ahead' ? (c.road ? 'Following the road' : 'Walking on') : `To ${c.name}${c.road ? ' by road' : ''} · ${left >= 1000 ? (left / 1000).toFixed(1) + ' km' : Math.round(left) + ' m'} to go`;
+    $('travelinfo').textContent = `${where} · ×${Math.round(this.k())} · ${clockString(G.time)}  (${Input.touch ? 'tap here' : 'any key'} to stop)`;
+  },
+
+  /* ---------- the ways to set off ---------- */
+  toward(x, z, name, byRoad) {
+    const P = G.player;
+    if (!byRoad) return this.start({ mode: 'straight', pts: [[P.pos.x, P.pos.z], [x, z]], name, road: false });
+    const r = this.route(P.pos.x, P.pos.z, x, z); if (!r) { msg('There is no road there that you know of.'); return false; }
+    return this.start({ mode: 'road', pts: r.pts, name, road: r.road });
+  },
+  ahead(followRoad) {
+    const P = G.player;
+    if (followRoad) { const r = this.roadAhead(P.pos.x, P.pos.z, P.yaw); if (!r) { msg('There is no road here to follow.'); return false; } return this.start({ mode: 'ahead', pts: r.pts, road: true, name: 'the road', arrive: 'The road forks here.' }); }
+    const fx = -Math.sin(P.yaw), fz = -Math.cos(P.yaw);
+    return this.start({ mode: 'ahead', pts: [[P.pos.x, P.pos.z], [P.pos.x + fx * 30000, P.pos.z + fz * 30000]], road: false, name: 'on' });
+  },
+  // the places you can name as a goal: the city, and the landmarks you have found or heard of
+  goals() {
+    const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
+    if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Daggerfall', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
+    for (const S of SITES) if (found[S.id] || heard[S.id]) out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
+    for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
+    return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);
   },
 };
 
@@ -6700,13 +7319,33 @@ const UI = {
   openVictory() {
     this.openStory('The Ghost Is at Rest', `<p>King Lysandus no longer walks the streets of Daggerfall. The Emperor's letter is in royal hands, and whatever it says will set the Iliac Bay on a new course — but that is a story for another city.</p><p>For now, Daggerfall sleeps soundly for the first time in months. Its taverns, guilds and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Daggerfall: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
   },
+  // fast travel on foot: straight on, along the road underfoot, or to a place you know of (by road or across country)
+  openFoot() {
+    const P = G.player; if (G.area !== G.city) { msg('You can only travel this way out in the open.'); return; }
+    const goals = Travel.goals(), road = Travel.roadAhead(P.pos.x, P.pos.z, P.yaw), dir = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((Math.atan2(-Math.sin(P.yaw), Math.cos(P.yaw)) * 180 / Math.PI) + 360) % 360 / 45) % 8];
+    const s = nearestStop(P.pos.x, P.pos.z), km = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m';
+    const render = () => `<h2>Travel on foot</h2><p class="dim">The world runs faster while you travel. Any key, or a tap on the banner, stops you; so does anything worth stopping for.</p>
+      <div class="btns col"><button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
+      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)} · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
+      <div class="btns"><span class="dim">Speed</span>${Travel.SPEEDS.map(v => `<button class="db sm${Travel.rate() === v ? ' primary' : ''}" data-a="v${v}">×${v}</button>`).join('')}</div>
+      ${s && insideCity(P.pos.x, P.pos.z, -40) ? `<p class="note">Inside the walls the carriages are quicker: the nearest stop is at ${esc(s.name)}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}.</p>` : ''}
+      <div class="btns"><button class="db" data-a="close">Stay here</button></div>`;
+    this.open('foot', render, { cls: 'mid', onAct: (a) => {
+      if (a[0] === 'v') { settings.travelSpeed = +a.slice(1); saveSettings(); this.render(); return; }
+      if (a === 'map') { this.close(true); MapView.open(true); return; }
+      const go = () => { this.close(true); };
+      if (a === 'ahead') { go(); Travel.ahead(false); return; }
+      if (a === 'road') { go(); Travel.ahead(true); return; }
+      const g = goals[+a.slice(1)]; if (!g) return; go(); Travel.toward(g.x, g.z, g.name, a[0] === 'r');
+    } });
+  },
   openTravel(stop) {
     const P = G.player;
     if (G.area.kind !== 'city') { msg('There are no carriages in here.'); return; }
     if (!stop) {
       const s = nearestStop(P.pos.x, P.pos.z);
       if (s && Math.hypot(s.x - P.pos.x, s.z - P.pos.z) < 8) stop = s;
-      else { if (s) msg(`The nearest carriage stop is at ${s.name}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}. Look for the signpost with the wheel.`); return; }
+      else { this.openFoot(); return; }
     }
     if (G.wanted) { msg('The coachman takes one look at you and shakes his head. "Not with the guard after you."', 'bad'); return; }
     if (nearbyHostiles(18)) { msg('The horses shy away. You cannot board with enemies nearby.', 'bad'); return; }
@@ -6714,8 +7353,8 @@ const UI = {
     const routes = carriageRoutes(stop);
     const render = () => `<h2>Daggerfall Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
       <div class="list scroll">${routes.map((r, i) => `<div class="row"><div class="nm">${esc(capFirst(r.stop.name))}<small>${esc(capFirst(districtAt(r.stop.x, r.stop.z).name))} · about ${r.mins} minutes${r.via.length ? ' · via ' + esc(r.via.join(', ')) : ''}</small></div><div class="pr">${r.fare * (night ? 2 : 1)} g</div><button class="db sm" data-a="t${i}" ${P.gold < r.fare * (night ? 2 : 1) ? 'disabled' : ''}>Travel</button></div>`).join('')}</div>
-      <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Stay here</button></div>`;
-    this.open('travel', render, { cls: 'mid', onAct: (a) => { const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
+      <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="foot">Travel on foot</button><button class="db" data-a="close">Stay here</button></div>`;
+    this.open('travel', render, { cls: 'mid', onAct: (a) => { if (a === 'foot') { this.openFoot(); return; } const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
   },
   openArrest() {
     const P = G.player; const fine = G.wanted.fine;
@@ -6732,26 +7371,71 @@ function isEquipped(it) { const e = G.player.equip; return e.weapon === it || e.
 
 /* ---------------- map ---------------- */
 const MapView = {
-  zoom: 1,
-  open() {
+  zoom: 1, view: null, dest: null, ZMIN: 0.035, ZMAX: 6,
+  // pick: opened to choose where to travel (starts zoomed out over the country)
+  open(pick = false) {
     if (G.area.kind === 'interior') { msg(`You are inside ${G.area.name}. There is no need for a map here.`); return; }
-    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.draw();
+    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = null; this.dest = null; $('mapdest').hidden = true;
+    const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
+    this.draw();
   },
-  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; if (G.state === 'play') requestLock(false); },
+  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
+  setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
+  // the whole country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow
+  worldImage() {
+    if (this._world) return this._world; const N = 300, [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = WORLD.x1 - WORLD.x0, Hd = WORLD.z1 - WORLD.z0, fm = G.city.forestMask;
+    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(WORLD.x0 + (i + 0.5) / N * Wd, WORLD.z0 + (j + 0.5) / N * Hd);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const wx = WORLD.x0 + (i + 0.5) / N * Wd, wz = WORLD.z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+      if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
+      const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
+      const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
+      if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
+      if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }
+      else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
+      else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
+      a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); return (this._world = c);
+  },
+  // screen → world on the map as last drawn
+  toWorld(px, py) { const t = this.tf; if (!t) return null; return [t.cx + (px * t.dpr - t.W / 2) / t.scale, t.cz + (py * t.dpr - t.H / 2) / t.scale]; },
+  pick(px, py) {
+    const w = this.toWorld(px, py); if (!w || G.area !== G.city) return; const t = this.tf, P = G.player; let best = null, bd = 22 * t.dpr;
+    for (const g of Travel.goals()) { const d = Math.hypot((g.x - w[0]) * t.scale, (g.z - w[1]) * t.scale); if (d < bd) { bd = d; best = g; } }
+    for (const S of SITES) { const d = Math.hypot((S.x - w[0]) * t.scale, (S.z - w[1]) * t.scale); if (d < bd && ((G.flags.found || {})[S.id] || (G.flags.heard || {})[S.id])) { bd = d; best = { name: S.name, x: S.road[0][0], z: S.road[0][1] }; } }
+    this.dest = best ? { ...best } : { name: 'the place you marked', x: w[0], z: w[1] };
+    const d = Math.hypot(this.dest.x - P.pos.x, this.dest.z - P.pos.z), el = $('mapdest');
+    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))} · ${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
+    el.hidden = false; this.draw();
+  },
+  go(how) {
+    const D = this.dest; if (how === 'clear' || !D) { this.dest = null; $('mapdest').hidden = true; this.draw(); return; }
+    this.close(); Travel.toward(D.x, D.z, D.name, how === 'road');
+  },
   draw() {
-    const c = $('mapc'); const W = c.width = Math.floor(innerWidth * Math.min(devicePixelRatio, 2)), H = c.height = Math.floor(innerHeight * Math.min(devicePixelRatio, 2));
+    const c = $('mapc'); const dpr = Math.min(devicePixelRatio, 2), W = c.width = Math.floor(innerWidth * dpr), H = c.height = Math.floor(innerHeight * dpr);
     const x = c.getContext('2d'); x.fillStyle = '#1b1712'; x.fillRect(0, 0, W, H); const P = G.player;
     const legend = $('maplegend');
     if (G.area.kind === 'dungeon') { this.drawDungeon(x, W, H); legend.textContent = 'The Catacombs — explored passages. The door marks the way out. (M or Esc to close)'; return; }
-    const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2);
-    const cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
+    let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    if (region) { cx = P.pos.x; cz = P.pos.z; }
+    if (this.view) { cx = this.view[0]; cz = this.view[1]; }
+    cx = clamp(cx, WORLD.x0, WORLD.x1); cz = clamp(cz, WORLD.z0, WORLD.z1 + 1000);
+    this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
     const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
     const poly = (pts, col, stroke) => { x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.closePath(); if (col) { x.fillStyle = col; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.stroke(); } };
     const circ = (px, pz, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(X(px), Z(pz), Math.max(1, r * scale), 0, 7); x.fill(); };
     const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
     if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
-    rect(-2000, -2000, 2000, 2000, '#1d3446'); x.imageSmoothingEnabled = true; x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
+    x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
+    if (this.zoom < 1.6) x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+    x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
+    // out in the country: rivers, tracks and the roads to the landmarks
+    for (const R of LAND.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const T of Wild.tracks) { x.strokeStyle = '#8a7350'; x.lineWidth = Math.max(1.5, 4 * scale); x.setLineDash(region ? [] : [6, 4]); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); x.setLineDash([]); }
     const FCOL = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' };
     for (const f of M.fields) poly(f.poly, FCOL[f.key] || '#5a5a30');
     poly(WALL_PTS, 'rgba(74,69,60,0.86)');
@@ -6776,8 +7460,8 @@ const MapView = {
     x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(2, 3 * scale); x.lineCap = 'butt'; x.beginPath(); WALL_PTS.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke();
     { const xs = [WALL_PTS[0][0], ...M.piers.flatMap(p => [p - 4.5, p + 4.5]), WALL_PTS[WALL_PTS.length - 1][0]]; x.beginPath(); for (let i = 0; i < xs.length; i += 2) { x.moveTo(X(xs[i]), Z(SHORE + 0.5)); x.lineTo(X(xs[i + 1]), Z(SHORE + 0.5)); } x.stroke(); } // the sea wall, open at each pier
     for (const [px, pz] of WALL_PTS) circ(px, pz, 4.6, '#8a8070');
-    for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
-    for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
+    if (this.zoom >= 0.45) for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
+    if (this.zoom >= 0.45) for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
     for (const d of M.labels) labels.push([d.name.toUpperCase(), X(d.x), Z(d.z), 'rgba(232,216,168,0.55)', Math.round(fs * 1.25)]);
     for (const l of G.city.landmarks) if (!l.id.endsWith('gate') || this.zoom >= 1.5) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 8, '#d8cca8', Math.round(fs * 0.9)]);
     // quest markers
@@ -6794,11 +7478,21 @@ const MapView = {
       else markers.push([bld('mausoleum').door, q.title]);
     }
     const t = performance.now() / 300;
-    for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
+    if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
+    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
+    // the landmarks you know of, the places you have come upon, the way you are going
+    const found = G.flags.found || {}, heard = G.flags.heard || {};
+    for (const S of SITES) { if (!found[S.id] && !heard[S.id]) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
+      x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
+      labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
+    for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    if (Travel.cur) { const pts = Travel.cur.pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
+    if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
     this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind === 'city' ? 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −.' : 'Wheel or + / − to zoom. (M or Esc to close)') : '';
+    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Daggerfall — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+      : 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
   },
   drawDungeon(x, W, H) {
     const D = G.area.dg; const cell = Math.floor(Math.min(W, H) * 0.9 / D.N); const ox = (W - cell * D.N) / 2, oz = (H - cell * D.N) / 2; const P = G.player;
@@ -7323,14 +8017,16 @@ function frame(now) {
   else if (G.state === 'play' && G.player) {
     const frozen = G.uiOpen || G.fading || (!Input.locked && !Input.fallback && !Input.touch);
     G.paused = frozen || !!G.resting;
+    let sdt = dt; // the world's own time step: faster while travelling
     if (G.resting) updateRest(dt);
     else if (!frozen) {
-      G.time += dt * TIME_SCALE; updateWeather(); updatePlayer(dt);
-      if (G.area.kind === 'city') cityTick(G.area, dt);
+      if (Travel.cur) sdt = Travel.update(dt); else updatePlayer(dt);
+      G.time += sdt * TIME_SCALE; updateWeather();
+      if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
       if (G.area.kind === 'dungeon') { const D = G.area.dg; const ci = Math.floor(G.player.pos.x / D.cs), cj = Math.floor(G.player.pos.z / D.cs); for (let j = cj - 2; j <= cj + 2; j++) for (let i = ci - 2; i <= ci + 2; i++) if (i >= 0 && j >= 0 && i < D.N && j < D.N) D.visited[i + j * D.N] = 1; }
     } else if (G.player.dead) updatePlayer(dt);
-    updateEntities(dt); updateFX(dt); pickMusic(false);
+    updateEntities(sdt); updateFX(dt); pickMusic(false);
     G.dmgFlash = Math.max(0, G.dmgFlash - dt); G.shake = Math.max(0, G.shake - dt);
     $('dmg').style.opacity = G.dmgFlash * 1.6;
     if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw();
@@ -7375,6 +8071,7 @@ function onKey(e) {
     return;
   }
   if (G.resting) { if (c === 'Escape' || c === 'KeyR') stopRest('You stop resting.'); return; }
+  if (Travel.cur && !['F5', 'F9', 'KeyN'].includes(c)) { Travel.stop('You stop.'); if (['Escape', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space', 'KeyT', 'KeyV'].includes(c)) return; }
   if (G.player.dead || G.fading) return;
   switch (c) {
     case 'Escape': UI.openPause(); break;
@@ -7444,11 +8141,20 @@ function bindInput() {
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { MapView.zoom = clamp(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8), 1, 6); MapView.draw(); e.preventDefault(); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { MapView.setZoom(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8)); e.preventDefault(); }, { passive: false });
+  // the map: drag to look around it, tap or click a place to travel there
+  { let drag = null; const mc = $('mapc');
+    mc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } });
+    mc.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
+      const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
+    mc.addEventListener('pointerup', e => { if (drag && !drag.moved && G.area === G.city) MapView.pick(e.clientX, e.clientY); drag = null; });
+    mc.addEventListener('pointercancel', () => { drag = null; });
+    $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }
   $('mapclose').addEventListener('click', () => MapView.close());
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
-  for (const [id, k] of [['mapzin', 1.25], ['mapzout', 0.8]]) $(id).addEventListener('click', () => { MapView.zoom = clamp(MapView.zoom * k, 1, 6); MapView.draw(); });
+  for (const [id, k] of [['mapzin', 1.25], ['mapzout', 0.8]]) $(id).addEventListener('click', () => MapView.setZoom(MapView.zoom * k));
   $('restinfo').addEventListener('click', () => { if (G.resting) stopRest('You stop resting.'); });
+  $('travelinfo').addEventListener('click', () => { if (Travel.cur) Travel.stop('You stop.'); });
   addEventListener('resize', () => { resize(); if (G.mapOpen) MapView.draw(); });
 }
 function boot(hotData) {
@@ -7469,7 +8175,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { Wild, LAND, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Wild, LAND, SITES, Sites, siteWeight, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

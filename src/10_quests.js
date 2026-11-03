@@ -169,6 +169,15 @@ function whereIs(npc, type) {
   return `${best.name} is ${describeDir(origin.x, origin.z, best.door.x, best.door.z)}${q ? ', in ' + q.name : ''}. I'll mark it on your map.${extra}${bd > 150 ? ' It is a long walk: take a carriage.' : ''}`;
 }
 
+// out on the road: what is there to see? The nearest landmark you have not found yet, marked on the map as a rumour
+function siteRumor(npc) {
+  return { label: 'Anything worth seeing out here?', fn: () => {
+    const found = G.flags.found || {}, heard = G.flags.heard || (G.flags.heard = {}), x = npc.pos.x, z = npc.pos.z;
+    const left = SITES.filter(S => !found[S.id]).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
+    const S = left[0] || SITES.slice().sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
+    const km = Math.hypot(S.x - x, S.z - z) / 1000; heard[S.id] = true;
+    return `"${capFirst(S.name)}? ${capFirst(S.blurb)}. It lies ${describeDir(x, z, S.x, S.z)}, ${km < 1 ? 'not far at all' : `a good ${Math.round(km)} kilometre${Math.round(km) === 1 ? '' : 's'}`}${S.track != null ? '. There is a road' : ''}." (Marked on your map.)`; } };
+}
 /* ---------------- dialogue ---------------- */
 // Returns { title, sub, text, opts:[{label, fn}] }. fn returns new text or null (panel handled elsewhere).
 function dialogFor(npc) {
@@ -255,6 +264,12 @@ function dialogFor(npc) {
       text = rnd.pick(['"Where to? Anywhere inside the walls, if you have the coin."', '"Climb aboard. Mind the horse, he bites."', '"Kingsward, the Docks, the Warrens if you are brave. Name it."']);
       opts.push({ label: 'Travel by carriage', fn: () => { UI.openTravel(stop); return null; } }, rumor, where); break;
     }
+    case 'villager': sub = 'A villager of Mirrormere';
+      text = rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Daggerfall, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
+      opts.push(siteRumor(npc), rumor); break;
+    case 'traveler': sub = npc.data.trade || 'A traveller on the road';
+      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Daggerfall, the gates shut at no hour, but the guards ask questions after dark."']);
+      opts.push(siteRumor(npc), rumor); break;
     case 'bard': sub = 'Traveling bard'; text = '"Care for a song? No? A rumor, then — bards hear everything."'; opts.push(rumor); break;
     case 'resident':
       text = night ? '"What are you doing in my house?! Get out!"' : rnd.pick(['"Can I help you? This is a private home."', '"Did you knock? I didn\'t hear a knock."']); opts.push(rumor, where); break;
@@ -263,6 +278,6 @@ function dialogFor(npc) {
       opts.push(where, rumor); break;
     default: opts.push(where, rumor);
   }
-  if (!['king', 'ghost'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
+  if (!['king', 'ghost', 'villager', 'traveler'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
   return { title: npc.name, sub, text, opts };
 }

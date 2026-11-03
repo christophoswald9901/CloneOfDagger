@@ -30,7 +30,9 @@ function playerAC() { const p = G.player; let ac = 0; for (const s of ['body', '
 // a step is refused (or slides along) if it climbs ground steeper than about 50°, or goes on into the high peaks
 function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
-  const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z); return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
+  const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
+    if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
+    return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
   if (!bad(p.pos.x, oz)) p.pos.z = oz; else if (!bad(ox, p.pos.z)) p.pos.x = ox; else { p.pos.x = ox; p.pos.z = oz; }
 }

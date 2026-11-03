@@ -50,6 +50,14 @@ TRANS = r"""(()=>{const look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)); const V={
  V.t_air_out=[1300,-900,look(1300,-900,0,-100),-0.28,150];
  return JSON.stringify(V);})()"""
 
+# views of the landmarks whose ground is fixed: from their own road, from where the generated land blends into them, and from the air
+SITES_V = r"""(()=>{const g=__game,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)); const V={};
+ for(const S of g.SITES){ const T=g.Wild.tracks[S.track]; let k=0; while(k<T.length-1&&Math.hypot(T[k][0]-S.x,T[k][1]-S.z)<170)k++; const [x,z]=T[k];
+   V[S.id+'_road']=[x,z,look(x,z,S.x,S.z),-0.02,null];
+   let a=Math.atan2(z-S.z,x-S.x)+1.9, bx=S.x+Math.cos(a)*S.rb*0.75, bz=S.z+Math.sin(a)*S.rb*0.75; V[S.id+'_edge']=[bx,bz,look(bx,bz,S.x,S.z),-0.01,null];
+   const ax=S.x+Math.cos(a-0.9)*520, az=S.z+Math.sin(a-0.9)*520; V[S.id+'_air']=[ax,az,look(ax,az,S.x,S.z),-0.24,150]; }
+ return JSON.stringify(V);})()"""
+
 # how far each view may turn to find an open outlook (radians either side of its planned heading)
 ARC = {'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
 
@@ -96,17 +104,17 @@ async def main():
         if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}'): print('boot failed', c.errors()[:2]); c.stop(); return
         await c.new_game(); await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
-        views = json.loads(await c.ev(TRANS if SET == 'transition' else FIND))
+        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else FIND))
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
             args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 5, name])
             where = await c.ev(PLACE.replace('ARGS', args))
-            await asyncio.sleep(6)
+            await asyncio.sleep(float(os.environ.get('WAIT', '6')))
             f = f'{OUT}/s{seed}_{name}.png'; await c.shot(f); files.append((name, f))
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
             print(seed, name, where, info)
         allf = [(n, f'{OUT}/s{seed}_{n}.png') for n in views if os.path.exists(f'{OUT}/s{seed}_{n}.png')] # every view taken so far, in order
-        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else ""}s{seed}.jpg')
+        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else ""}s{seed}.jpg')
         print(seed, 'errors:', [e[:300] for e in c.errors()[:3]]); c.stop()
 asyncio.run(main())

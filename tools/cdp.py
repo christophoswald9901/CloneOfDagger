@@ -46,6 +46,11 @@ class CDP:
         await self.send('Fetch.enable', patterns=[{'urlPattern': CDN + '*'}])
         await self.send('Page.navigate', url=url)
     async def _reader(self):
+        try:
+            await self._read()
+        except websockets.exceptions.ConnectionClosed:
+            pass  # the browser was stopped
+    async def _read(self):
         async for m in self.ws:
             d = json.loads(m)
             if 'id' in d and d['id'] in self.pending: self.pending.pop(d['id']).set_result(d)

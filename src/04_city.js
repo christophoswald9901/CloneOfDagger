@@ -692,7 +692,9 @@ function buildCity() {
     // out in the wild the woods come and go with the lie of the land: clearings, heaths and open valley floors
     if (wild > 0) f += wild * (0.22 * fbm(x / 520 + WSEED * 1.7, z / 520, 3, 78) - 0.06 * smoothstep(90, 150, h - 0.6 * (wildTreeLine(x, z) - 150)) - 0.9 * smoothstep(wildTreeLine(x, z) - 35, wildTreeLine(x, z), h));
     f -= 1.1 * wildCult(x, z); // farmed land: the woods are cleared back to copses
-    return smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd);
+    const m = smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd), st = r > 1500 ? siteAt(x, z) : null;
+    return st ? lerp(m, siteForest(st.S, x, z, h), st.w) : m; // a site's own woods, the same in every world
+
   };
   area.forestMask = forestMask;
   const matOf = (x, z, h, slope) => {

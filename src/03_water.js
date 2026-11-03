@@ -37,7 +37,7 @@ function landCarve(x, z, h) {
   return h1 + (floor - h1) * fw;
 }
 function riverD(x, z) { const T = LAND.rd; if (!T) return 9999; const fx = (x - T.X0) / T.C, fz = (z - T.Z0) / T.C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= T.NI - 1 || j >= T.NJ - 1) return 9999; const u = fx - i, v = fz - j, k = j * T.NI + i, D = T.D; return lerp(lerp(D[k], D[k + 1], u), lerp(D[k + T.NI], D[k + T.NI + 1], u), v); }
-function terrainRaw(x, z) { const h = terrainBase(x, z); return LAND.ready ? landCarve(x, z, h) : h; }
+function terrainRaw(x, z) { const h = terrainBase(x, z); return siteFix(x, z, LAND.ready ? landCarve(x, z, h) : h); } // the sites' fixed ground last: no river is cut through it
 // the nearest river to a point within reach r: { d, w } (distance to the middle of the water, its width), or null
 function riverNear(x, z, r = 40) {
   const L = LAND; if (!L.ready) return null; const list = L.hash.get((Math.floor(x / L.HC) + 4096) * 8192 + Math.floor(z / L.HC) + 4096); if (!list) return null;
@@ -55,7 +55,7 @@ function planLand() {
   const t0 = performance.now(), C = LAND_C, M = 480, X0 = WORLD.x0 - M, Z0 = WORLD.z0 - M;
   const NI = Math.round((WORLD.x1 - WORLD.x0 + 2 * M) / C) + 1, NJ = Math.round((WORLD.z1 - WORLD.z0 + 2 * M) / C) + 1, n = NI * NJ;
   const H = new Float32Array(n), F = new Float32Array(n), rec = new Int32Array(n).fill(-1), st = new Uint8Array(n); // st: 0 unseen, 1 reached, 2 kept out
-  for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z)) st[k] = 2; else H[k] = terrainBase(x, z); }
+  for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); }
   const tGrid = performance.now();
   // flood up from the sea and from the edge of the grid (beyond the mountains), lowest first
   const hk = new Float64Array(n), hv = new Int32Array(n); let hn = 0;

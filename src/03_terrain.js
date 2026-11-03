@@ -34,9 +34,9 @@ function coastZ(x) {
   if (ax < 158) return SHORE;
   const k = smoothstep(158, 200, ax);
   const wild = smoothstep(900, 1500, ax); // further along, the coast runs on in bays and headlands
-  return SHORE + k * (6 + 16 * fbm(x / 70, 3.7, 3, 5)) + 85 * smoothstep(230, 470, ax) + 30 * smoothstep(500, 800, ax) * (x < 0 ? 1.2 : 0.8)
+  return siteCoast(x, SHORE + k * (6 + 16 * fbm(x / 70, 3.7, 3, 5)) + 85 * smoothstep(230, 470, ax) + 30 * smoothstep(500, 800, ax) * (x < 0 ? 1.2 : 0.8)
     + (wild > 0 ? wild * (150 * fbm(x / 900 + WSEED * 3.1, 7.3, 3, 306) + 40 * fbm(x / 160, 2.9, 2, 307)) : 0)
-    + smoothstep(1800, 4000, ax) * 650 * fbm(x / 5200 + WSEED * 1.9, 13.7, 3, 309); // and at the scale of the whole bay, in broad bights and capes
+    + smoothstep(1800, 4000, ax) * 650 * fbm(x / 5200 + WSEED * 1.9, 13.7, 3, 309)); // and at the scale of the whole bay, in broad bights and capes (fixed where a site holds the coast)
 }
 // Pilgrim's Rise: a crag whose steep face looks down on the city from the north-east
 const RISE = { a: [115, -290], b: [295, -150], H: 85, wIn: 46, wOut: 150 };

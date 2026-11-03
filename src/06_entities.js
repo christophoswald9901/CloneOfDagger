@@ -199,6 +199,7 @@ function updateNPC(e, dt) {
       break;
     }
     case 'wander': wanderStep(e, dt, 0.5); break;
+    case 'traveller': Roads.step(e, dt); break;
     default: e.moving = false;
   }
 }
