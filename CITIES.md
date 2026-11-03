@@ -54,6 +54,7 @@ New cities should use the town generator. Daggerfall stays as it is, but it is w
 - **Water needs walking rules.** Moat and canal water refuses a step into it, the way the sea and the mere do. Bridges are colliders with a walkable top. Fast travel by road follows the town's street graph through the gates.
 - **Tracks must not run through walls.** The wild's track router treats a town's core as impassable. Each gate gets its own road out instead.
 - **Test views must fit the place.** The render tool's cameras keep clear of walls by 8 m in the open country but only 1.5 m in town; otherwise they slide into back yards or the canal. Stand far views on the road itself; a hedge beside the camera hides a whole town.
+- **One tree can hide a town.** From the road 1 km out, a single roadside oak covered the belfry exactly. Across a town's own farmland the roads are kept open (no trees within about 45 m), which is also how lowland approach roads look.
 - **Shader and one-line code edits break silently.** A `//` comment inside a one-line statement commented out the rest of it, and the whole game failed to load. `build.py` now refuses to write a build whose JavaScript doesn't parse.
 
 ## Open problems
