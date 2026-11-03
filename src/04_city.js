@@ -83,7 +83,7 @@ const CITY_MATS = {
   // the terrain itself
   farRock: { tex: 'scree' }, tGrass: { tex: 'grass' }, tGrassFade: { tex: 'grass', po: 1, transparent: true }, tDirt: { tex: 'yard' }, tSand: { tex: 'sand' }, tRock: { tex: 'cliff' }, tCrag: { tex: 'crag' }, crag: { tex: 'crag' }, farGround: { tex: 'grass' }, tScree: { tex: 'scree' },
   // the generated wild: its horizon mesh and the open sea
-  wFar: { tex: 'farNoise' }, wFarO: { tex: 'farNoise' }, wFarR: { tex: 'farNoise', po: 2 }, wFarRO: { tex: 'farNoise', po: 2 }, wFarH: { tex: 'farNoise' }, wSea: { tex: 'water', po: -2 }, boulder: { tex: 'cliff' },
+  wFar: { tex: 'farNoise' }, wFarO: { tex: 'farNoise' }, wFarR: { tex: 'farNoise', po: 8 }, wFarRO: { tex: 'farNoise', po: 8 }, wFarH: { tex: 'farNoise' }, wSea: { tex: 'water', po: -2 }, boulder: { tex: 'cliff' },
   wScreeO: { tex: 'scree', po: 1, transparent: true }, wEarthO: { tex: 'dirt', po: 1, transparent: true }, wRockO: { tex: 'cliff', po: 2, transparent: true }, wMudO: { tex: 'mud', po: 1, transparent: true }, wStream: { tex: 'water', double: true }, wFoam: { tex: 'farNoise', transparent: true, po: 1 },
   // layers laid over it: polygon offset decides what is drawn on top (overlays < roads < squares)
   gDirt: { tex: 'yard', po: 1 }, gSand: { tex: 'sand', po: 1 }, gGrass: { tex: 'meadow', po: 1 },

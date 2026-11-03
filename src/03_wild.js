@@ -102,9 +102,12 @@ const Wild = {
       sh.vertexShader = 'varying vec2 vWxz; varying float vWy;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n { vec4 wp = modelMatrix * vec4(transformed, 1.0); vWxz = wp.xz; vWy = wp.y; }');
       sh.fragmentShader = '#define FAR_HIGH\nuniform sampler2D wMask; uniform vec4 wInner; uniform vec4 wOuter; varying vec2 vWxz; varying float vWy;\n' + sh.fragmentShader.replace('void main() {', `void main() {
         if (texture2D(wMask, (floor((vWxz + 352.0) / 176.0) + vec2(64.5, 112.5)) / 128.0).r > 0.5) discard;
-        ${outer === 1 ? 'if (vWxz.x > wInner.x && vWxz.y > wInner.y && vWxz.x < wInner.z && vWxz.y < wInner.w) discard;' : outer === 2 ? 'if (vWxz.x > wOuter.x && vWxz.y > wOuter.y && vWxz.x < wOuter.z && vWxz.y < wOuter.w) discard;' : ''}`).replace('#include <fog_fragment>', FAR_FOG); };
+        ${outer === 1 ? 'if (vWxz.x > wInner.x + 64.0 && vWxz.y > wInner.y + 64.0 && vWxz.x < wInner.z - 64.0 && vWxz.y < wInner.w - 64.0) discard;' : outer === 2 ? 'if (vWxz.x > wOuter.x + 200.0 && vWxz.y > wOuter.y + 200.0 && vWxz.x < wOuter.z - 200.0 && vWxz.y < wOuter.w - 200.0) discard;' : ''}`).replace('#include <fog_fragment>', FAR_FOG); };
       m.customProgramCacheKey = () => 'wildFar' + outer; };
     farShader(env.mats.wFar, 0); farShader(env.mats.wFarR, 0); farShader(env.mats.wFarO, 1); farShader(env.mats.wFarRO, 1); farShader(env.mats.wFarH, 2);
+    // the coarse ring reaches a cell under the fine one, pushed back in depth: where they overlap the fine ground shows, and no crack opens between them
+    for (const m of [env.mats.wFarO]) { m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 16; }
+    { const m = env.mats.wFarH; m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 32; } // and the whole country's mesh under the coarse ring, likewise
     this.farTrees = { grove: new FarTrees(area, treeSprite('grove', 60).tex[0], 10.5, 8), pine: new FarTrees(area, treeSprite('pine', 20).tex[0], 6, 13) };
     this.mean = { grass: texMeanLin('grass'), cliff: texMeanLin('cliff'), scree: texMeanLin('scree'), sand: texMeanLin('sand'), noise: texMeanLin('farNoise'), water: texMeanLin('water'), dirt: texMeanLin('dirt'),
       fWheat: texMeanLin('wheat'), fBarley: texMeanLin('barley'), fPlowed: texMeanLin('plowed'), fMeadow: texMeanLin('meadow'), fGreens: texMeanLin('greens') };
@@ -493,7 +496,7 @@ const Wild = {
         lit[k] = sh[0] * cav; lit[k + 1] = sh[1] * cav; lit[k + 2] = sh[2] * cav;
         col[k] = sh[0] * t[0] * cav * (1 - 0.05 * wet); col[k + 1] = sh[1] * t[1] * cav * (1 + 0.04 * wet); col[k + 2] = sh[2] * t[2] * cav * (1 - 0.06 * Math.max(0, -wet));
         const SL = wildSnowLine(x, z), snow = smoothstep(SL, SL + 50, h + 12 * fbm(x / 40, z / 40, 2, 337)) * smoothstep(0.35, 0.75, 1 / Math.hypot(1, Math.hypot(gx, gz))); // snow lies on the high ledges, not the sheer faces
-        const rt = 1 + 0.14 * fbm(x / 55, z / 55, 2, 338); // rock weathers unevenly: large lighter and darker patches
+        const rt = (1 + 0.14 * fbm(x / 55, z / 55, 2, 338)) * (0.86 + 0.14 * Math.sin(h / 2.6 + 3 * fbm(x / 40, z / 40, 1, 339)) + 0.08 * fbm(x / 9, z / 9, 1, 340)); // rock weathers unevenly: large lighter and darker patches, and bands of ledges across the face
         colR[k] = sh[0] * cav * rt * lerp(0.94, 1.85, snow); colR[k + 1] = sh[1] * cav * rt * lerp(0.97, 1.87, snow); colR[k + 2] = sh[2] * cav * rt * lerp(1.03, 1.95, snow); // grey stone out here
         const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 ? 0 : q[1];
         qE[v] = (1 - smoothstep(3.5, 10, best[kb])) * smoothstep(0.22, 0.5, Math.hypot(gx, gz)); // the raw earth of a track's cutting
@@ -725,7 +728,7 @@ const Wild = {
     const g = { p: [], u: [], c: [], i: [] }, x1 = ox + n * C, z1 = oz + n * C, IR = this.innerU.value;
     for (let b = 0; b < n; b++) for (let a = 0; a < n; a++) {
       const x = ox + a * C, z = oz + b * C;
-      if (inner ? (x >= -TG.R && x + C <= TG.R && z >= -TG.R && z + C <= TG.R) : (x >= IR.x && x + C <= IR.z && z >= IR.y && z + C <= IR.w)) continue; // ground nearer in has its own
+      if (inner ? (x >= -TG.R && x + C <= TG.R && z >= -TG.R && z + C <= TG.R) : (x >= IR.x + 64 && x + C <= IR.z - 64 && z >= IR.y + 64 && z + C <= IR.w - 64)) continue; // ground nearer in has its own (the coarse ring keeps one cell of overlap)
       const hs = [hb(a, b), hb(a + 1, b), hb(a, b + 1), hb(a + 1, b + 1)]; if (Math.max(...hs) < SEA - 3) continue;
       const base = g.p.length / 3;
       [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([di, dj], q) => { const vx = x + di * C, vz = z + dj * C, k = ((b + dj) * (n + 1) + a + di) * 3; g.p.push(vx, hs[q], vz); g.u.push((vx + hs[q] * 0.7) / 6, (vz - hs[q] * 0.7) / 6); g.c.push(col[k], col[k + 1], col[k + 2]); }); // (the height shifts the grain, so steep faces are not streaked)
@@ -747,7 +750,7 @@ const Wild = {
     const wc = M.water.map((v, q) => v * [0.72, 0.84, 0.86][q] / M.noise[q]), dc = M.dirt.map((v, q) => v * 0.95 / M.noise[q]), step = inner ? 4 : 10;
     for (const R of this.rivers) { if (R.box[0] > x1 || R.box[2] < ox || R.box[1] > z1 || R.box[3] < oz) continue; const wmin = inner ? 4 : 7; if (Math.max(...R.w) < wmin) continue;
       const keep = R.P.map((_, q) => (q % step === 0 || q === R.P.length - 1)), pts = R.P.filter((_, q) => keep[q]), ws = R.w.filter((_, q) => keep[q]);
-      let run = []; const flush = () => { if (run.length > 1) strip(run.map(q => pts[q]), k => inner ? Math.max(ws[run[k]], 4) : Math.max(ws[run[k]] * 1.4, 9), wc, inner ? 1.0 : 3.0); run = []; }; // the small headwaters are left to the chunks
+      let run = []; const flush = () => { if (run.length > 1) strip(run.map(q => pts[q]), k => inner ? Math.max(ws[run[k]], 4) : Math.max(ws[run[k]] * 1.4, 9), wc, inner ? 2.2 : 4.0); run = []; }; // the small headwaters are left to the chunks
       const ok = ws.map(w => w >= wmin); for (let q = 0; q < ok.length; q++) if (!ok[q]) { let e = q; while (e < ok.length && !ok[e]) e++; if (q > 0 && e < ok.length && e - q < 5) for (let k = q; k < e; k++) ok[k] = true; q = e; } // short dips below the cut-off are bridged
       for (let q = 0; q < pts.length; q++) { if (ok[q]) run.push(q); else flush(); } flush(); }
     for (const T of this.tracks) strip(T.filter((_, q) => q % (inner ? 5 : 12) === 0), () => inner ? 4 : 8, dc, inner ? 0.9 : 2.6);
@@ -793,7 +796,7 @@ function segDistObb(segs, o) { const cs = obbCorners(o); return segs.some(s => {
 function wildRockiness(x, z, h, slope, apron = 0) {
   if (Math.hypot(x, z) < 380) return [0, 0];
   const nz = fbm(x / 36, z / 36, 2, 333), TL = wildTreeLine(x, z);
-  const sea = 0.35 * smoothstep(160, 40, coastZ(x) - z) + 0.3 * smoothstep(1800, 300, rimDist(x, z)); // the sea keeps its cliffs bare, and the great mountains theirs
+  const sea = 0.55 * smoothstep(160, 30, coastZ(x) - z) * smoothstep(SEA + 6, SEA + 18, h) + 0.3 * smoothstep(1800, 300, rimDist(x, z)); // (high ground breaks off at the sea in bare cliffs) // the sea keeps its cliffs bare, and the great mountains theirs
   const qr = smoothstep(1.0, 1.4, slope + 0.32 * nz + 0.15 * smoothstep(TL, TL + 60, h) + sea); // bare rock in outcrops on the steepest ground; turf and trees hold the rest
   const patch = smoothstep(-0.15, 0.25, fbm(x / 140, z / 140, 2, 334) + 0.35 * nz); // scree lies in tongues and fans, not over whole hills
   const alpine = smoothstep(TL + 90, TL + 190, h + 22 * nz) * smoothstep(0.55, 0.9, slope + 0.12 * nz) * patch; // above the trees alpine grass first, scree higher up on the steeper ground

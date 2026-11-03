@@ -52,7 +52,7 @@ function greywatchH(x, z) {
 // the Ninefold Stones: a broad bare dome with a level crown
 function stonesH(x, z) {
   const S = SITES[1], dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz) + 10 * fbm(x / 80, z / 80, 2, 911), H0 = 70;
-  const dome = Math.exp(-Math.pow(r / 240, 2)), crown = 1 - smoothstep(18, 40, r);
+  const dome = Math.pow(Math.max(0, 1 - r / 330), 1.7), crown = 1 - smoothstep(18, 40, r); // concave flanks: the crown and its ring stand on the skyline from below
   return H0 + 58 * dome + crown * 0.3 * (1 - dome) + (1 - crown) * (5 * fbm(x / 170, z / 170, 3, 912) + 1.6 * fbm(x / 40, z / 40, 2, 913));
 }
 // Mirrormere: a lake in a bowl of hills, open to the south-east where its outflow would run; the hamlet on a terrace on the east shore
@@ -208,10 +208,11 @@ const SITE_BUILD = {
     for (let k = 0; k < 9; k++) {
       const a = k / 9 * Math.PI * 2 + 0.3, r = 13 + rng.range(-0.6, 0.6), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r, y = H(x, z) - 0.6, ang = a + Math.PI / 2 + rng.range(-0.2, 0.2);
       if (k === 3 || k === 7) { gb.setXf(x, z, ang + 1.3, y + 0.2); gb.box(-0.55, 0, -1.6, 0.55, 0.85, 1.6, 'rock', 2, 2); gb.xf = null; siteCol(area, x, z, ang + 1.3, 0.55, 1.6, y - 1, y + 1.05); continue; } // fallen
-      const h = rng.range(3.8, 5.2), w = rng.range(0.6, 0.85);
-      gb.tint = [1.3, 1.28, 1.2]; gb.setXf(x, z, ang, y); gb.box(-w, 0, -0.32, w, h, 0.32, 'rock', 2, 2); gb.box(-w * 0.7, h, -0.25, w * 0.6, h + 0.35, 0.25, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, x, z, ang, w, 0.35, y - 1, y + h + 0.35);
+      const h = rng.range(5.6, 7.2), w = rng.range(0.9, 1.2);
+      gb.tint = [1.5, 1.48, 1.4]; gb.setXf(x, z, ang, y); gb.box(-w, 0, -0.32, w, h, 0.32, 'rock', 2, 2); gb.box(-w * 0.7, h, -0.25, w * 0.6, h + 0.35, 0.25, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, x, z, ang, w, 0.35, y - 1, y + h + 0.35);
     }
-    { const kx = S.x + 30, kz = S.z + 22, y = H(kx, kz) - 0.8; gb.tint = [1.3, 1.28, 1.2]; gb.setXf(kx, kz, 0.6, y); gb.box(-1.1, 0, -0.5, 1.1, 7.2, 0.5, 'rock', 2, 2); gb.box(-0.8, 7.2, -0.4, 0.7, 7.7, 0.4, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, kx, kz, 0.6, 1.1, 0.5, y - 1, y + 7.7); } // the king stone, standing apart
+    { const kx = S.x + 30, kz = S.z + 22, y = H(kx, kz) - 0.8; gb.tint = [1.3, 1.28, 1.2]; gb.setXf(kx, kz, 0.6, y); gb.box(-1.5, 0, -0.7, 1.5, 10, 0.7, 'rock', 2, 2); gb.box(-1.1, 10, -0.5, 1.0, 10.6, 0.5, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, kx, kz, 0.6, 1.5, 0.7, y - 1, y + 10.6); } // the king stone, standing apart
+    for (const q of [3, 6]) { const [mx, mz] = S.road[q], [nx, nz] = S.road[q + 1], l = Math.hypot(nx - mx, nz - mz), ox = -(nz - mz) / l * 4, oz = (nx - mx) / l * 4, y = H(mx + ox, mz + oz) - 0.5; gb.tint = [1.4, 1.38, 1.3]; gb.setXf(mx + ox, mz + oz, 0.3 * q, y); gb.box(-0.5, 0, -0.3, 0.5, 2.6, 0.3, 'rock', 2, 2); gb.xf = null; gb.tint = null; siteCol(area, mx + ox, mz + oz, 0.3 * q, 0.5, 0.3, y - 1, y + 2.6); } // marker stones beside the way up
     { const y = H(S.x, S.z) - 0.3; gb.setXf(S.x, S.z, 0.4, y); gb.box(-1.3, 0, -0.75, 1.3, 0.85, 0.75, 'rock', 2, 2); gb.xf = null; siteCol(area, S.x, S.z, 0.4, 1.3, 0.75, y - 1, y + 0.85); }
     for (let q = 0; q < 8; q++) { const a = rng.range(0, 6.283), r = rng.range(30, 120), x = S.x + Math.cos(a) * r, z = S.z + Math.sin(a) * r; boulder(gb, 'boulder', x, H(x, z), z, rng.range(0.4, 1.0), rng); }
   },
@@ -257,11 +258,11 @@ const SITE_BUILD = {
   // the lighthouse at the tip of the headland, its keeper's cottage beside it
   gullscar(gb, S, H, area) {
     const rng = new RNG(7501), lx = GULL.x, lz = gullCoast(GULL.x) - 34, y = H(lx, lz) - 0.5; S.clear = [[lx, lz, 12], [lx - 4, lz - 22, 12]];
-    gb.tint = [1.15, 1.15, 1.12]; gb.cyl('plaster', lx, lz, 4.6, y, y + 30, 14, 4, 4); gb.tint = null;
-    gb.cyl('stone', lx, lz, 5.0, y - 1.5, y + 1.2, 14, 3, 3); gb.cyl('iron', lx, lz, 3.2, y + 30, y + 33.5, 10, 2, 2); gb.cone('roofRed', lx, lz, 4.4, y + 33.5, 5, 12, 3); gb.disc('flag', lx, y + 30, lz, 4.65, 14, 3);
-    for (let wy = 4; wy < 28; wy += 5) gb.quad('winB', [lx - 0.45, y + wy, lz + 4.63], [1, 0, 0], [0, 1, 0], 0.9, 1.4, 1, 1, { fixedUV: true });
-    siteCol(area, lx, lz, 0, 4.8, 4.8, y - 2, y + 38);
-    this.glowAt(S, lx, y + 31.8, lz, 8);
+    gb.tint = [1.15, 1.15, 1.12]; gb.cyl('plaster', lx, lz, 5.6, y, y + 36, 14, 4, 4); gb.tint = null; gb.cyl('roofRed', lx, lz, 5.65, y + 17, y + 22, 14, 3, 3); // a red band, to be known by from the sea
+    gb.cyl('stone', lx, lz, 5.0, y - 1.5, y + 1.2, 14, 3, 3); gb.cyl('iron', lx, lz, 3.6, y + 36, y + 40, 10, 2, 2); gb.cone('roofRed', lx, lz, 5, y + 40, 5.5, 12, 3); gb.disc('flag', lx, y + 36, lz, 5.65, 14, 3);
+    for (let wy = 4; wy < 34; wy += 5) if (wy < 16 || wy > 23) gb.quad('winB', [lx - 0.45, y + wy, lz + 5.63], [1, 0, 0], [0, 1, 0], 0.9, 1.4, 1, 1, { fixedUV: true });
+    siteCol(area, lx, lz, 0, 5.8, 5.8, y - 2, y + 46);
+    this.glowAt(S, lx, y + 38, lz, 9);
     const cx = lx - 4, cz = lz - 22, cy = H(cx, cz); gb.setXf(cx, cz, 0.15, cy - 0.1); makeBuilding(area, gb, rng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: 'plaster', roof: 'gable', roofKey: 'roofSlate', doorT: 0.4, found: 0.8, chimney: 1 }); gb.xf = null;
     drapeStrip(gb, 'rDirt', resampleEven([[cx + 1, cz + 4], [lx - 1, lz - 6]], 3), 2.4, { lift: 0.07 });
   },

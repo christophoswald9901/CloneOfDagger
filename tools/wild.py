@@ -28,7 +28,7 @@ FIND = r"""(()=>{const g=__game,W=g.Wild,h=g.terrainH,R=g.LAND.rivers,T=W.tracks
    // on the top itself, looking out (the outlook search below turns to the open side)
    V.upland=[x,z,look(x,z,0,-6000),-0.1,null]; }
  // on the coast 4 km west of the city, looking along the shore
- { let x=-4200,z=-600; while(h(x,z)>1.5&&z<3000) z+=6; z-=12; for(let k=0;k<60;k++){ const sl=Math.hypot(h(x+3,z)-h(x-3,z),h(x,z+3)-h(x,z-3))/6; if(sl<0.25&&h(x,z)>0.5) break; z-=5; } z-=8; V.coast=[x,z,Math.atan2(1,-0.25),-0.1,null]; }
+ { let best=null; for(let x=-5200;x<=-3200;x+=100){ let z=-600; while(h(x,z)>1.5&&z<3000) z+=6; let zz=z; for(let k=0;k<40&&h(x,zz)<3.5;k++) zz-=3; const sl=Math.hypot(h(x+3,zz)-h(x-3,zz),h(x,zz+3)-h(x,zz-3))/6; if(sl<0.3&&(!best||Math.abs(x+4200)<Math.abs(best[0]+4200))) best=[x,zz]; } const [x,z]=best||[-4200,0]; V.coast=[x,z,Math.atan2(1,-0.25),-0.08,null]; } // at the shore, a few metres above the water
  // in the foothills of the mountains that close the world to the north, looking at them
  { let x=1500,z=-12000; while(h(x,z)<260&&z>-19000) z-=40; z+=700; for(let k=0;k<40&&fm(x,z,h(x,z))>0.15;k++){ x+=(k%2?1:-1)*k*60; } V.rim=[x,z,0,0.08,null]; }
  // from the air: over a river valley, high over the interior, and over the edge of the city's own country looking out
@@ -55,7 +55,8 @@ SITES_V = r"""(()=>{const g=__game,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(t
  for(const S of g.SITES){ const T=g.Wild.tracks[S.track]; let k=0; while(k<T.length-1&&Math.hypot(T[k][0]-S.x,T[k][1]-S.z)<170)k++; const [x,z]=T[k];
    V[S.id+'_road']=[x,z,look(x,z,S.x,S.z),-0.02,null];
    let a=Math.atan2(z-S.z,x-S.x)+1.9, bx=S.x+Math.cos(a)*S.rb*0.75, bz=S.z+Math.sin(a)*S.rb*0.75; V[S.id+'_edge']=[bx,bz,look(bx,bz,S.x,S.z),-0.01,null];
-   const ax=S.x+Math.cos(a-0.9)*520, az=S.z+Math.sin(a-0.9)*520; V[S.id+'_air']=[ax,az,look(ax,az,S.x,S.z),-0.24,150]; }
+   const ax=S.x+Math.cos(a-0.9)*520, az=S.z+Math.sin(a-0.9)*520; V[S.id+'_air']=[ax,az,look(ax,az,S.x,S.z),-0.24,150];
+   const fx=S.x+Math.cos(a+0.6)*(S.rb+250), fz=S.z+Math.sin(a+0.6)*(S.rb+250); V[S.id+'_far']=[fx,fz,look(fx,fz,S.x,S.z),-0.2,260]; }
  return JSON.stringify(V);})()"""
 
 # how far each view may turn to find an open outlook (radians either side of its planned heading)
@@ -85,6 +86,7 @@ LABEL = {'track': 'ground: on a track 4 km out', 'river': 'ground: bank of a big
          't_east': 'ground: east fields -> out', 't_north': 'ground: north fields -> out', 't_west': 'ground: west edge -> out', 't_back': 'ground: generated land looking back at the city',
          't_nw': 'ground: north-west edge -> out', 't_air_e': 'air: over the east fields, looking out', 't_air_n': 'air: over the north side, looking out', 't_air_w': 'air: over the west side, looking out',
          't_air_out': 'air: from the generated land back towards the city'}
+ARC['coast'] = 1.6
 
 def sheet(files, path):
     from PIL import Image, ImageDraw

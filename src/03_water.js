@@ -22,19 +22,22 @@ const LS = 12; // floats per valley segment: ax az bx bz, water level at a and b
 const zoneFade = (x, z) => Math.max(smoothstep(500, 640, Math.abs(x)), smoothstep(-560, -700, z));
 function landCarve(x, z, h) {
   const L = LAND, list = L.hash.get((Math.floor(x / L.HC) + 4096) * 8192 + Math.floor(z / L.HC) + 4096); if (!list) return h;
-  const S = L.segs; let cut = 0, best = Infinity, floor = 0, fw = 0, zf = -1;
+  // each river near by gives the ground its own valley profile; the lowest of them wins. (Taking the cut from one river and the floor
+  // from another, as before, stepped the ground by tens of metres where two rivers at different levels run side by side.)
+  const S = L.segs; let out = h, zf = -1;
   for (let q = 0; q < list.length; q++) {
     const o = list[q] * LS, ax = S[o], az = S[o + 1], dx = S[o + 2] - ax, dz = S[o + 3] - az, R = S[o + 9];
     let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1); t = t < 0 ? 0 : t > 1 ? 1 : t;
     const ex = x - ax - dx * t, ez = z - az - dz * t, d2 = ex * ex + ez * ez; if (d2 > R * R) continue;
     const d = Math.sqrt(d2), Fw = S[o + 6], c0 = S[o + 7] + (S[o + 8] - S[o + 7]) * t;
     let k = 1; if (S[o + 11] > 0) { if (zf < 0) zf = zoneFade(x, z); k = zf; if (k <= 0) continue; }
-    const c = c0 * (1 - smoothstep(Fw, R, d)) * k; if (c > cut) cut = c;
-    if (d - Fw < best) { best = d - Fw; floor = S[o + 4] + (S[o + 5] - S[o + 4]) * t + 0.5 + 0.4 * smoothstep(3, 8, S[o + 10]); fw = (1 - smoothstep(Fw * 0.5, Fw + 8, d)) * k; }
+    const cut = c0 * (1 - smoothstep(Fw, R, d)) * k, floor = S[o + 4] + (S[o + 5] - S[o + 4]) * t + 0.5 + 0.4 * smoothstep(3, 8, S[o + 10]);
+    let v = Math.max(h - cut, Math.min(h, floor)); // never let down below the river's own floor
+    const fw = (1 - smoothstep(Fw * 0.5, Fw + 8, d)) * k;
+    if (fw > 0 && !(v < floor && h < SEA + 1)) v += (floor - v) * fw; // the floor beside the water laid level (the sea and the beach at a river's mouth keep their own ground)
+    if (v < out) out = v;
   }
-  const h1 = Math.max(h - cut, Math.min(h, floor)); // never let down below the river's own floor
-  if (fw <= 0 || (h1 < floor && h < SEA + 1)) return h1; // the sea and the beach at a river's mouth keep their own ground
-  return h1 + (floor - h1) * fw;
+  return out;
 }
 function riverD(x, z) { const T = LAND.rd; if (!T) return 9999; const fx = (x - T.X0) / T.C, fz = (z - T.Z0) / T.C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= T.NI - 1 || j >= T.NJ - 1) return 9999; const u = fx - i, v = fz - j, k = j * T.NI + i, D = T.D; return lerp(lerp(D[k], D[k + 1], u), lerp(D[k + T.NI], D[k + T.NI + 1], u), v); }
 function terrainRaw(x, z) { const h = terrainBase(x, z); return siteFix(x, z, LAND.ready ? landCarve(x, z, h) : h); } // the sites' fixed ground last: no river is cut through it
