@@ -3237,6 +3237,7 @@ const Wild = {
         const x = x0 + (a + rng.next()) * SP, z = z0 + (b + rng.next()) * SP, h = this.heightAt(x, z);
         if (h < SEA + 1.6) continue;
         if (townHere && townCore(x, z) > 0.3) continue; // the town's own ground
+        const openRoad = townHere && townFields(x, z) > 0.3 && this.trackD(x, z) < 45; // across a town's farmland the roads run open, so its towers show from the way in
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 10 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.34 * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
@@ -3244,6 +3245,7 @@ const Wild = {
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
         let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
+        if (pick && !pick.small && openRoad) continue;
         if (pick && !pick.small) { const ex = 1 - smoothstep(90, 520, coastZ(x) - z); if (ex > 0 && rng.next() < ex) pick = rng.next() < 0.45 * (1 - ex) ? { kind: rng.chance(0.5) ? 'bush' : 'bushB', s: 0.6 + 0.5 * rng.next() } : null; } // the salt wind: trees thin to scrub towards the sea
         if (pick && st && st.w > 0.5 && Sites.clearAt(x, z, pick.small ? 1 : 4)) continue; // round a site's buildings and roads
         if (pick && !pick.small && st && st.S.bare && Math.hypot(x - st.S.x, z - st.S.z) < st.S.bare * (0.85 + 0.3 * _h2(Math.floor(x / 40), Math.floor(z / 40), 4403)) && rng.next() < st.w * 1.6) continue; // a site's bare ground: open grass and heath, no copses
