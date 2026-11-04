@@ -398,13 +398,13 @@ const MapView = {
     if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
     // the towns: moat, walls, canal, streets and squares, their great buildings named once the town is found
     for (const T of TOWNS) { const C = T.cfg, f = (G.flags.found || {})[T.id], P2 = (u, v) => { const [wx, wz] = T.w(u, v); return [X(wx), Z(wz)]; };
-      const rect = (u0, v0, u1, v1, col) => { x.fillStyle = col; x.beginPath(); [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.fill(); };
-      const mo = C.moat.off + C.moat.w / 2; x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1.5, C.moat.w * scale); x.beginPath(); [[-C.A - mo, -C.B - mo], [C.A + mo, -C.B - mo], [C.A + mo, C.B + mo], [-C.A - mo, C.B + mo]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.stroke();
-      rect(-C.A, -C.B, C.A, C.B, 'rgba(74,69,60,0.55)');
-      if (this.zoom > 0.12) { for (const b of T.blocks) if (b.use === 'square' || b.use === 'market') rect(b.u0, b.v0, b.u1, b.v1, '#6e675a'); else if (b.use === 'cathedral' || b.use === 'citadel') rect(b.u0, b.v0, b.u1, b.v1, '#4e4a44');
-        for (const s of T.streets) { const [a, b] = P2(s.u0, s.v0), [c, d] = P2(s.u1, s.v1); x.strokeStyle = s.canal ? '#857c6a' : s.main ? '#9a917e' : '#7a7262'; x.lineWidth = Math.max(1, (s.canal ? C.canal.w + 2 * C.canal.quay : s.w) * scale); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); }
-        { const [a, b] = P2(-C.A - mo, C.canal.v), [c, d] = P2(C.A + mo, C.canal.v); x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1, C.canal.w * scale); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); } }
-      x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(1.5, C.wall.t * scale); x.beginPath(); [[-C.A, -C.B], [C.A, -C.B], [C.A, C.B], [-C.A, C.B]].forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.closePath(); x.stroke();
+      const poly = (pts, close) => { x.beginPath(); pts.forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); if (close) x.closePath(); };
+      x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1.5, C.moat.w * scale); poly(T.offPoly(C.moat.off + C.moat.w / 2), true); x.stroke();
+      x.fillStyle = 'rgba(74,69,60,0.55)'; poly(T.wall, true); x.fill();
+      if (this.zoom > 0.12) { for (const b of T.blocks) if (b.use === 'square' || b.use === 'market' || b.use === 'parvis' || b.use === 'plein' || b.use === 'chapel') { x.fillStyle = '#6e675a'; poly(b.poly, true); x.fill(); } else if (b.use === 'cathedral' || b.use === 'citadel' || b.use === 'hall') { x.fillStyle = '#4e4a44'; poly(b.poly, true); x.fill(); }
+        for (const s of T.streets) { if (s.nopave) continue; const [a, b] = P2(s.u0, s.v0), [c, d] = P2(s.u1, s.v1); x.strokeStyle = s.main ? '#9a917e' : s.quay ? '#857c6a' : '#7a7262'; x.lineWidth = Math.max(1, s.w * scale); x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.stroke(); }
+        x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1, C.canal.w * scale); poly(T.canal, false); x.stroke(); }
+      x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(1.5, C.wall.t * scale); poly(T.wall, true); x.stroke();
       if (f) { if (this.zoom >= 0.3) for (const l of T.landmarks) if (!l.gate || this.zoom >= 1) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 6, '#d8cca8', Math.round(fs * 0.85)]);
         if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } }
     // the landmarks you know of, the places you have come upon, the way you are going
