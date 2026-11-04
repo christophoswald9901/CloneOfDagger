@@ -20,10 +20,10 @@ const TOWN_CFGS = [{
   rc: 1300, rb: 2400,          // the fixed ground: wholly within rc, blending out to rb
   wall: { h: 10.5, t: 3, towerEvery: 46, tower: 8.5, towerH: 17, gateW: 6, corners: 11 },
   moat: { off: 7, w: 20 },     // its inner edge off the wall's foot, its width
-  canal: { v: -88, w: 14, quay: 6 },
+  canal: { v: -52, w: 14, quay: 6 },
   mainU: 0, mainV: 34,         // the two main streets of the old town; roads run on from them to the gates
   ring: { off: 13, w: 7 },     // the street inside the wall
-  core: { a: 0.4, b: 0.4, bw: 10, du: [30, 42], dv: [28, 38] }, // the old town: its half-size as a share of the wall's, the boulevard round it, its grid
+  core: { a: 0.32, b: 0.32, bw: 10, du: [30, 42], dv: [28, 38] }, // the old town: its half-size as a share of the wall's, the boulevard round it, its grid
   street: { w: 8, main: 12 },
   blurb: 'a walled town of canals and tall brick gables on the northern plain',
   districts: [ // checked in order; the first that claims a point names it
@@ -57,7 +57,7 @@ const TQ = {
   tanners: { du: [24, 34], dv: [22, 30], sw: 5 },
   canal: { du: [44, 62], dv: [36, 48], sw: 7 },
   citadel: { du: [40, 56], dv: [36, 50], sw: 7 },
-  commons: { du: [58, 84], dv: [52, 72], sw: 6 },
+  commons: { du: [46, 64], dv: [40, 56], sw: 6 },
 };
 
 /* ---------------- plane geometry in the town frame (u, v) ---------------- */
@@ -108,12 +108,12 @@ class Town {
     this.mainU = mainU; this.mainV = mainV; this.cv = cv; const qOff = CW / 2 + QW / 2;
     const fu = C.flip && C.flip[0] ? -1 : 1, fv = C.flip && C.flip[1] ? -1 : 1; this.fu = fu; this.fv = fv; this.oneTower = !!(C.vary && rng.chance(0.4)); // a varied town may raise one great tower instead of two
     // the wall: a convex polygon round an ellipse, its corners jittered
-    { const pts = [], N = C.wall.corners || 11; for (let k = 0; k < N; k++) { const th = (k + rng.range(-0.28, 0.28)) / N * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), r = rng.range(0.94, 1.06) / Math.hypot(c / A, s / B); pts.push([r * c, r * s]); } this.wall = tHull(pts); }
+    { const pts = [], N = C.vary ? rng.int(8, 13) : C.wall.corners || 11; for (let k = 0; k < N; k++) { const th = (k + rng.range(-0.28, 0.28)) / N * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), r = rng.range(0.94, 1.06) / Math.hypot(c / A, s / B); pts.push([r * c, r * s]); } this.wall = tHull(pts); }
     this.wallIn = tEdgesIn(this.wall); const W = this.wall;
     // the roads from the old town's main streets out to the gates, each bent a little off the grid (east and west away from the canal)
     const rot = (d, a) => [d[0] * Math.cos(a) - d[1] * Math.sin(a), d[0] * Math.sin(a) + d[1] * Math.cos(a)], sg = Math.sign(cv - mainV) || 1;
-    const roads = [{ id: 'east', name: 'the Sunrise Gate', p0: [CA, mainV], d: rot([1, 0], -sg * rng.range(0.1, 0.32)) }, { id: 'south', name: 'the Bay Gate', p0: [mainU, CB], d: rot([0, 1], rng.range(-0.3, 0.3)) },
-      { id: 'west', name: 'the Mill Gate', p0: [-CA, mainV], d: rot([-1, 0], sg * rng.range(0.1, 0.32)) }, { id: 'north', name: 'the Moor Gate', p0: [mainU, -CB], d: rot([0, -1], rng.range(-0.3, 0.3)) }];
+    const roads = [{ id: 'east', name: 'the Sunrise Gate', p0: [CA, mainV], d: rot([1, 0], -sg * rng.range(0.18, 0.45)) }, { id: 'south', name: 'the Bay Gate', p0: [mainU, CB], d: rot([0, 1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) },
+      { id: 'west', name: 'the Mill Gate', p0: [-CA, mainV], d: rot([-1, 0], sg * rng.range(0.18, 0.45)) }, { id: 'north', name: 'the Moor Gate', p0: [mainU, -CB], d: rot([0, -1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) }];
     for (const r of roads) { const h = tRay(W, r.p0, r.d), e = this.wallIn[h.i], f = e.L < 44 ? 0.5 : clamp(h.f, 20 / e.L, 1 - 20 / e.L); // (a gate keeps clear of the wall's corners)
       r.g = [e.a[0] + (e.b[0] - e.a[0]) * f, e.a[1] + (e.b[1] - e.a[1]) * f]; r.n = [-e.nu, -e.nv]; const du = r.g[0] - r.p0[0], dv = r.g[1] - r.p0[1], l = Math.hypot(du, dv); r.d = [du / l, dv / l];
       const k = R / Math.max(0.3, r.d[0] * r.n[0] + r.d[1] * r.n[1]); r.rp = [r.g[0] - r.d[0] * k, r.g[1] - r.d[1] * k]; r.gate = !(C.gates === 3 && r.id === 'north'); }
@@ -121,14 +121,14 @@ class Town {
     this.gates = roads.filter(r => r.gate).map(r => ({ id: r.id, name: r.name, u: r.g[0], v: r.g[1], nu: r.n[0], nv: r.n[1] }));
     for (const g of this.gates) { [g.x, g.z] = this.w(g.u, g.v); const o = M.off + M.w + 10; [g.ox, g.oz] = this.w(g.u + g.nu * o, g.v + g.nv * o); }
     // the canal: straight through the old town, bending a little on each side out under the wall
-    { const a1 = rng.range(0.04, 0.2), a2 = rng.range(0.04, 0.2), de = [Math.cos(a1), sg * Math.sin(a1)], dw = [-Math.cos(a2), sg * Math.sin(a2)];
+    { const a1 = rng.range(0.06, 0.3), a2 = rng.range(0.06, 0.3), de = [Math.cos(a1), sg * Math.sin(a1)], dw = [-Math.cos(a2), sg * Math.sin(a2)];
       const endOf = (p, d) => { const h = tRay(W, p, d), t = h.t + M.off + M.w + 30; return [p[0] + d[0] * t, p[1] + d[1] * t]; };
       this.canal = [endOf([-CA, cv], dw), [-CA, cv], [CA, cv], endOf([CA, cv], de)]; }
     // the quarters between the roads: each road's line, turned to face into the sector between it and the next
     const ang2 = p => Math.atan2(p[1], p[0]);
     this.sectors = roads.map((r, k) => { const r2 = roads[(k + 1) % 4], a0 = ang2(r.g), a1 = ang2(r2.g), m = a0 + ((a1 - a0 + 4 * Math.PI) % (2 * Math.PI)) / 2, hm = tRay(W, [0, 0], [Math.cos(m), Math.sin(m)]), rep = [Math.cos(m) * hm.t * 0.75, Math.sin(m) * hm.t * 0.75];
       const side = rr => { let nu = -rr.d[1], nv = rr.d[0]; if (nu * (rep[0] - rr.p0[0]) + nv * (rep[1] - rr.p0[1]) < 0) { nu = -nu; nv = -nv; } return { nu, nv, c0: nu * rr.p0[0] + nv * rr.p0[1], clear: MW / 2 }; };
-      return { k, a: r, b: r2, rep, hp: [side(r), side(r2)] }; });
+      return { k, a: r, b: r2, rep, m, hp: [side(r), side(r2)] }; });
     const inSector = (sc, p) => sc.hp.every(h => h.nu * p[0] + h.nv * p[1] >= h.c0);
     const pool = rng.shuffle(['weavers', 'tanners', 'commons', 'citadel']), canalSeg = [[this.canal[2], this.canal[3]], [this.canal[1], this.canal[0]]];
     for (const sc of this.sectors) { const cs = canalSeg.find(([p, q]) => inSector(sc, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2]));
@@ -178,7 +178,7 @@ class Town {
       const jH = fv > 0 ? jv - 1 : jv; this.hall = tryClaim([[iS, jH, iS + 1, jH], [iS + (fu > 0 ? 0 : 1), jH, iS + (fu > 0 ? 0 : 1), jH]], 'hall'); }
     // the cathedral beyond the canal from the main street, its forecourt before the west front
     { const side = cv < mainV ? -1 : 1, rowOk = (j, h) => side < 0 ? j + h - 1 < jc : j >= jc, tu = -fu * CA * 0.35, tv = (cv + side * CB) / 2;
-      for (const wi of [3, 2]) { const o = nearestFit(wi + 1, 2, tu, tv, (i, j) => rowOk(j, 2)); if (!o) continue; this.cathedral = claim(o[0], o[1], o[0] + wi - 1, o[3], 'cathedral'); this.parvis = claim(o[0] + wi, o[1], o[0] + wi, o[3], 'parvis'); break; } }
+      for (const [wi, any] of [[3, 0], [2, 0], [3, 1], [2, 1]]) { const o = nearestFit(wi + 1, 2, tu, tv, (i, j) => any || rowOk(j, 2)); if (!o) continue; this.cathedral = claim(o[0], o[1], o[0] + wi - 1, o[3], 'cathedral'); this.parvis = claim(o[0] + wi, o[1], o[0] + wi, o[3], 'parvis'); break; } }
     { const o = nearestFit(2, 1, fu * CA * 0.6, mainV + fv * CB * 0.55) || nearestFit(1, 1, fu * CA * 0.6, mainV + fv * CB * 0.55); if (o) this.market = claim(...o, 'market'); }
     // a few bigger blocks among the small ones, then every cell left is a block of its own
     for (let i = 0; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i][j]) continue; if (rng.chance(0.18)) { if (rng.chance(0.5) ? tryClaim([[i, j, i + 1, j]], 'lots') : tryClaim([[i, j, i, j + 1]], 'lots')) continue; } claim(i, j, i, j, 'lots'); }
@@ -195,11 +195,14 @@ class Town {
       { const du = Math.abs(cen[0]) - CA, dv = Math.abs(cen[1]) - CB; hs.push(du > dv ? { nu: Math.sign(cen[0]), nv: 0, c0: CA, clear: BW / 2 } : { nu: 0, nv: Math.sign(cen[1]), c0: CB, clear: BW / 2 }); }
       if (cit && Math.max(Math.abs(cen[0] - cit.uc), Math.abs(cen[1] - cit.vc)) < S + 100) { const du = Math.abs(cen[0] - cit.uc), dv = Math.abs(cen[1] - cit.vc); hs.push(du > dv ? { nu: Math.sign(cen[0] - cit.uc), nv: 0, c0: Math.sign(cen[0] - cit.uc) * cit.uc + S + 10, clear: 4 } : { nu: 0, nv: Math.sign(cen[1] - cit.vc), c0: Math.sign(cen[1] - cit.vc) * cit.vc + S + 10, clear: 4 }); }
       for (const h of this.wallIn) hs.push({ nu: h.nu, nv: h.nv, c0: h.c + R, clear: RW / 2 });
+      for (const g of this.gates) if (Math.hypot(cen[0] - g.u, cen[1] - g.v) < 80) hs.push({ nu: -g.nu, nv: -g.nv, c0: -(g.nu * g.u + g.nv * g.v) + R + 26, clear: 0 }); // a little square inside each gate
       return hs; };
+    this.gateSquares = this.gates.map(g => { const t = [-g.nv, g.nu], a = R - RW / 2, b = R + 26; return [[g.u + t[0] * 46 - g.nu * a, g.v + t[1] * 46 - g.nv * a], [g.u - t[0] * 46 - g.nu * a, g.v - t[1] * 46 - g.nv * a], [g.u - t[0] * 46 - g.nu * b, g.v - t[1] * 46 - g.nv * b], [g.u + t[0] * 46 - g.nu * b, g.v + t[1] * 46 - g.nv * b]]; });
     const cellHP = hs => hs.map(h => ({ nu: h.nu, nv: h.nv, c: h.c0 + h.clear })), segHP = (hs, skipCanal) => hs.filter(h => !(skipCanal && h.canal)).map(h => ({ nu: h.nu, nv: h.nv, c: h.c0 + h.clear - 1.5 }));
     const quarterBlocks = [];
     for (const sc of this.sectors) {
-      const anchor = sc.canal ? { p: sc.canal.p, ax: sc.canal.ax, pp: sc.canal.pp } : (() => { const k = rng.chance(0.5) ? 0 : 1, r = k ? sc.b : sc.a, h = sc.hp[k]; return { p: r.p0, ax: r.d, pp: [h.nu, h.nv] }; })();
+      const anchor = sc.canal ? { p: sc.canal.p, ax: sc.canal.ax, pp: sc.canal.pp } : rng.chance(0.45) ? (() => { const h = tRay(W, [0, 0], [Math.cos(sc.m), Math.sin(sc.m)]), e = this.wallIn[h.i]; return { p: [e.a[0] + e.nu * R, e.a[1] + e.nv * R], ax: [(e.b[0] - e.a[0]) / e.L, (e.b[1] - e.a[1]) / e.L], pp: [e.nu, e.nv] }; })() // (streets that follow the wall)
+        : (() => { const k = rng.chance(0.5) ? 0 : 1, r = k ? sc.b : sc.a, h = sc.hp[k]; return { p: r.p0, ax: r.d, pp: [h.nu, h.nv] }; })();
       const colKind = sc.canal ? 'canal' : sc.kind, rowKind = s => sc.canal ? sc.kinds[s] : sc.kind, Q = TQ[colKind] || TQ.weavers, ext = 1.25 * Math.max(A, B);
       const cum = (d, n) => { const o = [0]; for (let k = 0; k < n; k++) o.push(o[k] + rng.range(...d)); return o; };
       const nI2 = Math.ceil(ext / Q.du[0]), Up = cum(Q.du, nI2), Un = cum(Q.du, nI2), Ucum = i => i >= 0 ? Up[i] : -Un[-i];
@@ -211,15 +214,21 @@ class Town {
       // the canal is bridged on some of the cross lanes, one lattice serving both banks
       const bridgeCols = new Set(); if (sc.canal) { const L = Math.hypot(sc.canal.q[0] - sc.canal.p[0], sc.canal.q[1] - sc.canal.p[1]); let last = -1e9; for (let i = 1; i < nI2; i++) { const t = Ucum(i); if (t > 45 && t < L - 100 && t - last > 80 && rng.chance(0.7)) { bridgeCols.add(i); last = t; } } }
       const edges = new Map(), j0 = sc.canal ? -nJn : 0;
-      for (let i = -nI2; i < nI2; i++) for (let j = j0; j < nJp; j++) {
-        const quad = [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)], cen = tCentroid(quad), side = j >= 0 ? 1 : -1;
+      const used = new Set();
+      for (let i = -nI2; i < nI2; i++) for (let j = j0; j < nJp; j++) { if (used.has(i * 4096 + j)) continue;
+        // now and then two cells make one block, so a lane ends at a T and the next one runs on offset
+        const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp ? 'v' : null;
+        const quad = mg === 'u' ? [P(i, j), P(i + 1, j), P(i + 2, j), P(i + 2, j + 1), P(i + 1, j + 1), P(i, j + 1)] : mg === 'v' ? [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i + 1, j + 2), P(i, j + 2), P(i, j + 1)] : [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)], cen = tCentroid(quad), side = j >= 0 ? 1 : -1;
+        if (mg === 'u') used.add((i + 1) * 4096 + j); if (mg === 'v') used.add(i * 4096 + j + 1);
         if (this.wallOut(cen[0], cen[1]) > -R || (Math.abs(cen[0]) < CA && Math.abs(cen[1]) < CB) || !inSector(sc, cen)) continue;
         const hs = consFor(sc, cen, side), sw = TQ[rowKind(side)] ? TQ[rowKind(side)].sw : Q.sw; let poly = quad; for (const h of tEdgesIn(quad, sw / 2)) poly = tClipPoly(poly, h); for (const h of cellHP(hs)) { if (poly.length < 3) break; poly = tClipPoly(poly, h); }
         if (poly.length < 3) continue; const area = Math.abs(tArea(poly)); if (area < 110) continue;
         const c2 = tCentroid(poly), b = { poly, uc: c2[0], vc: c2[1], use: area < 260 || tWidth(poly) < 11 ? 'place' : 'lots', q: sc.k * 2 + (side > 0 ? 0 : 1), ang: Math.atan2(anchor.ax[0], anchor.ax[1]), area };
         this.blocks.push(b); quarterBlocks.push(b);
-        for (const [key, a, bb, col] of [['h' + i + ',' + j, P(i, j), P(i + 1, j)], ['h' + i + ',' + (j + 1), P(i, j + 1), P(i + 1, j + 1)], ['v' + i + ',' + j, P(i, j), P(i, j + 1), i], ['v' + (i + 1) + ',' + j, P(i + 1, j), P(i + 1, j + 1), i + 1]])
-          if (!edges.has(key)) edges.set(key, { a, b: bb, hs, w: sw, bridge: col !== undefined && bridgeCols.has(col) && (j === 0 || j === -1) });
+        const H = (a, b) => ['h' + a + ',' + b, P(a, b), P(a + 1, b)], Vt = (a, b) => ['v' + a + ',' + b, P(a, b), P(a, b + 1), a];
+        const es = mg === 'u' ? [H(i, j), H(i + 1, j), H(i, j + 1), H(i + 1, j + 1), Vt(i, j), Vt(i + 2, j)] : mg === 'v' ? [H(i, j), H(i, j + 2), Vt(i, j), Vt(i, j + 1), Vt(i + 1, j), Vt(i + 1, j + 1)] : [H(i, j), H(i, j + 1), Vt(i, j), Vt(i + 1, j)];
+        for (const [key, a, bb, col] of es)
+          if (!edges.has(key)) edges.set(key, { a, b: bb, hs, w: sw, bridge: col !== undefined && bridgeCols.has(col) && (key.endsWith(',0') || key.endsWith(',-1')) });
       }
       for (const e of edges.values()) { const s2 = tClipSeg(e.a, e.b, segHP(e.hs, e.bridge)); if (s2) street(s2[0], s2[1], { w: e.w, lane: true }); }
     }
@@ -240,7 +249,7 @@ class Town {
     this.lots = [];
     const placeLots = (b, kind) => { const K = TK[kind] || TK.weavers, Pp = b.poly, E = tEdgesIn(Pp).sort((x, y) => y.L - x.L), mine = []; b.lots = mine; b.kind = kind;
       for (const e of E) { if (e.L < 5) continue; const tu = (e.b[0] - e.a[0]) / e.L, tv = (e.b[1] - e.a[1]) / e.L; let deep = 0; for (const p of Pp) deep = Math.max(deep, tDot(e, p) - e.c);
-        const d = Math.min(rng.range(...K.d) * 0.88, deep / 2 - 2); if (d < 6) continue; const a = Math.atan2(-e.nu, -e.nv); let s = 0.3, last = null, lastEnd = -9;
+        const d = Math.min(rng.range(...K.d) * 0.88, deep / 2 - 2); if (d < 6) continue; (b.edgeD = b.edgeD || {})[e.i] = d; const a = Math.atan2(-e.nu, -e.nv); let s = 0.3, last = null, lastEnd = -9;
         while (s < e.L - 4) { let w = rng.range(...K.w); if (e.L - s - w < 4) w = e.L - s - 0.3; if (w < 4) break; let ok = null;
           for (const ww of [w, Math.max(4.2, w * 0.65)]) { const cu = e.a[0] + tu * (s + ww / 2) + e.nu * d / 2, cv2 = e.a[1] + tv * (s + ww / 2) + e.nv * d / 2, o = mkObb(cu, cv2, a, ww / 2, d / 2);
             if (obbCorners(o).every(c => E.every(h => tDot(h, c) - h.c > -0.25)) && !mine.some(m => obbOverlap(m.ob, o, -0.12))) { ok = { u: cu, v: cv2, w: ww, ob: o }; break; } }
@@ -494,8 +503,14 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
     if (b.use === 'chapel') { gb.setXf(mx, mz, ang + b.ang, H0); makeBuilding(area, gb, r2, { fp: { x0: -5, z0: -8, x1: 5, z1: 8 }, h: 7, style: 'stone', roof: 'gable', roofKey: 'roofSlate', alongX: false, doorT: 0.5, found: 0.5, chimney: 0 }); gb.box(-1.2, 7, -9.6, 1.2, 15, -7.2, 'stone', 2, 2); gb.cone('roofSlate', 0, -8.4, 1.8, 15, 5, 4, 2); gb.xf = null; continue; }
     if (b.use === 'plein' || b.area > 260) { const [wx, wz] = b.use === 'plein' ? [mx, mz] : this.w(b.uc + 2, b.vc); if (b.use === 'plein') { gb.cyl('stone', wx, wz, 1.3, H0 - 0.2, H0 + 0.9, 10, 2, 2); gb.disc('water', wx, H0 + 0.5, wz, 1.1, 10, 2); siteCol(area, wx, wz, 0, 1.3, 1.3, H0 - 1, H0 + 0.9); }
       for (let k = 0, nT = b.use === 'plein' ? 3 : 1; k < nT; k++) { const c = b.poly[k % b.poly.length], f = 0.4, tu = lerp(b.uc, c[0], f), tv = lerp(b.vc, c[1], f), [tx, tz] = this.w(tu, tv); fl[r2.pick(['oak0', 'oak1', 'oak2'])].push([tx, H0 - 0.15, tz, r2.range(0.6, 0.85)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: H0 - 1, y1: H0 + 8 }); } } }
-  // yards and gardens inside the blocks: trees, a shed or two, bushes, wherever no house stands
-  for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / 200);
+  // the squares just inside the gates
+  for (const P of this.gateSquares) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.052); }
+  // yards and gardens inside the blocks: the ground before the houses paved, the gardens behind them walled, with trees, sheds and bushes; orchards in the commons
+  for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / (b.kind === 'commons' ? 120 : 200));
+    { drapePoly(gb, 'rCobble', b.poly.map(([u, v]) => this.w(u, v)), H0 + 0.05); let Y = b.poly; for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
+      if (Y.length >= 3 && Math.abs(tArea(Y)) > 20) { drapePoly(gb, 'gGrass', Y.map(([u, v]) => this.w(u, v)), H0 + 0.053); const wk = b.kind === 'commons' || b.kind === 'tanners' ? 'wood' : 'stone', wh = wk === 'wood' ? 1.1 : 1.6; // the garden wall (a fence in the poorer quarters)
+        for (let k = 0; k < Y.length; k++) { const a = Y[k], c = Y[(k + 1) % Y.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 1) continue; const [ax, az] = this.w(a[0], a[1]), [cx, cz] = this.w(c[0], c[1]); gb.setXf((ax + cx) / 2, (az + cz) / 2, Math.atan2(cx - ax, cz - az), H0); gb.box(-0.15, 0, -L / 2, 0.15, wh, L / 2, wk, 2, 2); gb.xf = null; }
+        if (b.kind === 'commons') { const yb = tEdgesIn(Y, 3), yc = tCentroid(Y), ya = b.ang || 0, ca = Math.cos(ya), sa = Math.sin(ya); for (let a = -60; a <= 60; a += 6.5) for (let c = -60; c <= 60; c += 6.5) { const u = yc[0] + a * ca + c * sa, v = yc[1] - a * sa + c * ca; if (!yb.every(h => tDot(h, [u, v]) - h.c > 0)) continue; const [x, z] = this.w(u, v); fl[r2.chance(0.7) ? 'oak2' : 'oak1'].push([x, H0 - 0.15, z, r2.range(0.42, 0.6)]); } continue; } } } // (an orchard)
     let u0 = 1e9, v0 = 1e9, u1 = -1e9, v1 = -1e9; for (const [u, v] of b.poly) { u0 = Math.min(u0, u); v0 = Math.min(v0, v); u1 = Math.max(u1, u); v1 = Math.max(v1, v); }
     for (let k = 0, tries = 0; k < nT && tries < nT * 6; tries++) { const u = r2.range(u0, u1), v = r2.range(v0, v1); if (!E.every(h => tDot(h, [u, v]) - h.c > 2.2) || b.lots.some(l => Math.abs((u - l.u) * Math.cos(l.a) - (v - l.v) * Math.sin(l.a)) < l.w / 2 + 1.2 && Math.abs((u - l.u) * Math.sin(l.a) + (v - l.v) * Math.cos(l.a)) < l.d / 2 + 1.2)) continue; k++;
       const [x, z] = this.w(u, v); if (r2.chance(0.6)) { const kind = r2.pick(['oak0', 'oak1', 'oak2', 'cypress']); fl[kind].push([x, H0 - 0.15, z, r2.range(0.6, 0.95)]); cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: H0 - 1, y1: H0 + 8 }); }
