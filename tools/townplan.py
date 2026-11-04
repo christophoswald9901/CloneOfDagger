@@ -9,7 +9,7 @@ DUMP = r"""(()=>{const T=__game.TOWNS[0],r=a=>a.map(p=>[+p[0].toFixed(1),+p[1].t
   streets:T.streets.map(s=>[s.u0,s.v0,s.u1,s.v1,s.w,s.main?1:s.quay?2:s.ring?3:s.nopave?4:0]),
   blocks:T.blocks.map(b=>({p:r(b.poly),use:b.use,kind:b.kind||''})),
   lots:T.lots.filter(l=>!l.suburb).map(l=>{const c=Math.cos(l.a),s=Math.sin(l.a);return [l.u,l.v,c,s,l.w/2,l.d/2,l.kind,l.type]}),
-  bridges:T.bridges.map(b=>[b.u,b.v]),nodes:T.nodes.length,gates:T.gates.map(g=>[g.u,g.v])})})()"""
+  bridges:T.bridges.map(b=>[b.u,b.v]),ang:T.cfg.ang,nodes:T.nodes.length,gates:T.gates.map(g=>[g.u,g.v])})})()"""
 
 KIND = {'old': (186, 120, 96), 'grand': (200, 90, 70), 'close': (170, 170, 190), 'canal': (120, 110, 150), 'weavers': (190, 160, 100), 'tanners': (150, 120, 80),
         'commons': (150, 170, 110), 'citadel': (130, 130, 130), 'suburb': (160, 160, 160)}
@@ -22,7 +22,8 @@ async def one(out, seed, port):
     d = json.loads(await c.ev(DUMP)); c.stop()
     S, M = 1.6, 1100  # pixels per metre, half-extent drawn
     im = Image.new('RGB', (int(2 * M * S), int(2 * M * S)), (92, 120, 70)); g = ImageDraw.Draw(im)
-    P = lambda u, v: ((u + M) * S, (v + M) * S)
+    import math; ca, sa = math.cos(d['ang']), math.sin(d['ang'])  # drawn as the map shows it: north up
+    P = lambda u, v: ((u * ca + v * sa + M) * S, (-u * sa + v * ca + M) * S)
     g.line([P(*p) for p in d['moat'] + d['moat'][:1]], fill=(50, 90, 130), width=int(20 * S))
     g.polygon([P(*p) for p in d['wall']], fill=(118, 140, 88))
     for b in d['blocks']:
@@ -35,8 +36,8 @@ async def one(out, seed, port):
         cs = [(u + a * hw * c + b * hd * s, v - a * hw * s + b * hd * c) for a, b in [(-1, -1), (1, -1), (1, 1), (-1, 1)]]
         g.polygon([P(*p) for p in cs], fill=KIND.get(kind, (200, 0, 200)), outline=(60, 50, 40))
     g.line([P(*p) for p in d['wall'] + d['wall'][:1]], fill=(70, 66, 60), width=int(3 * S))
-    for u, v in d['bridges']: g.ellipse([P(u - 4, v - 4), P(u + 4, v + 4)], fill=(230, 230, 230))
-    for u, v in d['gates']: g.rectangle([P(u - 6, v - 6), P(u + 6, v + 6)], fill=(20, 20, 20))
+    for u, v in d['bridges']: x, y = P(u, v); g.ellipse([x - 6, y - 6, x + 6, y + 6], fill=(230, 230, 230))
+    for u, v in d['gates']: x, y = P(u, v); g.rectangle([x - 10, y - 10, x + 10, y + 10], fill=(20, 20, 20))
     os.makedirs(out, exist_ok=True); fn = os.path.join(out, f'plan_{seed}.png'); im.save(fn)
     areas = {}
     for b in d['blocks']:

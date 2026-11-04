@@ -5296,7 +5296,7 @@ const TOWN_CFGS = [{
   A: 470, B: 380,              // half-length and half-width of the walled rectangle
   H0: 96,                      // the level of the plain it stands on
   rc: 1300, rb: 2400,          // the fixed ground: wholly within rc, blending out to rb
-  wall: { h: 10.5, t: 3, towerEvery: 46, tower: 8.5, towerH: 17, gateW: 6, corners: 11 },
+  wall: { h: 12, t: 3, towerEvery: 46, tower: 8.5, towerH: 22, gateW: 6, corners: 11 },
   moat: { off: 7, w: 20 },     // its inner edge off the wall's foot, its width
   canal: { v: -52, w: 14, quay: 6 },
   mainU: 0, mainV: 34,         // the two main streets of the old town; roads run on from them to the gates
@@ -5361,7 +5361,7 @@ const tJit = (i, j, s) => { let h = Math.imul(i, 73856093) ^ Math.imul(j, 193496
 
 class Town {
   constructor(cfg) {
-    if (cfg.vary) { const r = new RNG(cfg.seed + 31), k = r.range(0.88, 1.12); cfg = { ...cfg, A: Math.round(cfg.A * k), B: Math.round(cfg.B / k), mainU: Math.round(r.range(-0.25, 0.25) * cfg.A), mainV: Math.round(r.range(-0.15, 0.3) * cfg.B), canal: { ...cfg.canal, v: Math.round(r.pick([-1, 1]) * r.range(0.15, 0.45) * cfg.B) }, flip: [r.chance(0.5), r.chance(0.5)], gates: r.chance(0.3) ? 3 : 4 };
+    if (cfg.vary) { const r = new RNG(cfg.seed + 31), k = r.range(0.88, 1.12); cfg = { ...cfg, A: Math.round(cfg.A * k), B: Math.round(cfg.B / k), mainU: Math.round(r.range(-0.25, 0.25) * cfg.A), mainV: Math.round(r.range(-0.15, 0.3) * cfg.B), canal: { ...cfg.canal, v: Math.round(r.pick([-1, 1]) * r.range(0.15, 0.45) * cfg.B) }, flip: [r.chance(0.5), r.chance(0.5)], gates: r.chance(0.3) ? 3 : 4, ang: r.range(-Math.PI, Math.PI) };
       if (Math.abs(cfg.canal.v - cfg.mainV) < 60) cfg.canal.v = cfg.mainV + (cfg.canal.v > cfg.mainV ? 60 : -60); }
     this.cfg = cfg; this.id = cfg.id; this.name = cfg.name; this.x = cfg.x; this.z = cfg.z; this.H0 = cfg.H0;
     this.xf = makeXf(cfg.x, cfg.z, cfg.ang); this.c = Math.cos(cfg.ang); this.s = Math.sin(cfg.ang);
@@ -5381,12 +5381,15 @@ class Town {
   plan() {
     const C = this.cfg, rng = new RNG(C.seed), A = C.A, B = C.B, R = C.ring.off, RW = C.ring.w, M = C.moat, CW = C.canal.w, QW = C.canal.quay, MW = C.street.main;
     const CO = C.core, CA = Math.round(A * CO.a), CB = Math.round(B * CO.b), BW = CO.bw; this.CA = CA; this.CB = CB;
-    const mainU = clamp(C.mainU, -CA + 50, CA - 50), mainV = clamp(C.mainV, -CB + 50, CB - 50);
+    let mainU = clamp(C.mainU, -CA + 50, CA - 50), mainV = clamp(C.mainV, -CB + 50, CB - 50);
     let cv = clamp(C.canal.v, -CB + 40, CB - 40); if (Math.abs(cv - mainV) < 60) cv = mainV + (cv >= mainV ? 60 : -60); if (Math.abs(cv) > CB - 40) cv = mainV - Math.sign(cv - mainV) * 60;
-    this.mainU = mainU; this.mainV = mainV; this.cv = cv; const qOff = CW / 2 + QW / 2;
+    const qOff = CW / 2 + QW / 2;
     // the old town's outline: its rectangle with each corner cut off by its own amount
     { const cm = Math.max(0, Math.min(CB - Math.max(Math.abs(mainV), Math.abs(cv)) - 20, CA - Math.abs(mainU) - 20)), cut = () => Math.min(cm, rng.range(0.2, 0.45) * Math.min(CA, CB)), c = [cut(), cut(), cut(), cut()];
       this.core = [[-CA + c[0], -CB], [CA - c[1], -CB], [CA, -CB + c[1]], [CA, CB - c[2]], [CA - c[2], CB], [-CA + c[3], CB], [-CA, CB - c[3]], [-CA, -CB + c[0]]]; }
+    // a varied town's old town need not sit in the middle
+    const OU = C.vary ? Math.round(rng.range(-0.16, 0.16) * A) : 0, OV = C.vary ? Math.round(rng.range(-0.16, 0.16) * B) : 0; mainU += OU; mainV += OV; cv += OV; this.core = this.core.map(([u, v]) => [u + OU, v + OV]); this.OU = OU; this.OV = OV;
+    this.mainU = mainU; this.mainV = mainV; this.cv = cv;
     this.coreIn = tEdgesIn(this.core); const coreOut = (u, v) => { let m = -1e9; for (const h of this.coreIn) m = Math.max(m, h.c - h.nu * u - h.nv * v); return m; }; this.coreOut = coreOut;
     const fu = C.flip && C.flip[0] ? -1 : 1, fv = C.flip && C.flip[1] ? -1 : 1; this.fu = fu; this.fv = fv; this.oneTower = !!(C.vary && rng.chance(0.4)); // a varied town may raise one great tower instead of two
     // the wall: a convex polygon round an ellipse, its corners jittered
@@ -5394,8 +5397,8 @@ class Town {
     this.wallIn = tEdgesIn(this.wall); const W = this.wall;
     // the roads from the old town's main streets out to the gates, each bent a little off the grid (east and west away from the canal)
     const rot = (d, a) => [d[0] * Math.cos(a) - d[1] * Math.sin(a), d[0] * Math.sin(a) + d[1] * Math.cos(a)], sg = Math.sign(cv - mainV) || 1;
-    const roads = [{ id: 'east', name: 'the Sunrise Gate', p0: [CA, mainV], d: rot([1, 0], -sg * rng.range(0.18, 0.45)) }, { id: 'south', name: 'the Bay Gate', p0: [mainU, CB], d: rot([0, 1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) },
-      { id: 'west', name: 'the Mill Gate', p0: [-CA, mainV], d: rot([-1, 0], sg * rng.range(0.18, 0.45)) }, { id: 'north', name: 'the Moor Gate', p0: [mainU, -CB], d: rot([0, -1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) }];
+    const roads = [{ id: 'east', name: 'the Sunrise Gate', p0: [OU + CA, mainV], d: rot([1, 0], -sg * rng.range(0.18, 0.45)) }, { id: 'south', name: 'the Bay Gate', p0: [mainU, OV + CB], d: rot([0, 1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) },
+      { id: 'west', name: 'the Mill Gate', p0: [OU - CA, mainV], d: rot([-1, 0], sg * rng.range(0.18, 0.45)) }, { id: 'north', name: 'the Moor Gate', p0: [mainU, OV - CB], d: rot([0, -1], rng.pick([-1, 1]) * rng.range(0.12, 0.45)) }];
     for (const r of roads) { const h = tRay(W, r.p0, r.d), e = this.wallIn[h.i], f = e.L < 44 ? 0.5 : clamp(h.f, 20 / e.L, 1 - 20 / e.L); // (a gate keeps clear of the wall's corners)
       r.g = [e.a[0] + (e.b[0] - e.a[0]) * f, e.a[1] + (e.b[1] - e.a[1]) * f]; r.n = [-e.nu, -e.nv]; const du = r.g[0] - r.p0[0], dv = r.g[1] - r.p0[1], l = Math.hypot(du, dv); r.d = [du / l, dv / l];
       const k = R / Math.max(0.3, r.d[0] * r.n[0] + r.d[1] * r.n[1]); r.rp = [r.g[0] - r.d[0] * k, r.g[1] - r.d[1] * k]; r.gate = !(C.gates === 3 && r.id === 'north'); }
@@ -5405,7 +5408,7 @@ class Town {
     // the canal: straight through the old town, bending a little on each side out under the wall
     { const a1 = rng.range(0.06, 0.3), a2 = rng.range(0.06, 0.3), de = [Math.cos(a1), sg * Math.sin(a1)], dw = [-Math.cos(a2), sg * Math.sin(a2)];
       const endOf = (p, d) => { const h = tRay(W, p, d), t = h.t + M.off + M.w + 30; return [p[0] + d[0] * t, p[1] + d[1] * t]; };
-      this.canal = [endOf([-CA, cv], dw), [-CA, cv], [CA, cv], endOf([CA, cv], de)]; }
+      this.canal = [endOf([OU - CA, cv], dw), [OU - CA, cv], [OU + CA, cv], endOf([OU + CA, cv], de)]; }
     // the quarters between the roads: each road's line, turned to face into the sector between it and the next
     const ang2 = p => Math.atan2(p[1], p[0]);
     this.sectors = roads.map((r, k) => { const r2 = roads[(k + 1) % 4], a0 = ang2(r.g), a1 = ang2(r2.g), m = a0 + ((a1 - a0 + 4 * Math.PI) % (2 * Math.PI)) / 2, hm = tRay(W, [0, 0], [Math.cos(m), Math.sin(m)]), rep = [Math.cos(m) * hm.t * 0.75, Math.sin(m) * hm.t * 0.75];
@@ -5446,7 +5449,7 @@ class Town {
       const fill = (a, b) => { let p = a + rng.range(...d); while (p < b - d[0] * 0.75) { if (!out.some(l => Math.abs(l.p - p) < d[0] * 0.6)) out.push({ p, w: C.street.w }); p += rng.range(...d); } };
       const fixed = out.map(l => l.p).sort((x, y) => x - y); for (let k = 1; k < fixed.length; k++) fill(fixed[k - 1], fixed[k]);
       return out.sort((x, y) => x.p - y.p); };
-    const U = lines(-CA, CA, mainU, [], CO.du), V = lines(-CB, CB, mainV, [{ p: cv, w: CW + 2 * QW, canal: true }], CO.dv); this.U = U; this.V = V;
+    const U = lines(OU - CA, OU + CA, mainU, [], CO.du), V = lines(OV - CB, OV + CB, mainV, [{ p: cv, w: CW + 2 * QW, canal: true }], CO.dv); this.U = U; this.V = V;
     const nI = U.length - 1, nJ = V.length - 1, own = [...Array(nI)].map(() => Array(nJ).fill(null)), iu = U.findIndex(l => l.main), jv = V.findIndex(l => l.main), jc = V.findIndex(l => l.canal);
     const fits = (i0, j0, i1, j1) => { if (i0 < 0 || j0 < 0 || i1 >= nI || j1 >= nJ) return false; for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (own[i][j]) return false;
       for (let i = i0 + 1; i <= i1; i++) if (U[i].main) return false; for (let j = j0 + 1; j <= j1; j++) if (V[j].main || V[j].canal) return false;
@@ -5460,9 +5463,9 @@ class Town {
       this.square = tryClaim([[iS, jS, iS + 1, jS + 1], [iS, jS + (fv > 0 ? 0 : 1), iS + 1, jS + (fv > 0 ? 0 : 1)], [iS + (fu > 0 ? 0 : 1), jS, iS + (fu > 0 ? 0 : 1), jS + 1]], 'square');
       const jH = fv > 0 ? jv - 1 : jv; this.hall = tryClaim([[iS, jH, iS + 1, jH], [iS + (fu > 0 ? 0 : 1), jH, iS + (fu > 0 ? 0 : 1), jH]], 'hall'); }
     // the cathedral beyond the canal from the main street, its forecourt before the west front
-    { const side = cv < mainV ? -1 : 1, rowOk = (j, h) => side < 0 ? j + h - 1 < jc : j >= jc, tu = -fu * CA * 0.35, tv = (cv + side * CB) / 2;
+    { const side = cv < mainV ? -1 : 1, rowOk = (j, h) => side < 0 ? j + h - 1 < jc : j >= jc, tu = OU - fu * CA * 0.35, tv = (cv + OV + side * CB) / 2;
       for (const [wi, any] of [[3, 0], [2, 0], [3, 1], [2, 1]]) { const o = nearestFit(wi + 1, 2, tu, tv, (i, j) => any || rowOk(j, 2)); if (!o) continue; this.cathedral = claim(o[0], o[1], o[0] + wi - 1, o[3], 'cathedral'); this.parvis = claim(o[0] + wi, o[1], o[0] + wi, o[3], 'parvis'); break; } }
-    { const o = nearestFit(2, 1, fu * CA * 0.6, mainV + fv * CB * 0.55) || nearestFit(1, 1, fu * CA * 0.6, mainV + fv * CB * 0.55); if (o) this.market = claim(...o, 'market'); }
+    { const o = nearestFit(2, 1, OU + fu * CA * 0.6, mainV + fv * CB * 0.55) || nearestFit(1, 1, OU + fu * CA * 0.6, mainV + fv * CB * 0.55); if (o) this.market = claim(...o, 'market'); }
     // a few bigger blocks among the small ones, then every cell left is a block of its own
     for (let i = 0; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i][j]) continue; if (rng.chance(0.18)) { if (rng.chance(0.5) ? tryClaim([[i, j, i + 1, j]], 'lots') : tryClaim([[i, j, i, j + 1]], 'lots')) continue; }
       const b = claim(i, j, i, j, 'lots'); let P2 = b.poly; for (const h of tEdgesIn(this.core, BW / 2)) { if (P2.length < 3) break; P2 = tClipPoly(P2, h); } // (the cells at the cut corners are cut too)
@@ -5714,6 +5717,8 @@ const TOWN_BUILD = {
     gb.setXf(...xfP(xf, 0, S2), xf.ang, y); for (const sd of [-1, 1]) { gb.box(sd * 6.5 - 3, 0, -3, sd * 6.5 + 3, 16, 3, { side: 'stone', top: 'stone' }, 3, 3); hipRoof(gb, 'roofSlate', sd * 6.5 - 3.3, -3.3, sd * 6.5 + 3.3, 3.3, 16, 5, 0.3); const [tx, tz] = xfP(xf, sd * 6.5, S2); siteCol(area, tx, tz, xf.ang, 3, 3, y - 1, y + 21); }
     gb.box(-3.5, 6, -2.5, 3.5, 13, 2.5, { side: 'stone', top: 'stone', bottom: 'stone' }, 3, 3); gb.xf = null;
     drapePatch(gb, 'sqCobble', xf, -S2 + 2, -S2 + 2, S2 - 2, S2 - 2, { cell: 6, lift: 0.05 });
+    for (const [a0, b0, a1, b1] of [[-S2 - 10, -S2 - 10, S2 + 10, -S2 - 1.4], [-S2 - 10, S2 + 1.4, S2 + 10, S2 + 10], [-S2 - 10, -S2 - 1.4, -S2 - 1.4, S2 + 1.4], [S2 + 1.4, -S2 - 1.4, S2 + 10, S2 + 1.4]]) drapePatch(gb, 'rDirt', xf, a0, b0, a1, b1, { cell: 6, lift: 0.045 }); // the bare glacis round the walls
+    for (const [tx, tz] of [[-S2, -S2], [S2, -S2], [S2, S2], [-S2, S2]]) for (const [fx, fz] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) for (const hy of [6, 12]) { gb.setXf(...xfP(xf, tx + fx * 5.04, tz + fz * 5.04), xf.ang + Math.atan2(fx, fz), y); gb.box(-0.25, hy, -0.02, 0.25, hy + 1.8, 0.02, 'iron', 1, 1); } gb.xf = null; // arrow slits
   },
   // the market hall: a great roof on timber posts over the stalls, in a paved square
   market(T, gb, b, area) {
@@ -5759,14 +5764,16 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
   if (this.square) { const b = this.square, r2 = new RNG(8100), W2 = b.u1 - b.u0, H2 = b.v1 - b.v0;
     const at = (u, v) => this.w(u, v);
     { const [wx, wz] = at(b.uc + W2 * 0.15, b.vc); if (inC(wx, wz)) { gb.cyl('stone', wx, wz, 1.4, H0 - 0.2, H0 + 0.9, 10, 2, 2); gb.disc('water', wx, H0 + 0.5, wz, 1.2, 10, 2); for (const sd of [-1, 1]) gb.box(wx + sd * 1.3 - 0.1, H0, wz - 0.1, wx + sd * 1.3 + 0.1, H0 + 2.6, wz + 0.1, 'woodDark', 1, 1); gb.box(wx - 1.5, H0 + 2.5, wz - 0.12, wx + 1.5, H0 + 2.7, wz + 0.12, 'woodDark', 1, 1); siteCol(area, wx, wz, 0, 1.4, 1.4, H0 - 1, H0 + 0.9); } }
-    const nS = Math.max(8, Math.round(W2 / 7)), rowsS = H2 > 70 ? 4 : 2; for (let k = 0; k < nS * rowsS; k++) { const row = Math.floor(k / nS), u = b.u0 + 6 + (k % nS) * (W2 - 12) / (nS - 1), v = b.v0 + H2 * (row + 0.5) / rowsS + r2.range(-1.5, 1.5), [sx, sz] = at(u, v); if (!inC(sx, sz) || r2.chance(0.15)) continue; const a = C.ang + (row % 2 ? Math.PI : 0);
+    const nS = Math.max(8, Math.round(W2 / 7)), rowsS = H2 > 70 ? 4 : H2 > 44 ? 3 : 2; for (let k = 0; k < nS * rowsS; k++) { const row = Math.floor(k / nS), u = b.u0 + 6 + (k % nS) * (W2 - 12) / (nS - 1), v = b.v0 + H2 * (row + 0.5) / rowsS + r2.range(-1.5, 1.5), [sx, sz] = at(u, v); if (!inC(sx, sz) || r2.chance(0.15)) continue; const a = C.ang + (row % 2 ? Math.PI : 0);
       gb.setXf(sx, sz, a, H0); gb.box(-1.3, 0, -0.6, 1.3, 0.95, 0.6, { side: 'woodDark', top: 'wood' }, 1, 1); for (const [px, pz] of [[-1.25, -0.6], [1.25, -0.6], [-1.25, 1.1], [1.25, 1.1]]) gb.box(px - 0.05, 0, pz - 0.05, px + 0.05, pz < 0 ? 2.5 : 2.1, pz + 0.05, 'woodDark', 1, 1);
       gb.quad4(r2.pick(['stallA', 'stallB', 'stallC']), [-1.4, 2.5, -0.75], [1.4, 2.5, -0.75], [1.4, 2.1, 1.25], [-1.4, 2.1, 1.25], [0, 0], [2, 0], [2, 1], [0, 1], [0, 1, 1]);
       for (let q = 0; q < 3; q++) gb.box(-1 + q * 0.75, 0.95, -0.4, -0.55 + q * 0.75, 1.25, 0.1, r2.pick(['wood', 'roofThatch', 'stallB', 'cloth']), 1, 1);
       gb.xf = null; siteCol(area, sx, sz, a, 1.3, 0.6, H0 - 1, H0 + 0.95); }
     for (let k = 0; k < 3; k++) { const [cx2, cz2] = at(b.u0 + r2.range(8, W2 - 8), b.v0 + r2.range(6, H2 - 6)); if (!inC(cx2, cz2)) continue; const a = r2.range(0, 6.28); gb.setXf(cx2, cz2, a, H0); gb.box(-0.8, 0.5, -1.5, 0.8, 1.1, 1.5, { side: 'woodDark', top: 'wood' }, 1, 1); for (const sd of [-1, 1]) gb.box(sd * 0.85 - 0.06, 0, -0.5, sd * 0.85 + 0.06, 1.0, 0.5, 'woodDark', 1, 1); gb.box(-0.05, 0.6, 1.5, 0.05, 0.7, 3.2, 'woodDark', 1, 1); gb.xf = null; siteCol(area, cx2, cz2, a, 0.9, 1.6, H0 - 1, H0 + 1.1); }
     for (let k = 0; k < 8; k++) { const [bx2, bz2] = at(b.u0 + r2.range(3, W2 - 3), b.v0 + r2.range(3, H2 - 3)); if (inC(bx2, bz2)) gb.cyl('woodDark', bx2, bz2, 0.35, H0, H0 + 0.9, 8, 1, 1); }
-    { const [px, pz] = at(b.u0 + W2 * 0.8, b.vc); if (inC(px, pz)) { gb.box(px - 1.6, H0, pz - 1.6, px + 1.6, H0 + 0.6, pz + 1.6, 'stone', 2, 2); gb.box(px - 0.2, H0 + 0.6, pz - 0.2, px + 0.2, H0 + 3.4, pz + 0.2, 'woodDark', 1, 1); gb.box(px - 0.9, H0 + 2.4, pz - 0.15, px + 0.9, H0 + 2.8, pz + 0.15, 'woodDark', 1, 1); siteCol(area, px, pz, 0, 1.6, 1.6, H0 - 1, H0 + 0.6); } } } // the pillory
+    { const [px, pz] = at(b.u0 + W2 * 0.8, b.vc); if (inC(px, pz)) { gb.box(px - 1.6, H0, pz - 1.6, px + 1.6, H0 + 0.6, pz + 1.6, 'stone', 2, 2); gb.box(px - 0.2, H0 + 0.6, pz - 0.2, px + 0.2, H0 + 3.4, pz + 0.2, 'woodDark', 1, 1); gb.box(px - 0.9, H0 + 2.4, pz - 0.15, px + 0.9, H0 + 2.8, pz + 0.15, 'woodDark', 1, 1); siteCol(area, px, pz, 0, 1.6, 1.6, H0 - 1, H0 + 0.6); } // the pillory
+    for (let u = b.u0 + 5; u < b.u1 - 4; u += 9) { const [tx, tz] = at(u, b.v0 + 2.5); if (!inC(tx, tz)) continue; gb.box(tx - 0.9, H0, tz - 0.9, tx + 0.9, H0 + 0.25, tz + 0.9, 'stone', 1, 1); fl[r2.pick(['oak0', 'oak1'])].push([tx, H0 + 0.1, tz, r2.range(0.6, 0.75)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: H0 - 1, y1: H0 + 8 }); } // a row of limes in stone pits
+    { const [qx, qz] = at(b.u0 + W2 * 0.45, b.vc + H2 * 0.25); if (inC(qx, qz)) { gb.box(qx - 1.5, H0, qz - 1.5, qx + 1.5, H0 + 0.5, qz + 1.5, 'stone', 2, 2); gb.box(qx - 1, H0 + 0.5, qz - 1, qx + 1, H0 + 1, qz + 1, 'stone', 2, 2); gb.box(qx - 0.3, H0 + 1, qz - 0.3, qx + 0.3, H0 + 6, qz + 0.3, 'stoneLight', 1, 1); gb.box(qx - 0.8, H0 + 6, qz - 0.8, qx + 0.8, H0 + 6.6, qz + 0.8, 'stoneLight', 1, 1); siteCol(area, qx, qz, 0, 1.5, 1.5, H0 - 1, H0 + 1); } } } } // the market cross
   if (this.parvis) { const b = this.parvis, r2 = new RNG(8300), [cx2, cz2] = this.w((b.u0 + b.u1) / 2, b.vc);
     if (inC(cx2, cz2)) { gb.box(cx2 - 1.2, H0, cz2 - 1.2, cx2 + 1.2, H0 + 0.8, cz2 + 1.2, 'stone', 2, 2); gb.box(cx2 - 0.25, H0 + 0.8, cz2 - 0.25, cx2 + 0.25, H0 + 5.5, cz2 + 0.25, 'stoneLight', 1, 1); gb.setXf(cx2, cz2, C.ang, H0); gb.box(-1.2, 4.2, -0.22, 1.2, 4.7, 0.22, 'stoneLight', 1, 1); gb.xf = null; siteCol(area, cx2, cz2, 0, 1.2, 1.2, H0 - 1, H0 + 0.8); } // the calvary
     for (let u = b.u0 + 5; u < b.u1 - 4; u += 9) for (const v of [b.v0 + 3, b.v1 - 3]) { const [tx, tz] = this.w(u, v); if (!inC(tx, tz)) continue; fl[r2.pick(['oak0', 'oak1'])].push([tx, H0 - 0.15, tz, r2.range(0.75, 0.95)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: H0 - 1, y1: H0 + 8 }); } }

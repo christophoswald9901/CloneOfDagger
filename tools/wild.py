@@ -70,7 +70,7 @@ TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.at
  const old=T.streets.filter(s=>s.core&&!s.main&&len(s)>25&&g.terrainH(...W(s.u0,s.v0))>T.H0-0.5&&g.terrainH(...W(s.u1,s.v1))>T.H0-0.5).sort((a,b)=>Math.hypot(...mid(a))-Math.hypot(...mid(b)))[3]; if(old) at('town_street',old.u0,old.v0,old.u1,old.v1,0.03,null);
  for (const [nm,kind] of [['town_lane','tanners'],['town_lane2','weavers'],['town_commons','commons']]) { const ls=T.streets.filter(s=>s.lane&&T.kindAt(...mid(s))===kind&&len(s)>22).sort((a,b)=>len(b)-len(a)); const s=ls[Math.min(ls.length-1,2)]; if(s) at(nm,s.u0,s.v0,s.u1,s.v1,0.03,null); }
  { const p=T.canal[2],q=T.canal[3],L=Math.hypot(q[0]-p[0],q[1]-p[1]),du=(q[0]-p[0])/L,dv=(q[1]-p[1])/L,o=C.canal.w/2+2,t=L*0.18; at('town_canal',p[0]+du*t+dv*o,p[1]+dv*t-du*o,p[0]+du*(t+60),p[1]+dv*(t+60),0.02,null); }
- const cb=T.cathedral; if(cb){const d=T.cathDims(cb),pv=T.parvis; at('town_cathedral',pv?pv.u1-4:cb.u1+4,pv?pv.vc+(pv.v1-pv.v0)*0.32:cb.vc+8,d.cu,cb.vc,0.17,null);}
+ const cb=T.cathedral; if(cb){const d=T.cathDims(cb),pv=T.parvis; at('town_cathedral',pv?pv.u1-4:cb.u1+4,pv?pv.vc+(pv.v1-pv.v0)*0.32:cb.vc+8,d.cu,cb.vc,0.17,null); at('town_nave',cb.u1+2,cb.v1+6,d.cu,cb.vc,0.18,null);}
  const mk=T.market; if(mk) at('town_market',mk.u0+4,mk.v0+4,mk.uc,mk.vc,0.05,null);
  if(T.citadel){const c=T.citadel; at('town_citadel',c.uc+c.u1-c.uc+10,c.vc+c.v1-c.vc+10,c.uc,c.vc,0.15,null);}
  at('town_air',C.A+500,C.B+450,0,0,-0.3,260);
