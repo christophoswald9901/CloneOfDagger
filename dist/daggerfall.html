@@ -5692,7 +5692,12 @@ const TOWN_BUILD = {
     for (const [tx, tz] of [[-S2, -S2], [S2, -S2], [S2, S2], [-S2, S2]]) { gb.box(tx - 5, 0, tz - 5, tx + 5, 17, tz + 5, { side: 'stone', top: 'stone' }, 3, 3); hipRoof(gb, 'roofSlate', tx - 5, tz - 5, tx + 5, tz + 5, 17, 7, 0.4); const [wx, wz] = xfP(xf, tx, tz); siteCol(area, wx, wz, xf.ang, 5, 5, y - 1, y + 24); }
     gb.xf = null; const [kx, kz] = xfP(xf, 0, -S2 * 0.25); gb.setXf(kx, kz, xf.ang, y);
     makeBuilding(area, gb, rng, { fp: { x0: -12, z0: -12, x1: 12, z1: 12 }, h: 30, style: 'stone', roof: 'flat', doorT: 0.5, found: 1, winRate: 0.4, chimney: 0 });
-    gb.box(-3, 30, -3, 3, 38, 3, { side: 'stone', top: 'stone' }, 3, 3); gb.xf = null; gb.box(kx - 0.1, y + 38, kz - 0.1, kx + 0.1, y + 42, kz + 0.1, 'woodDark', 1, 1);
+    gb.box(-3, 30, -3, 3, 38, 3, { side: 'stone', top: 'stone' }, 3, 3); for (let t = -11.6; t < 11.6; t += 2.2) for (const [a, b] of [[t, -12], [t, 11.4], [-12, t], [11.4, t]]) gb.box(a, 30, b, a + 0.6 + (a === -12 || a === 11.4 ? 0 : 0.6), 31.4, b + 0.6 + (a === -12 || a === 11.4 ? 0.6 : 0), 'stone', 1, 1); // the keep's battlements
+    gb.xf = null; gb.box(kx - 0.1, y + 38, kz - 0.1, kx + 0.1, y + 42, kz + 0.1, 'woodDark', 1, 1);
+    // barracks along two sides of the ward, and a gate between two towers
+    gb.setXf(...xfP(xf, 0, 0), xf.ang, y); for (const sd of [-1, 1]) { gb.setXf(...xfP(xf, sd * (S2 - 8), S2 * 0.1), xf.ang, y); makeBuilding(area, gb, rng, { fp: { x0: -5, z0: -S2 * 0.55, x1: 5, z1: S2 * 0.55 }, h: 7, stories: 2, style: 'stone', roof: 'gable', roofKey: 'roofSlate', alongX: false, doorT: 0.5, found: 0.4, chimney: 0.6, winRate: 0.7 }); }
+    gb.setXf(...xfP(xf, 0, S2), xf.ang, y); for (const sd of [-1, 1]) { gb.box(sd * 6.5 - 3, 0, -3, sd * 6.5 + 3, 16, 3, { side: 'stone', top: 'stone' }, 3, 3); hipRoof(gb, 'roofSlate', sd * 6.5 - 3.3, -3.3, sd * 6.5 + 3.3, 3.3, 16, 5, 0.3); const [tx, tz] = xfP(xf, sd * 6.5, S2); siteCol(area, tx, tz, xf.ang, 3, 3, y - 1, y + 21); }
+    gb.box(-3.5, 6, -2.5, 3.5, 13, 2.5, { side: 'stone', top: 'stone', bottom: 'stone' }, 3, 3); gb.xf = null;
     drapePatch(gb, 'sqCobble', xf, -S2 + 2, -S2 + 2, S2 - 2, S2 - 2, { cell: 6, lift: 0.05 });
   },
   // the market hall: a great roof on timber posts over the stalls, in a paved square
