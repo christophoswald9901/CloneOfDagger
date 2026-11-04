@@ -72,6 +72,7 @@ TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.at
  { const p=T.canal[2],q=T.canal[3],L=Math.hypot(q[0]-p[0],q[1]-p[1]),du=(q[0]-p[0])/L,dv=(q[1]-p[1])/L,o=C.canal.w/2+2,t=L*0.18; at('town_canal',p[0]+du*t+dv*o,p[1]+dv*t-du*o,p[0]+du*(t+60),p[1]+dv*(t+60),0.02,null); }
  const cb=T.cathedral; if(cb){const d=T.cathDims(cb),pv=T.parvis; at('town_cathedral',pv?pv.u1-4:cb.u1+4,pv?pv.vc+(pv.v1-pv.v0)*0.32:cb.vc+8,d.cu,cb.vc,0.17,null); at('town_nave',cb.u1+2,cb.v1+6,d.cu,cb.vc,0.18,null);}
  const mk=T.market; if(mk) at('town_market',mk.u0+4,mk.v0+4,mk.uc,mk.vc,0.05,null);
+ { const B=T.bridges.find(b=>T.coreOut(b.u,b.v)>20)||T.bridges[0]; if(B){ let best=null; for(let k=0;k<T.canal.length-1;k++){const p=T.canal[k],q=T.canal[k+1],L=Math.hypot(q[0]-p[0],q[1]-p[1]),cu=(q[0]-p[0])/L,cv=(q[1]-p[1])/L,t=(B.u-p[0])*cu+(B.v-p[1])*cv,d=Math.abs((B.u-p[0])*cv-(B.v-p[1])*cu); if(t>0&&t<L&&(!best||d<best.d)) best={d,cu,cv}; } const c=best||{cu:B.dv,cv:-B.du}, o=T.cfg.canal.w/2+1.2; at('town_bridge',B.u+c.cu*34-c.cv*o,B.v+c.cv*34+c.cu*o,B.u,B.v,0.06,null);} }
  if(T.citadel){const c=T.citadel; at('town_citadel',c.uc+c.u1-c.uc+10,c.vc+c.v1-c.vc+10,c.uc,c.vc,0.15,null);}
  at('town_air',C.A+500,C.B+450,0,0,-0.3,260);
  at('town_air_low',-C.A*0.55,T.CB+160,T.CA*0.2,-T.CB*0.5,-0.25,80);

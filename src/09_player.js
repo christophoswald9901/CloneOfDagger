@@ -32,7 +32,7 @@ function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
   const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
     if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
-    for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40)) return true; // a town's moat and canal: not to be waded into
+    for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40) && groundAt(G.area, x, z, 0.3, p.pos.y) < T.wl() + 0.3) return true; // a town's moat and canal: not to be waded into (but a bridge over it is walked on)
     return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
   if (!bad(p.pos.x, oz)) p.pos.z = oz; else if (!bad(ox, p.pos.z)) p.pos.x = ox; else { p.pos.x = ox; p.pos.z = oz; }

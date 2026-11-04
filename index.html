@@ -5572,7 +5572,7 @@ class Town {
       for (let k = 0; k < this.canal.length - 1; k++) { const a = this.canal[k], b = this.canal[k + 1]; let p = null; const r = segCross(s.u0, s.v0, s.u1, s.v1, a[0], a[1], b[0], b[1]); if (r) p = [lerp(s.u0, s.u1, r[0]), lerp(s.v0, s.v1, r[0])];
         else for (const e of [[s.u0, s.v0], [s.u1, s.v1]]) { const d = segDist(e[0], e[1], a[0], a[1], b[0], b[1]); if (d.d < 0.6 && d.t > 0 && d.t < 1) p = e; }
         if (!p || this.bridges.some(q => Math.hypot(q.u - p[0], q.v - p[1]) < 5)) continue; const cl = Math.hypot(b[0] - a[0], b[1] - a[1]), sn = Math.abs(su * (b[1] - a[1]) - sv * (b[0] - a[0])) / sl / cl;
-        this.bridges.push({ u: p[0], v: p[1], du: su / sl, dv: sv / sl, w: Math.min(s.w, 8), hl: (CW / 2 + 1) / Math.max(0.5, sn) }); } }
+        this.bridges.push({ u: p[0], v: p[1], du: su / sl, dv: sv / sl, w: Math.min(s.w, 8), hl: (CW / 2 + 1) / Math.max(0.5, sn) }); s.bridged = true; } }
 
     // the suburbs: cottages along each road out of a gate, beyond the moat
     for (const g of this.gates) { const pu = -g.nv, pv = g.nu, start = M.off + M.w + 26;
@@ -5752,8 +5752,9 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
   for (const l of this.lotHash.query(x0, z0, x0 + WC, z0 + WC)) { if (!inC(l.x, l.z)) continue; const rng = new RNG(l.seed); l.prevStyle = l.prev ? this.styleOf(l.prev) : null; l.oddHeight = l.idx % 2 === 1; gb.setXf(l.x, l.z, l.o.ang, H0); townHouse(area, gb, rng, l, TK[l.kind], T); gb.xf = null; n++; }
   // paving: streets in pieces, the quays along the canal with their walls, the squares in tiles
   for (const s of this.streets) { if (s.nopave) continue;
-    const L = Math.hypot(s.u1 - s.u0, s.v1 - s.v0), np = Math.max(1, Math.ceil(L / 16));
+    const L = Math.hypot(s.u1 - s.u0, s.v1 - s.v0), np = Math.max(1, Math.ceil(L / (s.bridged ? 2 : 16)));
     for (let k = 0; k < np; k++) { const f0 = k / np, f1 = (k + 1) / np, mu = lerp(s.u0, s.u1, (f0 + f1) / 2), mv = lerp(s.v0, s.v1, (f0 + f1) / 2), [mx, mz] = this.w(mu, mv); if (!inC(mx, mz)) continue;
+      if (s.bridged && this.bridges.some(B2 => Math.hypot(B2.u - mu, B2.v - mv) < B2.hl + 3.3)) continue; // (the bridge is the street there)
       const a = this.w(lerp(s.u0, s.u1, f0), lerp(s.v0, s.v1, f0)), b = this.w(lerp(s.u0, s.u1, f1), lerp(s.v0, s.v1, f1));
       if (s.quay) { drapeStrip(gb, 'rFlag', [a, b], s.w, { lift: 0.064, hAt: () => H0 }); const o = s.w / 2, wa = this.w(lerp(s.u0, s.u1, f0) + s.cn[0] * o, lerp(s.v0, s.v1, f0) + s.cn[1] * o), wb = this.w(lerp(s.u0, s.u1, f1) + s.cn[0] * o, lerp(s.v0, s.v1, f1) + s.cn[1] * o), Lq = Math.hypot(wb[0] - wa[0], wb[1] - wa[1]);
         gb.setXf((wa[0] + wb[0]) / 2, (wa[1] + wb[1]) / 2, Math.atan2(wb[0] - wa[0], wb[1] - wa[1]), H0); gb.box(-0.5, -3.2, -Lq / 2 - 0.05, 0.5, 0.08, Lq / 2 + 0.05, { side: 'stone', top: 'stoneLight' }, 2, 2); gb.xf = null; continue; } // the quay wall
@@ -5791,7 +5792,7 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
       for (const sd of [-1, 1]) { gb.tri('woodDark', [-1.2, -0.4, sd * 3.4], [1.2, -0.4, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [0, 0.3, sd]); gb.tri('woodDark', [-1.2, 0.5, sd * 3.4], [0, 0.9, sd * 5], [-1.2, -0.4, sd * 3.4], [0, 0], [1, 0], [0.5, 1], [-1, 0, 0]); gb.tri('woodDark', [1.2, 0.5, sd * 3.4], [1.2, -0.4, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [1, 0, 0]); gb.tri('wood', [-1.2, 0.5, sd * 3.4], [1.2, 0.5, sd * 3.4], [0, 0.9, sd * 5], [0, 0], [1, 0], [0.5, 1], [0, 1, 0]); } // bow and stern
       for (const s of [-1, 1]) gb.box(s * 1.2 - 0.12, 0.5, -3.4, s * 1.2 + 0.12, 0.85, 3.4, 'wood', 1, 1); // the gunwales
       gb.box(-1.1, 0.42, -3.3, 1.1, 0.5, 3.3, 'woodDark', 1, 1); gb.box(-0.05, 0.5, -5.2, 0.05, 1.8, -4.9, 'woodDark', 1, 1); // the hold's floor, the tiller
-      if (r2.chance(0.6)) { gb.box(-0.08, 0.5, -0.6, 0.08, 7, -0.4, 'woodDark', 1, 1); gb.box(-0.06, 2.0, -0.55, 0.06, 2.12, 2.2, 'woodDark', 1, 1); gb.quad('sail', [-0.05, 2.2, -0.45], [0, 0, 1], [0, 1, 0], 2.6, 4, 2, 2, { double: true }); }
+      if (r2.chance(0.2)) { gb.box(-0.08, 0.5, -0.6, 0.08, 7, -0.4, 'woodDark', 1, 1); gb.box(-0.06, 2.0, -0.55, 0.06, 2.12, 2.2, 'woodDark', 1, 1); gb.quad('sail', [-0.05, 2.2, -0.45], [0, 0, 1], [0, 1, 0], 2.6, 4, 2, 2, { double: true }); }
       else { gb.box(-0.85, 0.5, 0.8, 0.85, 1.6, 2.8, { side: 'wood', top: 'woodDark' }, 1, 1); gableRoof(gb, 'roofBrown', 'wood', -0.95, 0.7, 0.95, 2.9, 1.6, 0.6, 0.1, false); }
       for (let q = 0, nq = r2.int(1, 4); q < nq; q++) { const cz3 = r2.range(-3, -1); if (r2.chance(0.5)) gb.cyl('woodDark', r2.range(-0.6, 0.6), cz3, 0.32, 0.5, 1.25, 8, 1, 1); else gb.box(-0.4, 0.5, cz3 - 0.4, 0.4, 1.2, cz3 + 0.4, 'wood', 1, 1); } // its cargo: barrels and crates
       gb.xf = null; }
@@ -5850,10 +5851,17 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
     gb.xf = null; for (const sd of [-1, 1]) { const [px, pz] = xfP(makeXf(gx, gz, ga), sd * (W.gateW / 2 + 3), 0); siteCol(area, px, pz, ga, 3, 6, H0 - 2, H0 + W.h + 11); }
     { const [bx, bz] = xfP(makeXf(gx, gz, ga), 0, (4 + bl) / 2); siteCol(area, bx, bz, ga, W.gateW / 2 - 0.2, (bl - 4) / 2, H0 - 0.4, H0 + 0.08); for (const sd of [-1, 1]) { const [px, pz] = xfP(makeXf(gx, gz, ga), sd * (W.gateW / 2 - 0.2), (6 + bl) / 2); siteCol(area, px, pz, ga, 0.25, (bl - 6) / 2, H0 + 0.08, H0 + 0.95); } }
     drapeStrip(gb, 'rFlag', [this.w(g.u - g.nu * 8, g.v - g.nv * 8), this.w(g.u + g.nu * 4, g.v + g.nv * 4)], W.gateW, { lift: 0.06, hAt: () => H0 }); }
-  // bridges where streets cross the canal
-  for (const B2 of this.bridges) { const [bx, bz] = this.w(B2.u, B2.v); if (!inC(bx, bz)) continue; const ba = ang + Math.atan2(B2.du, B2.dv), bw = B2.w, hl = B2.hl;
-    gb.setXf(bx, bz, ba, H0); gb.box(-bw / 2, -0.6, -hl, bw / 2, 0.1, hl, { side: 'stone', top: 'flag' }, 2, 2); for (const sd of [-1, 1]) gb.box(sd * bw / 2 - (sd > 0 ? 0.5 : 0), 0.1, -hl, sd * bw / 2 + (sd > 0 ? 0 : 0.5), 1.0, hl, 'stoneLight', 2, 2);
-    gb.box(-bw / 2, -3.2, -1, bw / 2, -0.6, 1, 'stone', 2, 2); gb.xf = null; siteCol(area, bx, bz, ba, bw / 2, hl, H0 - 0.7, H0 + 0.1); for (const sd of [-1, 1]) { const [px, pz] = xfP(makeXf(bx, bz, ba), sd * (bw / 2 - 0.25), 0); siteCol(area, px, pz, ba, 0.25, hl, H0 + 0.1, H0 + 1); } }
+  // bridges where streets cross the canal: humped stone arches, high enough for the barges to pass under, with ramps down onto the quays on both sides
+  for (const B2 of this.bridges) { const [bx, bz] = this.w(B2.u, B2.v); if (!inC(bx, bz)) continue; const ba = ang + Math.atan2(B2.du, B2.dv), bw = B2.w, hl = B2.hl + 3.5, rise = 2.9, top = t => 0.1 + rise * (1 - (t / hl) * (t / hl)), xf = makeXf(bx, bz, ba);
+    const n2 = Math.ceil(2 * hl / 0.75), dt = 2 * hl / n2; gb.setXf(bx, bz, ba, H0);
+    for (let k = 0; k < n2; k++) { const t0 = -hl + k * dt, t1 = t0 + dt, y0 = top(t0), y1 = top(t1), ym = top((t0 + t1) / 2);
+      gb.quad4('flag', [-bw / 2, y0, t0], [bw / 2, y0, t0], [bw / 2, y1, t1], [-bw / 2, y1, t1], [0, t0 / 3], [bw / 3, t0 / 3], [bw / 3, t1 / 3], [0, t1 / 3], [0, 1, 0]); // the deck
+      for (const sd of [-1, 1]) { const x0 = sd * bw / 2; gb.quad4('stone', [x0, Math.min(y0, y1) - 0.7 - (Math.abs(t0 + dt / 2) < hl - 4 ? 0 : 2.6), t0], [x0, Math.min(y0, y1) - 0.7 - (Math.abs(t0 + dt / 2) < hl - 4 ? 0 : 2.6), t1], [x0, y1, t1], [x0, y0, t0], [t0 / 3, 0], [t1 / 3, 0], [t1 / 3, 1], [t0 / 3, 1], [sd, 0, 0]); // the arch's flank, solid where it meets the quays
+        gb.box(sd * bw / 2 - (sd > 0 ? 0.5 : 0), ym, t0, sd * bw / 2 + (sd > 0 ? 0 : 0.5), ym + 0.95, t1, 'stoneLight', 2, 2); }
+      gb.quad4('stone', [-bw / 2, y0 - 0.7, t0], [-bw / 2, y1 - 0.7, t1], [bw / 2, y1 - 0.7, t1], [bw / 2, y0 - 0.7, t0], [0, 0], [0, 1], [1, 1], [1, 0], [0, -1, 0]); // its underside
+      const [px, pz] = xfP(xf, 0, (t0 + t1) / 2); siteCol(area, px, pz, ba, bw / 2, dt / 2, H0 - 0.7, H0 + ym); // one walkable step of it
+      for (const sd of [-1, 1]) { const [qx, qz] = xfP(xf, sd * (bw / 2 - 0.25), (t0 + t1) / 2); siteCol(area, qx, qz, ba, 0.25, dt / 2, H0 + ym, H0 + ym + 0.95); } }
+    gb.xf = null; }
   return n;
 };
 
@@ -6969,7 +6977,7 @@ function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
   const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
     if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
-    for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40)) return true; // a town's moat and canal: not to be waded into
+    for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40) && groundAt(G.area, x, z, 0.3, p.pos.y) < T.wl() + 0.3) return true; // a town's moat and canal: not to be waded into (but a bridge over it is walked on)
     return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
   if (!bad(p.pos.x, oz)) p.pos.z = oz; else if (!bad(ox, p.pos.z)) p.pos.x = ox; else { p.pos.x = ox; p.pos.z = oz; }
