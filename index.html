@@ -5318,15 +5318,15 @@ const TOWN_CFGS = [{
 
 // how each quarter builds: plot frontage and depth, storeys, walls and roofs
 const TK = {
-  old: { w: [6.5, 10], d: [12, 16], stories: [3, 3, 4, 2], styles: ['brick', 'brick', 'stone', 'plaster'], roofs: ['roofRed', 'roofBrown', 'roofSlate'], step: 0.5, jetty: 0.1 },
-  tanners: { w: [5, 8], d: [8, 11], stories: [1, 2, 2], styles: ['timber2', 'plaster', 'wood', 'brick'], roofs: ['roofThatch', 'roofBrown', 'roofRed'], step: 0, jetty: 0.3 },
-  grand: { w: [7, 11], d: [14, 18], stories: [3, 3, 4], styles: ['brick', 'brick', 'stone'], roofs: ['roofSlate', 'roofBrown', 'roofRed'], step: 0.75, jetty: 0 },
+  old: { w: [6.5, 10], d: [12, 16], stories: [3, 3, 4, 2], styles: ['brick', 'brick', 'stone', 'plaster'], roofs: ['roofRed', 'roofRed', 'roofBrown'], step: 0.5, jetty: 0.1 },
+  tanners: { w: [5, 8], d: [8, 11], stories: [1, 2, 2], styles: ['timber2', 'plaster', 'wood', 'brick'], roofs: ['roofThatch', 'roofBrown', 'roofThatch'], step: 0, jetty: 0.3 },
+  grand: { w: [7, 11], d: [14, 18], stories: [3, 3, 4], styles: ['brick', 'brick', 'stone'], roofs: ['roofSlate', 'roofSlate', 'roofRed'], step: 0.75, jetty: 0 },
   close: { w: [8, 12], d: [12, 16], stories: [2, 3], styles: ['stone', 'stoneLight', 'brick'], roofs: ['roofSlate'], step: 0.35, jetty: 0 },
   citadel: { w: [8, 12], d: [12, 16], stories: [2, 2, 3], styles: ['stone', 'brick', 'timber2'], roofs: ['roofSlate', 'roofBrown'], step: 0.15, jetty: 0.2 },
-  canal: { w: [8, 13], d: [14, 20], stories: [3, 4], styles: ['brick', 'brick', 'timber2'], roofs: ['roofBrown', 'roofSlate', 'roofRed'], step: 0.55, jetty: 0.1, warehouse: 0.45 },
-  suburb: { w: [6, 9], d: [9, 11], stories: [1, 2, 2], styles: ['brick', 'timber2', 'brick', 'plaster'], roofs: ['roofSlate', 'roofBrown', 'roofRed'], step: 0.3, jetty: 0.2 },
+  canal: { w: [8, 13], d: [14, 20], stories: [3, 4], styles: ['brick', 'brick', 'timber2'], roofs: ['roofRed', 'roofRed', 'roofBrown'], step: 0.55, jetty: 0.1, warehouse: 0.45 },
+  suburb: { w: [6, 9], d: [9, 11], stories: [1, 2, 2], styles: ['brick', 'timber2', 'brick', 'plaster'], roofs: ['roofThatch', 'roofBrown', 'roofBrown'], step: 0.3, jetty: 0.2 },
   commons: { w: [6, 9], d: [9, 12], stories: [1, 1, 2], styles: ['timber2', 'plaster', 'wood'], roofs: ['roofThatch', 'roofThatch', 'roofBrown'], step: 0, jetty: 0.1 },
-  weavers: { w: [6, 9], d: [11, 15], stories: [2, 3, 3], styles: ['timber2', 'timber2', 'plaster', 'brick'], roofs: ['roofBrown', 'roofSlate', 'roofRed'], step: 0.2, jetty: 0.55 },
+  weavers: { w: [6, 9], d: [11, 15], stories: [2, 3, 3], styles: ['timber2', 'timber2', 'plaster', 'brick'], roofs: ['roofBrown', 'roofBrown', 'roofRed'], step: 0.2, jetty: 0.55 },
 };
 
 // how each kind of quarter is cut into blocks: block length and depth between street lines, and the width of its lanes
@@ -5384,6 +5384,10 @@ class Town {
     const mainU = clamp(C.mainU, -CA + 50, CA - 50), mainV = clamp(C.mainV, -CB + 50, CB - 50);
     let cv = clamp(C.canal.v, -CB + 40, CB - 40); if (Math.abs(cv - mainV) < 60) cv = mainV + (cv >= mainV ? 60 : -60); if (Math.abs(cv) > CB - 40) cv = mainV - Math.sign(cv - mainV) * 60;
     this.mainU = mainU; this.mainV = mainV; this.cv = cv; const qOff = CW / 2 + QW / 2;
+    // the old town's outline: its rectangle with each corner cut off by its own amount
+    { const cm = Math.max(0, Math.min(CB - Math.max(Math.abs(mainV), Math.abs(cv)) - 20, CA - Math.abs(mainU) - 20)), cut = () => Math.min(cm, rng.range(0.2, 0.45) * Math.min(CA, CB)), c = [cut(), cut(), cut(), cut()];
+      this.core = [[-CA + c[0], -CB], [CA - c[1], -CB], [CA, -CB + c[1]], [CA, CB - c[2]], [CA - c[2], CB], [-CA + c[3], CB], [-CA, CB - c[3]], [-CA, -CB + c[0]]]; }
+    this.coreIn = tEdgesIn(this.core); const coreOut = (u, v) => { let m = -1e9; for (const h of this.coreIn) m = Math.max(m, h.c - h.nu * u - h.nv * v); return m; }; this.coreOut = coreOut;
     const fu = C.flip && C.flip[0] ? -1 : 1, fv = C.flip && C.flip[1] ? -1 : 1; this.fu = fu; this.fv = fv; this.oneTower = !!(C.vary && rng.chance(0.4)); // a varied town may raise one great tower instead of two
     // the wall: a convex polygon round an ellipse, its corners jittered
     { const pts = [], N = C.vary ? rng.int(8, 13) : C.wall.corners || 11; for (let k = 0; k < N; k++) { const th = (k + rng.range(-0.28, 0.28)) / N * Math.PI * 2, c = Math.cos(th), s = Math.sin(th), r = rng.range(0.94, 1.06) / Math.hypot(c / A, s / B); pts.push([r * c, r * s]); } this.wall = tHull(pts); }
@@ -5417,7 +5421,7 @@ class Town {
     const S = 38; this.blocks = [];
     for (const pass of [0, 1]) { if (this.citadel) break; const cands = []; for (let u = -A; u <= A; u += 16) for (let v = -B; v <= B; v += 16) { if (pass === 0 && quarterAt(u, v) !== 'citadel') continue; const m = S + 16;
         if ([[-1, -1], [1, -1], [1, 1], [-1, 1]].some(([a, b]) => this.wallOut(u + a * m, v + b * m) > -(R + RW / 2 + 2))) continue;
-        if (Math.abs(u) < CA + BW / 2 + m && Math.abs(v) < CB + BW / 2 + m) continue;
+        if (coreOut(u, v) < BW / 2 + m * 1.2) continue;
         if (roads.some(r => segDist(u, v, r.p0[0], r.p0[1], r.g[0], r.g[1]).d < m * 1.15 + MW / 2) || tPolyDist([u, v], this.canal).d < m * 1.15 + CW / 2 + QW) continue;
         cands.push([u, v, Math.hypot(u / A, v / B) + rng.range(0, 0.05)]); }
       cands.sort((a, b) => b[2] - a[2]); if (cands.length) { const [u, v] = cands[0]; this.citadel = { u0: u - S, u1: u + S, v0: v - S, v1: v + S, uc: u, vc: v, use: 'citadel', poly: [[u - S, v - S], [u + S, v - S], [u + S, v + S], [u - S, v + S]] }; this.blocks.push(this.citadel); } }
@@ -5425,7 +5429,7 @@ class Town {
     const cit = this.citadel;
     // what kind of place a point is in: it names the district and decides how the houses there are built
     this.kindAt = (u, v) => {
-      if (Math.abs(u) <= CA + BW / 2 && Math.abs(v) <= CB + BW / 2) { // the old town
+      if (coreOut(u, v) <= BW / 2) { // the old town
         if (this.square && Math.hypot(u - this.square.uc, v - this.square.vc) < 95) return 'grand';
         if (this.cathedral && Math.hypot(u - this.cathedral.uc, v - this.cathedral.vc) < 95) return 'close';
         if (Math.abs(v - cv) < 45) return 'canal'; return 'old'; }
@@ -5445,7 +5449,8 @@ class Town {
     const U = lines(-CA, CA, mainU, [], CO.du), V = lines(-CB, CB, mainV, [{ p: cv, w: CW + 2 * QW, canal: true }], CO.dv); this.U = U; this.V = V;
     const nI = U.length - 1, nJ = V.length - 1, own = [...Array(nI)].map(() => Array(nJ).fill(null)), iu = U.findIndex(l => l.main), jv = V.findIndex(l => l.main), jc = V.findIndex(l => l.canal);
     const fits = (i0, j0, i1, j1) => { if (i0 < 0 || j0 < 0 || i1 >= nI || j1 >= nJ) return false; for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) if (own[i][j]) return false;
-      for (let i = i0 + 1; i <= i1; i++) if (U[i].main) return false; for (let j = j0 + 1; j <= j1; j++) if (V[j].main || V[j].canal) return false; return true; };
+      for (let i = i0 + 1; i <= i1; i++) if (U[i].main) return false; for (let j = j0 + 1; j <= j1; j++) if (V[j].main || V[j].canal) return false;
+      for (const u of [U[i0].p + U[i0].w / 2, U[i1 + 1].p - U[i1 + 1].w / 2]) for (const v of [V[j0].p + V[j0].w / 2, V[j1 + 1].p - V[j1 + 1].w / 2]) if (coreOut(u, v) > -BW / 2 + 0.3) return false; return true; }; // (whole, inside the old town's outline)
     const claim = (i0, j0, i1, j1, use) => { const u0 = U[i0].p + U[i0].w / 2, u1 = U[i1 + 1].p - U[i1 + 1].w / 2, v0 = V[j0].p + V[j0].w / 2, v1 = V[j1 + 1].p - V[j1 + 1].w / 2;
       const b = { u0, u1, v0, v1, uc: (u0 + u1) / 2, vc: (v0 + v1) / 2, use, core: true, poly: [[u0, v0], [u1, v0], [u1, v1], [u0, v1]] }; for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) own[i][j] = b; this.blocks.push(b); return b; };
     const tryClaim = (opts, use) => { for (const o of opts) if (fits(...o)) return claim(...o, use); return null; };
@@ -5459,18 +5464,21 @@ class Town {
       for (const [wi, any] of [[3, 0], [2, 0], [3, 1], [2, 1]]) { const o = nearestFit(wi + 1, 2, tu, tv, (i, j) => any || rowOk(j, 2)); if (!o) continue; this.cathedral = claim(o[0], o[1], o[0] + wi - 1, o[3], 'cathedral'); this.parvis = claim(o[0] + wi, o[1], o[0] + wi, o[3], 'parvis'); break; } }
     { const o = nearestFit(2, 1, fu * CA * 0.6, mainV + fv * CB * 0.55) || nearestFit(1, 1, fu * CA * 0.6, mainV + fv * CB * 0.55); if (o) this.market = claim(...o, 'market'); }
     // a few bigger blocks among the small ones, then every cell left is a block of its own
-    for (let i = 0; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i][j]) continue; if (rng.chance(0.18)) { if (rng.chance(0.5) ? tryClaim([[i, j, i + 1, j]], 'lots') : tryClaim([[i, j, i, j + 1]], 'lots')) continue; } claim(i, j, i, j, 'lots'); }
+    for (let i = 0; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i][j]) continue; if (rng.chance(0.18)) { if (rng.chance(0.5) ? tryClaim([[i, j, i + 1, j]], 'lots') : tryClaim([[i, j, i, j + 1]], 'lots')) continue; }
+      const b = claim(i, j, i, j, 'lots'); let P2 = b.poly; for (const h of tEdgesIn(this.core, BW / 2)) { if (P2.length < 3) break; P2 = tClipPoly(P2, h); } // (the cells at the cut corners are cut too)
+      const ar = P2.length >= 3 ? Math.abs(tArea(P2)) : 0; if (ar < 60) { this.blocks.pop(); continue; } b.poly = P2; if (ar < 250) b.use = 'place'; [b.uc, b.vc] = tCentroid(P2); }
     // its streets: every grid edge between two blocks; some cross streets bridge the canal, the rest stop at the quays
+    const cst = (a, b, o) => { const s2 = tClipSeg(a, b, this.coreIn); if (s2) street(s2[0], s2[1], { ...o, core: true }); };
     { const bridged = new Set(); let last = -1e9; for (const [l, i] of U.map((l, i) => [l, i]).filter(([l]) => !l.ring)) if (l.main || (l.p - last > 70 && rng.chance(0.6))) { bridged.add(i); last = l.p; }
-      for (let i = 1; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i - 1][j] === own[i][j]) continue; let v0 = V[j].p, v1 = V[j + 1].p; if (!bridged.has(i)) { if (V[j].canal) v0 = cv + qOff; if (V[j + 1].canal) v1 = cv - qOff; } street([U[i].p, v0], [U[i].p, v1], { w: U[i].w, main: !!U[i].main }); }
-      for (let j = 1; j < nJ; j++) { if (V[j].canal) continue; for (let i = 0; i < nI; i++) if (own[i][j - 1] !== own[i][j]) street([U[i].p, V[j].p], [U[i + 1].p, V[j].p], { w: V[j].w, main: !!V[j].main }); } }
+      for (let i = 1; i < nI; i++) for (let j = 0; j < nJ; j++) { if (own[i - 1][j] === own[i][j]) continue; let v0 = V[j].p, v1 = V[j + 1].p; if (!bridged.has(i)) { if (V[j].canal) v0 = cv + qOff; if (V[j + 1].canal) v1 = cv - qOff; } cst([U[i].p, v0], [U[i].p, v1], { w: U[i].w, main: !!U[i].main }); }
+      for (let j = 1; j < nJ; j++) { if (V[j].canal) continue; for (let i = 0; i < nI; i++) if (own[i][j - 1] !== own[i][j]) cst([U[i].p, V[j].p], [U[i + 1].p, V[j].p], { w: V[j].w, main: !!V[j].main }); } }
     // the boulevard where the old town's wall once stood
-    { const P = [[-CA, -CB], [CA, -CB], [CA, CB], [-CA, CB]]; for (let k = 0; k < 4; k++) street(P[k], P[(k + 1) % 4], { w: BW, main: true, boulevard: true }); }
+    { const P = this.core; for (let k = 0; k < P.length; k++) street(P[k], P[(k + 1) % P.length], { w: BW, main: true, boulevard: true }); }
 
     /* the quarters: each a lattice of blocks laid along one of its roads (or along the canal), at its own scale, bent and jittered, cut off by the roads, the canal, the boulevard and the wall */
     const consFor = (sc, cen, side) => { const hs = sc.hp.slice();
       if (sc.canal) { const n = [sc.canal.pp[0] * side, sc.canal.pp[1] * side]; hs.push({ nu: n[0], nv: n[1], c0: n[0] * sc.canal.p[0] + n[1] * sc.canal.p[1], clear: CW / 2 + QW, canal: true }); }
-      { const du = Math.abs(cen[0]) - CA, dv = Math.abs(cen[1]) - CB; hs.push(du > dv ? { nu: Math.sign(cen[0]), nv: 0, c0: CA, clear: BW / 2 } : { nu: 0, nv: Math.sign(cen[1]), c0: CB, clear: BW / 2 }); }
+      { let hb = null, m = -1e9; for (const h of this.coreIn) { const o = h.c - tDot(h, cen); if (o > m) { m = o; hb = h; } } hs.push({ nu: -hb.nu, nv: -hb.nv, c0: -hb.c, clear: BW / 2 }); } // (off the old town, beyond the boulevard on its nearest side)
       if (cit && Math.max(Math.abs(cen[0] - cit.uc), Math.abs(cen[1] - cit.vc)) < S + 100) { const du = Math.abs(cen[0] - cit.uc), dv = Math.abs(cen[1] - cit.vc); hs.push(du > dv ? { nu: Math.sign(cen[0] - cit.uc), nv: 0, c0: Math.sign(cen[0] - cit.uc) * cit.uc + S + 10, clear: 4 } : { nu: 0, nv: Math.sign(cen[1] - cit.vc), c0: Math.sign(cen[1] - cit.vc) * cit.vc + S + 10, clear: 4 }); }
       for (const h of this.wallIn) hs.push({ nu: h.nu, nv: h.nv, c0: h.c + R, clear: RW / 2 });
       for (const g of this.gates) if (Math.hypot(cen[0] - g.u, cen[1] - g.v) < 80) hs.push({ nu: -g.nu, nv: -g.nv, c0: -(g.nu * g.u + g.nv * g.v) + R + 26, clear: 0 }); // a little square inside each gate
@@ -5498,7 +5506,7 @@ class Town {
         const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp ? 'v' : null;
         const quad = mg === 'u' ? [P(i, j), P(i + 1, j), P(i + 2, j), P(i + 2, j + 1), P(i + 1, j + 1), P(i, j + 1)] : mg === 'v' ? [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i + 1, j + 2), P(i, j + 2), P(i, j + 1)] : [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)], cen = tCentroid(quad), side = j >= 0 ? 1 : -1;
         if (mg === 'u') used.add((i + 1) * 4096 + j); if (mg === 'v') used.add(i * 4096 + j + 1);
-        if (this.wallOut(cen[0], cen[1]) > -R || (Math.abs(cen[0]) < CA && Math.abs(cen[1]) < CB) || !inSector(sc, cen)) continue;
+        if (this.wallOut(cen[0], cen[1]) > -R || coreOut(cen[0], cen[1]) < 0 || !inSector(sc, cen)) continue;
         const hs = consFor(sc, cen, side), sw = TQ[rowKind(side)] ? TQ[rowKind(side)].sw : Q.sw; let poly = quad; for (const h of tEdgesIn(quad, sw / 2)) poly = tClipPoly(poly, h); for (const h of cellHP(hs)) { if (poly.length < 3) break; poly = tClipPoly(poly, h); }
         if (poly.length < 3) continue; const area = Math.abs(tArea(poly)); if (area < 110) continue;
         const c2 = tCentroid(poly), b = { poly, uc: c2[0], vc: c2[1], use: area < 260 || tWidth(poly) < 11 ? 'place' : 'lots', q: sc.k * 2 + (side > 0 ? 0 : 1), ang: Math.atan2(anchor.ax[0], anchor.ax[1]), area };
@@ -5628,7 +5636,7 @@ function townHouse(area, gb, rng, l, K, T) {
   const shop = l.type !== 'house' && l.type !== 'warehouse', wh = l.type === 'warehouse';
   let stories = rng.pick(K.stories); if (shop) stories = Math.max(2, stories); if (wh) stories = Math.max(3, stories);
   let style = wh ? rng.pick(['brick', 'brick', 'timber2']) : rng.pick(K.styles); if (style === l.prevStyle) style = ['brick', 'stone', 'plaster', 'timber2', 'stoneLight'].filter(s2 => s2 !== l.prevStyle && (K.styles.includes(s2) || s2 === 'plaster'))[rng.int(0, 2) % 2] || style; const timber = style.startsWith('timber');
-  const roofKey = stories === 1 ? rng.pick(K.roofs) : rng.pick(K.roofs.filter(r => r !== 'roofThatch').concat(['roofSlate']));
+  const roofKey = stories === 1 ? rng.pick(K.roofs) : rng.pick(K.roofs.filter(r => r !== 'roofThatch').concat(K.roofs.every(r => r === 'roofThatch') ? ['roofBrown'] : [])); // (each quarter keeps to its own roofs)
   const tint = roofKey === 'roofBrown' ? [0.82, 0.62, 0.52] : roofKey === 'roofSlate' ? [0.78, 0.84, 0.94] : roofKey === 'roofRed' ? [0.86, 0.66, 0.6] : [1, 0.95, 0.85];
   const fp = { x0: -l.w / 2, z0: -l.d / 2, x1: l.w / 2, z1: l.d / 2 }, h = stories * 3.1 + 0.3 + (wh ? 0.8 : 0) + rng.range(-0.3, 0.9) + (l.oddHeight ? 1.1 : 0);
   const pitch = rng.range(1.15, 1.6); // steep northern roofs
@@ -5786,11 +5794,13 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
     if (b.use === 'chapel') { gb.setXf(mx, mz, ang + b.ang, H0); makeBuilding(area, gb, r2, { fp: { x0: -5, z0: -8, x1: 5, z1: 8 }, h: 7, style: 'stone', roof: 'gable', roofKey: 'roofSlate', alongX: false, doorT: 0.5, found: 0.5, chimney: 0 }); gb.box(-1.2, 7, -9.6, 1.2, 15, -7.2, 'stone', 2, 2); gb.cone('roofSlate', 0, -8.4, 1.8, 15, 5, 4, 2); gb.xf = null; continue; }
     if (b.use === 'plein' || b.area > 260) { const [wx, wz] = b.use === 'plein' ? [mx, mz] : this.w(b.uc + 2, b.vc); if (b.use === 'plein') { gb.cyl('stone', wx, wz, 1.3, H0 - 0.2, H0 + 0.9, 10, 2, 2); gb.disc('water', wx, H0 + 0.5, wz, 1.1, 10, 2); siteCol(area, wx, wz, 0, 1.3, 1.3, H0 - 1, H0 + 0.9); }
       for (let k = 0, nT = b.use === 'plein' ? 3 : 1; k < nT; k++) { const c = b.poly[k % b.poly.length], f = 0.4, tu = lerp(b.uc, c[0], f), tv = lerp(b.vc, c[1], f), [tx, tz] = this.w(tu, tv); fl[r2.pick(['oak0', 'oak1', 'oak2'])].push([tx, H0 - 0.15, tz, r2.range(0.6, 0.85)]); cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: H0 - 1, y1: H0 + 8 }); } } }
+  // the roads out of the gates paved through the suburbs
+  for (const g of this.gates) { const o0 = C.moat.off + C.moat.w + 8, pts = []; for (let t = o0; t <= o0 + 190; t += 10) pts.push(this.w(g.u + g.nu * t, g.v + g.nv * t)); for (let k = 1; k < pts.length; k++) if (inC(...pts[k - 1])) drapeStrip(gb, 'rCobble', [pts[k - 1], pts[k]], 7, { lift: 0.07 }); }
   // the squares just inside the gates
   for (const P of this.gateSquares) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.052); }
   // yards and gardens inside the blocks: the ground before the houses paved, the gardens behind them walled, with trees, sheds and bushes; orchards in the commons
   for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / (b.kind === 'commons' ? 120 : 200));
-    { drapePoly(gb, 'rCobble', b.poly.map(([u, v]) => this.w(u, v)), H0 + 0.05); let Y = b.poly; for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
+    { for (const h of tEdgesIn(b.poly)) { const dk = (b.edgeD && b.edgeD[h.i] || 2.4) + 0.6; drapePoly(gb, 'rCobble', [h.a, h.b, [h.b[0] + h.nu * dk, h.b[1] + h.nv * dk], [h.a[0] + h.nu * dk, h.a[1] + h.nv * dk]].map(([u, v]) => this.w(u, v)), H0 + 0.05); } let Y = b.poly; // (the ground before the houses paved, each row's depth back) for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
       if (Y.length >= 3 && Math.abs(tArea(Y)) > 20) { drapePoly(gb, 'gGrass', Y.map(([u, v]) => this.w(u, v)), H0 + 0.053); const wk = b.kind === 'commons' || b.kind === 'tanners' ? 'wood' : 'stone', wh = wk === 'wood' ? 1.1 : 1.6; // the garden wall (a fence in the poorer quarters)
         for (let k = 0; k < Y.length; k++) { const a = Y[k], c = Y[(k + 1) % Y.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 1) continue; const [ax, az] = this.w(a[0], a[1]), [cx, cz] = this.w(c[0], c[1]); gb.setXf((ax + cx) / 2, (az + cz) / 2, Math.atan2(cx - ax, cz - az), H0); gb.box(-0.15, 0, -L / 2, 0.15, wh, L / 2, wk, 2, 2); gb.xf = null; }
         if (b.kind === 'commons') { const yb = tEdgesIn(Y, 3), yc = tCentroid(Y), ya = b.ang || 0, ca = Math.cos(ya), sa = Math.sin(ya); for (let a = -60; a <= 60; a += 6.5) for (let c = -60; c <= 60; c += 6.5) { const u = yc[0] + a * ca + c * sa, v = yc[1] - a * sa + c * ca; if (!yb.every(h => tDot(h, [u, v]) - h.c > 0)) continue; const [x, z] = this.w(u, v); fl[r2.chance(0.7) ? 'oak2' : 'oak1'].push([x, H0 - 0.15, z, r2.range(0.42, 0.6)]); } continue; } } } // (an orchard)
@@ -5850,7 +5860,7 @@ Town.prototype.buildLasting = function (area, mats) {
     const fm = { tfWall: mk(mats.plaster, 'w'), tfRoof: mk(mats.roofSlate, 'r'), tfBrick: mk(mats.brick, 'b') };
     for (const l of this.lots) { const r = new RNG(l.seed), K = TK[l.kind]; let st = r.pick(K.stories); if (l.type !== 'house') st = Math.max(2, st); const h = st * 3.1 + 0.3, rh = l.w / 2 * 1.35, style = r.pick(K.styles);
       sg.setXf(l.x, l.z, l.o.ang, H0); sg.tint = style === 'brick' ? [1, 0.82, 0.74] : style.startsWith('stone') ? [0.95, 0.95, 0.96] : [1.06, 1.02, 0.94];
-      sg.box(-l.w / 2, 0, -l.d / 2, l.w / 2, h, l.d / 2, { side: style === 'brick' ? 'tfBrick' : 'tfWall', top: null }, 3.2, 3.2, { skip: 'b' }); sg.tint = r.chance(0.5) ? [0.5, 0.55, 0.66] : [0.66, 0.46, 0.4]; gableRoof(sg, 'tfRoof', style === 'brick' ? 'tfBrick' : 'tfWall', -l.w / 2, -l.d / 2, l.w / 2, l.d / 2, h, rh, 0.3, false); sg.tint = null; sg.xf = null; }
+      sg.box(-l.w / 2, 0, -l.d / 2, l.w / 2, h, l.d / 2, { side: style === 'brick' ? 'tfBrick' : 'tfWall', top: null }, 3.2, 3.2, { skip: 'b' }); sg.tint = { roofSlate: [0.5, 0.55, 0.66], roofRed: [0.7, 0.44, 0.38], roofBrown: [0.6, 0.47, 0.4], roofThatch: [0.72, 0.62, 0.42] }[K.roofs[r.int(0, K.roofs.length - 1)]] || [0.6, 0.5, 0.45]; gableRoof(sg, 'tfRoof', style === 'brick' ? 'tfBrick' : 'tfWall', -l.w / 2, -l.d / 2, l.w / 2, l.d / 2, h, rh, 0.3, false); sg.tint = null; sg.xf = null; }
     const WP = this.wallPieces(); sg.tint = [0.92, 0.9, 0.86];
     for (const p of WP.pieces) { const [ax, az] = this.w(p.u0, p.v0), [bx, bz] = this.w(p.u1, p.v1), L = Math.hypot(bx - ax, bz - az); sg.setXf((ax + bx) / 2, (az + bz) / 2, Math.atan2(bx - ax, bz - az), H0); sg.box(-C.wall.t / 2, -1, -L / 2, C.wall.t / 2, C.wall.h + 1, L / 2, 'tfWall', 3, 3); sg.xf = null; }
     for (const t of WP.towers) { const [x, z] = this.w(t.u, t.v), s = C.wall.tower / 2 + (t.corner ? 1.5 : 0), h = C.wall.towerH + (t.corner ? 4 : 0); sg.setXf(x, z, C.ang + t.a, H0); sg.box(-s, -1, -s, s, h, s, 'tfWall', 3, 3); sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -s, -s, s, s, h, s * 1.1, 0.4); sg.tint = [0.92, 0.9, 0.86]; sg.xf = null; }

@@ -63,11 +63,11 @@ SITES_V = r"""(()=>{const g=__game,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(t
 TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)),W=(u,v)=>T.w(u,v); const V={};
  const at=(name,u,v,tu,tv,pitch,fly)=>{const [x,z]=W(u,v),[tx,tz]=W(tu,tv); V[name]=[x,z,look(x,z,tx,tz),pitch,fly];};
  const gs=T.gates.find(g=>g.id==='south')||T.gates[0], mo=C.moat.off+C.moat.w;
- at('town_far',gs.u+gs.nu*620,gs.v+gs.nv*620,0,0,0.03,null);
+ at('town_far',gs.u+gs.nu*430,gs.v+gs.nv*430,0,0,0.04,null);
  at('town_gate',gs.u+gs.nu*(mo+45)+3,gs.v+gs.nv*(mo+45),gs.u,gs.v,0.06,null);
  const sq=T.square; if(sq) at('town_square',sq.u1-6,sq.v1-6,sq.uc,sq.v0-30,0.12,null);
  const mid=s=>[(s.u0+s.u1)/2,(s.v0+s.v1)/2], len=s=>Math.hypot(s.u1-s.u0,s.v1-s.v0);
- const old=T.streets.filter(s=>!s.main&&!s.ring&&!s.quay&&!s.lane&&!s.nopave&&!s.esplanade&&len(s)>25).sort((a,b)=>Math.hypot(...mid(a))-Math.hypot(...mid(b)))[3]; if(old) at('town_street',old.u0,old.v0,old.u1,old.v1,0.03,null);
+ const old=T.streets.filter(s=>s.core&&!s.main&&len(s)>25).sort((a,b)=>Math.hypot(...mid(a))-Math.hypot(...mid(b)))[3]; if(old) at('town_street',old.u0,old.v0,old.u1,old.v1,0.03,null);
  for (const [nm,kind] of [['town_lane','tanners'],['town_lane2','weavers'],['town_commons','commons']]) { const ls=T.streets.filter(s=>s.lane&&T.kindAt(...mid(s))===kind&&len(s)>22).sort((a,b)=>len(b)-len(a)); const s=ls[Math.min(ls.length-1,2)]; if(s) at(nm,s.u0,s.v0,s.u1,s.v1,0.03,null); }
  { const p=T.canal[2],q=T.canal[3],L=Math.hypot(q[0]-p[0],q[1]-p[1]),du=(q[0]-p[0])/L,dv=(q[1]-p[1])/L,o=C.canal.w/2+2,t=L*0.18; at('town_canal',p[0]+du*t+dv*o,p[1]+dv*t-du*o,p[0]+du*(t+60),p[1]+dv*(t+60),0.02,null); }
  const cb=T.cathedral; if(cb){const d=T.cathDims(cb),pv=T.parvis; at('town_cathedral',pv?pv.u1-4:cb.u1+4,pv?pv.vc+(pv.v1-pv.v0)*0.32:cb.vc+8,d.cu,cb.vc,0.17,null);}
