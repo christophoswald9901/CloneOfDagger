@@ -3,30 +3,33 @@
 Notes for whoever adds the next city. There are two cities so far:
 
 - **Daggerfall** (`src/04_city.js`): hand-built, organic, on a hill by the bay.
-- **Corrinvale** (`src/04_town.js`): generated from a config, a planned canal town on flat ground in the north.
+- **Corrinvale** (`src/04_town.js`): generated from a config, a canal town on flat ground in the north: a small planned old town ringed by looser quarters.
 
 New cities should use the town generator. Daggerfall stays as it is, but it is where most of these lessons came from.
 
 ## Adding a city
 
-1. Add an entry to `TOWN_CFGS` in `src/04_town.js`. Set its place (`x`, `z`, `ang`), its size (`A`, `B`, which are the half-length and half-width of the walls), the ground level `H0`, the fixed-ground radii `rc` and `rb`, and the wall, moat, canal, street and district settings. Give it a new `seed`.
+1. Add an entry to `TOWN_CFGS` in `src/04_town.js`. Set its place (`x`, `z`, `ang`), its size (`A`, `B`, the half-axes of the ellipse its polygonal wall is drawn round), the old town's share (`core`), the ground level `H0`, the fixed-ground radii `rc` and `rb`, and the wall, moat, canal, street and district settings. Give it a new `seed`.
 2. Choose a spot at least `rb` plus the other sites' `rb` away from every landmark in `SITES`. Keep it well clear of the mountains at the world's edge: the walkability rule refuses ground where `rimDist < 0`. Keep it out of the bay. The plain under it is flat by construction, so the spot only needs to be roughly level.
-3. If the city should look different from Corrinvale, add district kinds to `TK` (plot sizes, storeys, wall styles, roofs, stepped-gable and jetty rates). You can also add new landmark builders to `TOWN_BUILD` and assign them to blocks in `Town.plan()`.
+3. If the city should look different from Corrinvale, add district kinds to `TK` (plot sizes, storeys, wall styles, roofs, stepped-gable and jetty rates) and quarter kinds to `TQ` (block length and depth, lane width). You can also add new landmark builders to `TOWN_BUILD` and assign them to blocks in `Town.plan()`.
 4. Check it:
    - `python3 build.py`
-   - `SET=town python3 tools/wild.py tools/out/t 0 1 2`, which renders ten views per generator seed: approach, gate, square, street, canal, cathedral, market, commons and two from the air.
+   - `python3 tools/townplan.py tools/out/plan 0 1 2`, which draws each layout from above as data (north up, coloured by quarter) and prints block counts and sizes. It takes seconds; look at it before rendering anything.
+   - `SET=town python3 tools/wild.py tools/out/t 0 1 2`, which renders about fifteen views per generator seed: approach, gate, square, old-town street, lanes in two quarters, commons, canal, cathedral and nave, market, citadel and two from the air.
    - Have critics score it (see CLAUDE.md).
 
    `?townseed=N` lays out the town afresh from the same generator, with the varied proportions and placements a new city would get. Judge the generator on at least three of these seeds, not just the one layout you will ship.
 
 ## How a town is made
 
-- **Plan once, as plain data.** `Town.plan()` lays out:
-  - the street grid, including cross streets that end at T-junctions, with a guard so no block grows wider than about 165 m;
-  - the blocks, and the great places that take whole blocks (square, belfry hall, cathedral, citadel, market hall);
-  - the districts;
-  - the lots, which are rows of narrow plots facing each street with yards left behind them;
-  - the suburbs along the gate roads, the gates, the street graph, the landmarks and the windmills.
+- **Plan once, as plain data, like a polycrystal.** `Town.plan()` lays out:
+  - an irregular convex wall (corners jittered round an ellipse), gates where the roads from the old town meet it, kept clear of the wall's corners;
+  - the old town: a strict grid inside a rectangle with cut corners, ringed by a boulevard where its first wall stood, holding the great places (square, belfry hall, cathedral and forecourt, market hall), which take whole groups of cells;
+  - the canal, straight through the old town and bending out under the wall on both sides;
+  - the quarters between the gate roads (split by the canal where it runs through one). Each is a lattice laid along one of its roads, along the canal or along the wall, at its own block size (`TQ`), bent and jittered, with some cells merged so lanes end at offset T-junctions. Each cell is clipped by half-planes: its roads, the canal, the boulevard, the citadel's esplanade, the ring street inside the wall, and the little squares inside the gates. Slivers become small paved places; one block per quarter becomes a square with a well, and a couple become chapels;
+  - the citadel, placed in its quarter near the wall, clear of the roads and the canal;
+  - the lots: rows of plots along every edge of a block, longest edges first, each kept inside the block and clear of the others. The rest is gardens;
+  - the street graph, made by cutting every street where it crosses another or where one ends on another; bridges wherever a street crosses the canal; the suburbs, landmarks and windmills.
 
   The plan costs very little and runs at load time.
 - **Build per ground chunk.** `Town.buildChunk()` builds only what stands in one 176 m square of the wild: houses, paving, quays, walls, towers, gates, bridges, props and the great buildings, each built by the chunk its centre stands in. The wild's chunk streaming then loads and unloads the town like any other ground. A town chunk with about 150 houses takes about 120 ms to build, spread over frames.
@@ -46,7 +49,7 @@ New cities should use the town generator. Daggerfall stays as it is, but it is w
 ## New lessons from Corrinvale
 
 - **Even spacing puts towers in gateways.** With wall towers at equal intervals, one landed exactly on the south gate and filled the passage. Skip towers near gates; the gatehouse is the tower there.
-- **A grid needs a width cap.** Cross streets that stop early can merge a row into one block 360 m long. After choosing which streets end, run the cross street through any row where a block would get too wide.
+- **A grid needs a width cap.** Cross streets that stop early can merge a row into one block 360 m long. (The old town's grid now merges cells only in small rectangular groups.)
 - **Size the great buildings to their block.** A cathedral with a fixed length spills into the streets on a narrow block. `cathDims()` derives the nave length, aisles and transept from the block.
 - **A rectangle reads as a stamp from the air.** Suburbs along the gate roads, farmland reaching the moat and windmills on the approach root it in the land. Fields need a ring around the town (`townFields`), not just permission to exist.
 - **The same seed gives the same town.** A generator must be judged on several seeds. The varied mode changes proportions, the canal and main-street positions, which side the square, cathedral and citadel take, and the number of gates.
@@ -61,12 +64,18 @@ New cities should use the town generator. Daggerfall stays as it is, but it is w
 - **Openings must read as openings.** A gate passage lit like the street beyond it doesn't show from 100 m; it needs a dark soffit and side walls and a dressed-stone arch round it. A see-through grille over the canal's water gate looked like a rendering bug, so the water gate is now a dark vault under a band of dressed stone.
 - **Landmarks need forms, not just positions.** Moving the same belfry around between seeds doesn't make towns feel different. The belfry now has three forms (an octagon under a spire, a stone tower under a pyramid roof, and an octagon with a lantern), chosen by the town's seed. More landmark forms are the cheapest way to add variety between cities.
 
+- **One grid over a whole town is a monocrystal.** The first Corrinvale was one rectangle of parallel streets, and its blocks were 60–90 m: it read as a stamp and was tiring to walk. Keep the strict grid to a small old town (about a fifth of the walled area) and grow the rest as quarters, each with its own orientation and block size. The seams between them (roads, the canal, the boulevard) are where the town looks most medieval: triangular blocks, small places, streets meeting at angles.
+- **Blocks should differ between neighbours and between quarters.** Block sizes range from about 20 m in the tanners' ward to about 60 m in the commons. Within a quarter, spacing varies street by street, and merged cells break the rhythm.
+- **Long straight lanes are corridors.** Bending the lattice a little, jittering its corners and merging cells so lanes end at T-junctions closes the views; a building or tower at the end of a lane is what makes it feel like a town.
+- **Fill the ground between houses.** Grass verges between lanes and house fronts read as unfinished. Pave the band in front of each row as deep as its houses, keep the gardens green behind a wall or fence, and put orchards in the commons.
+- **Judge layouts north-up and side by side.** The plan tool draws each seed as the map shows it. Critics compared three plans and at once saw what every seed shared (an old town dead centre, the canal straight through it); the varied mode now also moves the old town off centre and turns the whole town.
+- **Clip by half-planes, not by polygons.** Every cut in the plan (roads, canal, boulevard, wall, esplanade, gate squares) is a half-plane on a convex cell, so clipping is a few lines of code and never fails. Choosing which side of the old town's outline applies (its nearest edge) keeps that convex too.
+
 ## Open problems
 
-- Every town has the same rectangular wall. An outline that follows the water, or a polygon, would do most for variety between cities.
-- From 600 m out the town is low on the horizon, and only the tallest towers stand out.
-- The plan is a straight grid. The critics' top complaint in the last round was long dead-straight streets; bends, forks and closed vistas would make it read as grown rather than planned.
-- The Grand Square and market take whole blocks and still look too big for the stalls in them. The cathedral sometimes backs onto the wall with an empty apron in front.
+- The gate roads are straight lines from the old town to the gates, and the canal always runs straight through the old town. Bent or forking roads and a canal that bends inside the town would vary the skeleton more; both need the sectors between roads to be built from polylines instead of single lines.
+- From 400 m out the town is still low on the horizon; only the belfry and the cathedral stand out.
+- The squares still read as large and empty from some views.
 - Trees placed on paving look tilted, and wall stairs don't quite meet the wall-walk.
 - Ordinary streets still repeat the same window rhythm; more facade types (shop fronts, arcades, wider guild houses) would help.
 - With some 300–500k triangles while the player is in town, it is heavier than Daggerfall. Watch the frame rate on the iPad, and consider simpler houses for chunks beyond about 250 m.
