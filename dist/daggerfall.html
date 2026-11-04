@@ -5328,7 +5328,7 @@ const TQ = {
   tanners: { du: [24, 34], dv: [22, 30], sw: 5 },
   canal: { du: [44, 62], dv: [36, 48], sw: 7 },
   citadel: { du: [40, 56], dv: [36, 50], sw: 7 },
-  commons: { du: [46, 64], dv: [40, 56], sw: 6 },
+  commons: { du: [38, 54], dv: [34, 48], sw: 6 },
 };
 
 /* ---------------- plane geometry in the town frame (u, v) ---------------- */
@@ -5529,14 +5529,14 @@ class Town {
 
     /* lots: rows of plots along every edge of a block, gable to the street, the longest edges first; a plot must lie in the block and clear of the others. The rest is yards and gardens */
     this.lots = [];
-    const placeLots = (b, kind) => { const K = TK[kind] || TK.weavers, Pp = b.poly, E = tEdgesIn(Pp).sort((x, y) => y.L - x.L), mine = []; b.lots = mine; b.kind = kind;
+    const placeLots = (b, kind) => { const K = TK[kind] || TK.weavers, Pp = b.poly, E = tEdgesIn(Pp).sort((x, y) => y.L - x.L), mine = []; b.lots = mine; b.kind = kind; const broof = rng.pick(K.roofs);
       for (const e of E) { if (e.L < 5) continue; const tu = (e.b[0] - e.a[0]) / e.L, tv = (e.b[1] - e.a[1]) / e.L; let deep = 0; for (const p of Pp) deep = Math.max(deep, tDot(e, p) - e.c);
         const d = Math.min(rng.range(...K.d) * 0.88, deep / 2 - 2); if (d < 6) continue; (b.edgeD = b.edgeD || {})[e.i] = d; const a = Math.atan2(-e.nu, -e.nv); let s = 0.3, last = null, lastEnd = -9;
         while (s < e.L - 4) { let w = rng.range(...K.w); if (e.L - s - w < 4) w = e.L - s - 0.3; if (w < 4) break; let ok = null;
           for (const ww of [w, Math.max(4.2, w * 0.65)]) { const cu = e.a[0] + tu * (s + ww / 2) + e.nu * d / 2, cv2 = e.a[1] + tv * (s + ww / 2) + e.nv * d / 2, o = mkObb(cu, cv2, a, ww / 2, d / 2);
             if (obbCorners(o).every(c => E.every(h => tDot(h, c) - h.c > -0.25)) && !mine.some(m => obbOverlap(m.ob, o, -0.12))) { ok = { u: cu, v: cv2, w: ww, ob: o }; break; } }
           if (!ok) { if (last) last.corner = true; last = null; s += 1.5; continue; }
-          const l = { u: ok.u, v: ok.v, a, w: ok.w, d, kind, seed: rng.int(1, 1e9), corner: s - lastEnd > 0.4, ob: ok.ob }; if (l.corner && last) last.corner = true;
+          const l = { u: ok.u, v: ok.v, a, w: ok.w, d, kind, seed: rng.int(1, 1e9), corner: s - lastEnd > 0.4, ob: ok.ob, roof: rng.chance(0.75) ? broof : null }; if (l.corner && last) last.corner = true;
           this.lots.push(l); mine.push(l); last = l; lastEnd = s + ok.w; s += ok.w; }
         if (last) last.corner = true; } };
     for (const b of this.blocks) if (b.use === 'lots') placeLots(b, this.kindAt(b.uc, b.vc));
@@ -5593,6 +5593,7 @@ class Town {
     let h = this.H0 + (out > M.off + M.w + 20 ? 0.6 * fbm(x / 120, z / 120, 2, 9301) * smoothstep(M.off + M.w + 20, M.off + M.w + 120, out) : 0);
     const dm = Math.min(out - M.off, M.off + M.w - out); // inside the moat, its distance from the nearer bank
     if (dm > -2) h = Math.min(h, this.H0 - 2.8 * smoothstep(-2, 3, dm));
+    if (this.citadel) { const c = this.citadel, S2 = (c.u1 - c.u0) / 2 - 4, dd = Math.max(Math.abs(u - c.uc), Math.abs(v - c.vc)) - S2; if (dd > 2 && dd < 10 && !(Math.abs(u - c.uc) < 4.5 && v > c.vc)) h = Math.min(h, this.H0 - 2.6 * smoothstep(2, 4, dd) * smoothstep(10, 8, dd)); } // the citadel's dry ditch, a causeway to its gate
     if (out < M.off + M.w + 40) { const dc = C.canal.w / 2 - tPolyDist([u, v], this.canal).d; if (dc > -0.5) h = Math.min(h, this.H0 - 3 * smoothstep(-0.5, 1, dc)); } // (the canal has walled quays: steep)
     return h;
   }
@@ -5632,7 +5633,7 @@ function townHouse(area, gb, rng, l, K, T) {
   const shop = l.type !== 'house' && l.type !== 'warehouse', wh = l.type === 'warehouse';
   let stories = rng.pick(K.stories); if (shop) stories = Math.max(2, stories); if (wh) stories = Math.max(3, stories);
   let style = wh ? rng.pick(['brick', 'brick', 'timber2']) : rng.pick(K.styles); if (style === l.prevStyle) style = ['brick', 'stone', 'plaster', 'timber2', 'stoneLight'].filter(s2 => s2 !== l.prevStyle && (K.styles.includes(s2) || s2 === 'plaster'))[rng.int(0, 2) % 2] || style; const timber = style.startsWith('timber');
-  const roofKey = stories === 1 ? rng.pick(K.roofs) : rng.pick(K.roofs.filter(r => r !== 'roofThatch').concat(K.roofs.every(r => r === 'roofThatch') ? ['roofBrown'] : [])); // (each quarter keeps to its own roofs)
+  const roofPick = rng.pick(K.roofs), roofKey = l.roof && (stories === 1 || l.roof !== 'roofThatch') ? l.roof : stories === 1 ? roofPick : rng.pick(K.roofs.filter(r => r !== 'roofThatch').concat(K.roofs.every(r => r === 'roofThatch') ? ['roofBrown'] : [])); // (each quarter keeps to its own roofs)
   const tint = roofKey === 'roofBrown' ? [0.82, 0.62, 0.52] : roofKey === 'roofSlate' ? [0.78, 0.84, 0.94] : roofKey === 'roofRed' ? [0.86, 0.66, 0.6] : [1, 0.95, 0.85];
   const fp = { x0: -l.w / 2, z0: -l.d / 2, x1: l.w / 2, z1: l.d / 2 }, h = stories * 3.1 + 0.3 + (wh ? 0.8 : 0) + rng.range(-0.3, 0.9) + (l.oddHeight ? 1.1 : 0);
   const pitch = rng.range(1.15, 1.6); // steep northern roofs
@@ -5663,15 +5664,19 @@ const TOWN_BUILD = {
     gb.box(-nw, 0, -L / 2, nw, nh, L / 2, { side: 'stoneLight', top: null }, 3, 3); gableRoof(gb, 'roofSlate', 'stoneLight', -nw, -L / 2, nw, L / 2, nh, 9, 0.6, false);
     for (const s of [-1, 1]) { gb.box(s > 0 ? nw : -nw - aw, 0, -L / 2 + 6, s > 0 ? nw + aw : -nw, 11, L / 2 - 2, { side: 'stoneLight', top: 'roofSlate' }, 3, 3);
       for (let t = -L / 2 + 10; t < L / 2 - 4; t += 8) { gb.box(s * (nw + aw) - 0.8, 0, t - 0.8, s * (nw + aw) + 0.8, 13, t + 0.8, 'stoneLight', 2, 2); gb.box(s * (nw + aw / 2) - 0.5, 13, t - 0.5, s * (nw + aw / 2) + 0.5, 18, t + 0.5, 'stoneLight', 2, 2); }
-      for (let t = -L / 2 + 8; t < L / 2 - 6; t += 8) gb.quad('winB', [s > 0 ? nw + aw + 0.03 : -nw - aw - 0.03, 3, t + (s > 0 ? 1 : -1)], [0, 0, s > 0 ? -1 : 1], [0, 1, 0], 2, 5.5, 1, 1, { fixedUV: true }); }
+      for (let t = -L / 2 + 8; t < L / 2 - 6; t += 8) { gb.quad('winB', [s > 0 ? nw + aw + 0.03 : -nw - aw - 0.03, 3, t + (s > 0 ? 1 : -1)], [0, 0, s > 0 ? -1 : 1], [0, 1, 0], 2, 5.5, 1, 1, { fixedUV: true }); gb.quad('winB', [s > 0 ? nw + 0.03 : -nw - 0.03, 12.5, t + 4 + (s > 0 ? 0.8 : -0.8)], [0, 0, s > 0 ? -1 : 1], [0, 1, 0], 1.6, 6.5, 1, 1, { fixedUV: true }); } } // the aisle windows, the tall clerestory lancets over them
     gb.box(-tr, 0, -12, tr, nh - 1, 0, { side: 'stoneLight', top: null }, 3, 3); gableRoof(gb, 'roofSlate', 'stoneLight', -tr, -12, tr, 0, nh - 1, 8, 0.6, true); // the transept
     gb.cyl('stoneLight', 0, -L / 2, nw, 0, nh - 2, 10, 3, 3); gb.cone('roofSlate', 0, -L / 2, nw + 0.5, nh - 2, 8, 10, 3);                                 // the apse at the east end
-    const one = T.oneTower; gb.box(-3.2, 0, L / 2 + 5, 3.2, 32, L / 2 + 9, { side: 'stoneLight', top: 'stone' }, 3, 3); // the screen of the west front
+    const one = T.oneTower; gb.box(-3.2, 0, L / 2 + 3, 3.2, 32, L / 2 + 7.4, { side: 'stoneLight', top: 'stone' }, 3, 3); // the screen of the west front, set back between the towers
     for (const s of one ? [0] : [-1, 1]) { const tx = s * 8.5, tw = one ? 7.5 : 5.5, th = one ? 62 : 52; gb.box(tx - tw, 0, L / 2 - 2, tx + tw, th, L / 2 + 9, { side: 'stoneLight', top: 'stone' }, 3, 3);  // the west towers and their spires
       gb.setXf(...xfP(xf, tx, L / 2 + 3.5), xf.ang, y); hipRoof(gb, 'roofSlate', -tw, -tw, tw, tw, th, one ? 30 : 34, 0.3); gb.xf = xf;
-      for (let wy = 34; wy < th - 3; wy += 6) gb.quad('winB', [tx - 0.8, wy, L / 2 + 9.03], [1, 0, 0], [0, 1, 0], 1.6, 3.6, 1, 1, { fixedUV: true }); }
-    gb.box(-3, 0, L / 2 + 8.9, 3, 0.2, L / 2 + 9.6, 'stone', 1, 1); gb.quad('door', [-2.2, 0.2, L / 2 + 9.05], [1, 0, 0], [0, 1, 0], 4.4, 6.2, 1, 1, { fixedUV: true }); // the great door
-    wallDisc(gb, 'winB', 0, 26, L / 2 + 9.06, 3.4, 14); // the rose window
+      for (let wy = 34; wy < th - 3; wy += 6) gb.quad('winB', [tx - 0.8, wy, L / 2 + 9.03], [1, 0, 0], [0, 1, 0], 1.6, 3.6, 1, 1, { fixedUV: true });
+      for (const hy of [14, 30, th - 2]) gb.box(tx - tw - 0.35, hy, L / 2 - 2.35, tx + tw + 0.35, hy + 0.7, L / 2 + 9.35, 'stone', 2, 1); // string courses
+      for (const ex of [-1, 1]) gb.box(tx + ex * tw - (ex > 0 ? 0.6 : 0.8), 0, L / 2 + 8.6, tx + ex * tw + (ex > 0 ? 0.8 : 0.6), 24, L / 2 + 10.2, 'stoneLight', 1, 3); } // corner buttresses
+    gb.box(-3, 0, L / 2 + 7.3, 3, 0.2, L / 2 + 9.6, 'stone', 1, 1); gb.quad('door', [-2.2, 0.2, L / 2 + 7.45], [1, 0, 0], [0, 1, 0], 4.4, 6.2, 1, 1, { fixedUV: true }); // the great door, deep in its porch
+    for (const ex of [-1, 1]) gb.box(ex * 3.2 - 0.7, 0, L / 2 + 7.4, ex * 3.2 + 0.7, 8.4, L / 2 + 9.6, 'stoneLight', 1, 2); gb.box(-3.9, 8.4, L / 2 + 7.4, 3.9, 9.4, L / 2 + 9.6, 'stoneLight', 2, 1);
+    gb.tri('stoneLight', [-3.9, 9.4, L / 2 + 9.6], [3.9, 9.4, L / 2 + 9.6], [0, 13.5, L / 2 + 9.6], [0, 0], [1, 0], [0.5, 1], [0, 0, 1]); gb.tri('stoneLight', [-3.9, 9.4, L / 2 + 7.4], [0, 13.5, L / 2 + 7.4], [3.9, 9.4, L / 2 + 7.4], [0, 0], [0.5, 1], [1, 0], [0, 0, -1]); // the porch and its gable
+    wallDisc(gb, 'winB', 0, 22, L / 2 + 7.46, 3.2, 14); // the rose window
     gb.xf = null;
     for (const [lx, lz, hx, hz, top] of [[0, 0, nw + aw + 1, L / 2, 22], [0, -6, tr, 6, 21], [-8.5, L / 2 + 3.5, one ? 16 : 5.5, 5.5, 86], [8.5, L / 2 + 3.5, 5.5, 5.5, 86], [0, -L / 2, nw, nw, 28]]) { const [wx, wz] = xfP(xf, lx, lz); siteCol(area, wx, wz, xf.ang, hx, hz, y - 1, y + top); }
   },
@@ -5801,10 +5806,10 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
   // yards and gardens inside the blocks: the ground before the houses paved, the gardens behind them walled, with trees, sheds and bushes; orchards in the commons
   for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / (b.kind === 'commons' ? 120 : 200));
     { for (const h of tEdgesIn(b.poly)) { const dk = (b.edgeD && b.edgeD[h.i] || 2.4) + 0.6; drapePoly(gb, 'rCobble', [h.a, h.b, [h.b[0] + h.nu * dk, h.b[1] + h.nv * dk], [h.a[0] + h.nu * dk, h.a[1] + h.nv * dk]].map(([u, v]) => this.w(u, v)), H0 + 0.05); } let Y = b.poly; // (the ground before the houses paved, each row's depth back) for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
-      if (Y.length >= 3 && Math.abs(tArea(Y)) > 20) { drapePoly(gb, 'gGrass', Y.map(([u, v]) => this.w(u, v)), H0 + 0.053); const wk = b.kind === 'commons' || b.kind === 'tanners' ? 'wood' : 'stone', wh = wk === 'wood' ? 1.1 : 1.6; // the garden wall (a fence in the poorer quarters)
+      if (Y.length >= 3 && Math.abs(tArea(Y)) > 20) { drapePoly(gb, 'gGrass', Y.map(([u, v]) => this.w(u, v)), H0 + 0.053); const wk = b.kind === 'commons' || b.kind === 'tanners' ? 'wood' : 'stone', wh = b.core ? 0 : wk === 'wood' ? 1.1 : 1.6; // the garden wall (a fence in the poorer quarters)
         const inLot = (u, v) => b.lots.some(l => Math.abs((u - l.u) * Math.cos(l.a) - (v - l.v) * Math.sin(l.a)) < l.w / 2 + 0.2 && Math.abs((u - l.u) * Math.sin(l.a) + (v - l.v) * Math.cos(l.a)) < l.d / 2 + 0.2);
         for (let k = 0; k < Y.length; k++) { const a = Y[k], c = Y[(k + 1) % Y.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L < 1) continue; const n2 = Math.ceil(L / 2), [ax, az] = this.w(a[0], a[1]), [cx, cz] = this.w(c[0], c[1]), wa = Math.atan2(cx - ax, cz - az); // (in short pieces, none where a house stands)
-          for (let q = 0; q < n2; q++) { const f = (q + 0.5) / n2; if (inLot(lerp(a[0], c[0], f), lerp(a[1], c[1], f))) continue; gb.setXf(lerp(ax, cx, f), lerp(az, cz, f), wa, H0); gb.box(-0.15, 0, -L / n2 / 2 - 0.02, 0.15, wh, L / n2 / 2 + 0.02, wk, 2, 2); gb.xf = null; } }
+          for (let q = 0; q < n2 && wh > 0; q++) { const f = (q + 0.5) / n2; if (inLot(lerp(a[0], c[0], f), lerp(a[1], c[1], f))) continue; gb.setXf(lerp(ax, cx, f), lerp(az, cz, f), wa, H0); gb.box(-0.15, 0, -L / n2 / 2 - 0.02, 0.15, wh, L / n2 / 2 + 0.02, wk, 2, 2); gb.xf = null; } }
         if (b.kind === 'commons') { const yb = tEdgesIn(Y, 3), yc = tCentroid(Y), ya = b.ang || 0, ca = Math.cos(ya), sa = Math.sin(ya); for (let a = -60; a <= 60; a += 6.5) for (let c = -60; c <= 60; c += 6.5) { const u = yc[0] + a * ca + c * sa, v = yc[1] - a * sa + c * ca; if (!yb.every(h => tDot(h, [u, v]) - h.c > 0)) continue; const [x, z] = this.w(u, v); fl[r2.chance(0.7) ? 'oak2' : 'oak1'].push([x, H0 - 0.15, z, r2.range(0.42, 0.6)]); } continue; } } } // (an orchard)
     let u0 = 1e9, v0 = 1e9, u1 = -1e9, v1 = -1e9; for (const [u, v] of b.poly) { u0 = Math.min(u0, u); v0 = Math.min(v0, v); u1 = Math.max(u1, u); v1 = Math.max(v1, v); }
     for (let k = 0, tries = 0; k < nT && tries < nT * 6; tries++) { const u = r2.range(u0, u1), v = r2.range(v0, v1); if (!E.every(h => tDot(h, [u, v]) - h.c > 2.2) || b.lots.some(l => Math.abs((u - l.u) * Math.cos(l.a) - (v - l.v) * Math.sin(l.a)) < l.w / 2 + 1.2 && Math.abs((u - l.u) * Math.sin(l.a) + (v - l.v) * Math.cos(l.a)) < l.d / 2 + 1.2)) continue; k++;
@@ -5863,9 +5868,9 @@ Town.prototype.buildLasting = function (area, mats) {
     for (const l of this.lots) { const r = new RNG(l.seed), K = TK[l.kind]; let st = r.pick(K.stories); if (l.type !== 'house') st = Math.max(2, st); const h = st * 3.1 + 0.3, rh = l.w / 2 * 1.35, style = r.pick(K.styles);
       sg.setXf(l.x, l.z, l.o.ang, H0); sg.tint = style === 'brick' ? [1, 0.82, 0.74] : style.startsWith('stone') ? [0.95, 0.95, 0.96] : [1.06, 1.02, 0.94];
       sg.box(-l.w / 2, 0, -l.d / 2, l.w / 2, h, l.d / 2, { side: style === 'brick' ? 'tfBrick' : 'tfWall', top: null }, 3.2, 3.2, { skip: 'b' }); sg.tint = { roofSlate: [0.5, 0.55, 0.66], roofRed: [0.7, 0.44, 0.38], roofBrown: [0.6, 0.47, 0.4], roofThatch: [0.72, 0.62, 0.42] }[K.roofs[r.int(0, K.roofs.length - 1)]] || [0.6, 0.5, 0.45]; gableRoof(sg, 'tfRoof', style === 'brick' ? 'tfBrick' : 'tfWall', -l.w / 2, -l.d / 2, l.w / 2, l.d / 2, h, rh, 0.3, false); sg.tint = null; sg.xf = null; }
-    const WP = this.wallPieces(); sg.tint = [0.92, 0.9, 0.86];
+    const WP = this.wallPieces(); sg.tint = [0.7, 0.68, 0.64];
     for (const p of WP.pieces) { const [ax, az] = this.w(p.u0, p.v0), [bx, bz] = this.w(p.u1, p.v1), L = Math.hypot(bx - ax, bz - az); sg.setXf((ax + bx) / 2, (az + bz) / 2, Math.atan2(bx - ax, bz - az), H0); sg.box(-C.wall.t / 2, -1, -L / 2, C.wall.t / 2, C.wall.h + 1, L / 2, 'tfWall', 3, 3); sg.xf = null; }
-    for (const t of WP.towers) { const [x, z] = this.w(t.u, t.v), s = C.wall.tower / 2 + (t.corner ? 1.5 : 0), h = C.wall.towerH + (t.corner ? 4 : 0); sg.setXf(x, z, C.ang + t.a, H0); sg.box(-s, -1, -s, s, h, s, 'tfWall', 3, 3); sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -s, -s, s, s, h, s * 1.1, 0.4); sg.tint = [0.92, 0.9, 0.86]; sg.xf = null; }
+    for (const t of WP.towers) { const [x, z] = this.w(t.u, t.v), s = C.wall.tower / 2 + (t.corner ? 1.5 : 0), h = C.wall.towerH + (t.corner ? 4 : 0); sg.setXf(x, z, C.ang + t.a, H0); sg.box(-s, -1, -s, s, h, s, 'tfWall', 3, 3); sg.tint = [0.72, 0.74, 0.82]; hipRoof(sg, 'tfRoof', -s, -s, s, s, h, s * 1.1, 0.4); sg.tint = [0.7, 0.68, 0.64]; sg.xf = null; }
     const tall = (u, v, hx, hz, h, roof) => { const [x, z] = this.w(u, v); sg.setXf(x, z, C.ang, H0); sg.tint = h > 30 ? [0.75, 0.66, 0.6] : [0.92, 0.9, 0.86]; sg.box(-hx, 0, -hz, hx, h, hz, h > 30 ? 'tfBrick' : 'tfWall', 3, 3); if (roof) { sg.tint = [0.45, 0.5, 0.6]; hipRoof(sg, 'tfRoof', -hx, -hz, hx, hz, h, roof, 0.3); sg.tint = [0.92, 0.9, 0.86]; } sg.xf = null; };
     if (this.cathedral) { const b = this.cathedral, { L, cu, nw, aw } = this.cathDims(b); tall(cu, b.vc, L / 2, nw + aw, 22, 9); if (this.oneTower) tall(cu + L / 2 + 3.5, b.vc, 7.5, 7.5, 62, 30); else { tall(cu + L / 2 + 3.5, b.vc - 8.5, 5.5, 5.5, 52, 34); tall(cu + L / 2 + 3.5, b.vc + 8.5, 5.5, 5.5, 52, 34); } }
     if (this.hall) { const b = this.hall, f = this.fv; tall(b.uc, f > 0 ? b.v1 - 9 : b.v0 + 9, Math.min(35, (b.u1 - b.u0) / 2 - 3), 8, 15, 6); tall(b.uc, f > 0 ? b.v1 - 3 : b.v0 + 3, 7, 7, 66, 13); }
