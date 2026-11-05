@@ -8144,6 +8144,7 @@ const MapView = {
     G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = null; this.dest = null; $('mapdest').hidden = true;
     const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
     this.draw();
+    if (Travel.paused && G.area === G.city) { const c = Travel.paused.c, el = $('mapdest'); el.innerHTML = `<span class="nm">${esc(c.mode === 'ahead' ? 'Your walk, paused' : `Your journey to ${c.name}, paused`)}</span><button class="db sm" data-m="resume">Go on</button><button class="db sm" data-m="clear">✕</button>`; el.hidden = false; } // (a paused journey can be taken up from the map too)
   },
   close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
@@ -8176,6 +8177,7 @@ const MapView = {
     el.hidden = false; this.draw();
   },
   go(how) {
+    if (how === 'resume') { this.close(); Travel.resume(); return; }
     const D = this.dest; if (how === 'clear' || !D) { this.dest = null; $('mapdest').hidden = true; this.draw(); return; }
     this.close(); Travel.toward(D.x, D.z, D.name, how === 'road');
   },
@@ -8264,7 +8266,7 @@ const MapView = {
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
     for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
-    if (Travel.cur) { const pts = Travel.cur.pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
+    if (Travel.cur || Travel.paused) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
     if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
