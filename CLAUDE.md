@@ -10,6 +10,8 @@ A world that feels believable when walking through it. Lore and systemic feature
 - Keep parked systems switchable rather than deleting them. Combat and stats are behind Settings → "Show combat and character stats", which also brings back character creation. The INTRO story text is kept in `src/12_main.js` but not shown.
 - Don't test or extend the main quest unless asked.
 - The game is also played on an iPad, so touch controls must keep working.
+- Setting and story ideas for when lore comes back are in `docs/SETTING.md`. They are ideas, not decisions, so don't build from them unless asked.
+- The Elder Scrolls is not an inspiration for the setting, and everything from it will be replaced. Don't add new Elder Scrolls names, gods, races or guilds. The existing ones (Daggerfall, Arkay, Iliac Bay, the races, the guilds) stay until the user decides to replace them.
 
 ## Visual work: critic loops
 
