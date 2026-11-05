@@ -241,15 +241,16 @@ const UI = {
     const goals = Travel.goals(), road = Travel.roadAhead(P.pos.x, P.pos.z, P.yaw), dir = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'][Math.round(((Math.atan2(-Math.sin(P.yaw), Math.cos(P.yaw)) * 180 / Math.PI) + 360) % 360 / 45) % 8];
     const s = nearestStop(P.pos.x, P.pos.z), km = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m';
     const render = () => `<h2>Travel on foot</h2><p class="dim">The world runs faster while you travel. Any key, or a tap on the banner, stops you; so does anything worth stopping for.</p>
-      <div class="btns col"><button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
+      <div class="btns col">${Travel.paused ? `<button class="db primary" data-a="resume" autofocus>${Travel.paused.c.mode === 'ahead' ? 'Go on the way you were going' : `Go on to ${esc(Travel.paused.c.name)}`}</button>` : ''}<button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
       ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)} · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
       <div class="btns"><span class="dim">Speed</span>${Travel.SPEEDS.map(v => `<button class="db sm${Travel.rate() === v ? ' primary' : ''}" data-a="v${v}">×${v}</button>`).join('')}</div>
       ${s && insideCity(P.pos.x, P.pos.z, -40) ? `<p class="note">Inside the walls the carriages are quicker: the nearest stop is at ${esc(s.name)}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}.</p>` : ''}
       <div class="btns"><button class="db" data-a="close">Stay here</button></div>`;
     this.open('foot', render, { cls: 'mid', onAct: (a) => {
       if (a[0] === 'v') { settings.travelSpeed = +a.slice(1); saveSettings(); this.render(); return; }
-      if (a === 'map') { this.close(true); MapView.open(true); return; }
+      if (a === 'map') { G.mapOpen = true; this.close(true); MapView.open(true); return; } // (the map is marked open first, so closing this panel does not capture the mouse again)
       const go = () => { this.close(true); };
+      if (a === 'resume') { go(); Travel.resume(); return; }
       if (a === 'ahead') { go(); Travel.ahead(false); return; }
       if (a === 'road') { go(); Travel.ahead(true); return; }
       const g = goals[+a.slice(1)]; if (!g) return; go(); Travel.toward(g.x, g.z, g.name, a[0] === 'r');
@@ -406,7 +407,8 @@ const MapView = {
         x.strokeStyle = '#2e5a78'; x.lineWidth = Math.max(1, C.canal.w * scale); poly(T.canal, false); x.stroke(); }
       x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(1.5, C.wall.t * scale); poly(T.wall, true); x.stroke();
       if (f) { if (this.zoom >= 0.3) for (const l of T.landmarks) if (!l.gate || this.zoom >= 1) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 6, '#d8cca8', Math.round(fs * 0.85)]);
-        if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } }
+ }
+      if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } // (the big towns are known by name from the start)
     // the landmarks you know of, the places you have come upon, the way you are going
     const found = G.flags.found || {}, heard = G.flags.heard || {};
     for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);

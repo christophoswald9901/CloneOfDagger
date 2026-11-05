@@ -77,13 +77,15 @@ const Travel = {
     if (G.flying) setFlying(false);
     if (rpgUI() && nearbyHostiles(30)) { msg('You cannot travel with enemies nearby.', 'bad'); return false; }
     const pts = o.pts.map(p => p.slice()), cum = [0]; for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1] + Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]));
-    this.cur = { ...o, pts, cum, s: 0, seg: 0, t0: G.time, moved: 0, chk: { s: 0, t: 0 }, stuck: 0, detour: 0, detourT: 0 };
-    $('travelinfo').hidden = false; this.lookT = 0; this.banner();
-    msg(o.mode === 'ahead' ? 'You set off.' : `You set off ${o.road ? 'by road' : 'across country'} towards ${o.name}.`);
+    this.cur = { ...o, pts, cum, s: 0, seg: 0, t0: G.time, moved: 0, chk: { s: 0, t: 0 }, stuck: 0, detour: 0, detourT: 0, head: P.yaw }; this.paused = null;
+    $('travelinfo').hidden = false; this.lookT = 0; this.lookOff = 0; this.banner();
+    msg(o.resumed ? (o.mode === 'ahead' ? 'You go on.' : `You go on towards ${o.name}.`) : o.mode === 'ahead' ? 'You set off.' : `You set off ${o.road ? 'by road' : 'across country'} towards ${o.name}.`);
     return true;
   },
-  stop(text, cls) {
+  // a journey that was stopped short (by you, or by something found on the way) can be taken up again from where you stand
+  stop(text, cls, resumable = true) {
     if (!this.cur) return; const c = this.cur; this.cur = null; $('travelinfo').hidden = true; Wild.fast = false;
+    if (resumable) { const P = G.player; this.paused = { c, x: P.pos.x, z: P.pos.z }; this.showPaused(); }
     const mins = Math.round(G.time - c.t0), d = Math.round(c.moved);
     if (text !== null) msg(`${text || 'You stop.'} (${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : d + ' m'} in ${mins >= 120 ? Math.floor(mins / 60) + ' hours' + (mins % 60 ? ' ' + (mins % 60) + ' min' : '') : mins + ' minutes'})`, cls);
   },
@@ -97,10 +99,13 @@ const Travel = {
   update(dt) {
     const c = this.cur, P = G.player;
     if (Input.stick.x || Input.stick.y) { this.stop('You stop.'); return dt; }
-    if (Input.mdx || Input.mdy) this.lookT = 2; this.lookT -= dt;
+    if (Input.mdx || Input.mdy) this.lookT = 1.5; this.lookT -= dt;
     const k = this.k(), sdt = dt * k; Wild.fast = true;
     let left = sdt; while (left > 1e-4 && this.cur) { const h = Math.min(0.2, left); left -= h; this.step(h); }
-    updatePlayer(0); // the view: free to look about, else it turns to the way ahead
+    // the view turns with the way: where you look yourself is kept as a turn away from it, which eases back once you leave the mouse alone
+    const y0 = P.yaw; updatePlayer(0); this.lookOff = (this.lookOff || 0) + (P.yaw - y0);
+    if (this.lookT <= 0) { this.lookOff *= Math.exp(-dt * 2.2); P.pitch = lerp(P.pitch, -0.03, Math.min(1, dt * 2)); }
+    if (this.cur) P.yaw = this.cur.head + this.lookOff;
     if (this.cur) this.banner();
     return sdt - left;
   },
@@ -111,7 +116,7 @@ const Travel = {
     for (let q = c.seg; q < Math.min(c.pts.length - 1, c.seg + 6); q++) { const [ax, az] = c.pts[q], [bx, bz] = c.pts[q + 1], r = segDist(P.pos.x, P.pos.z, ax, az, bx, bz); if (r.d < bd) { bd = r.d; bq = q; bs = c.cum[q] + r.t * (c.cum[q + 1] - c.cum[q]); } }
     c.seg = bq; c.s = Math.max(c.s, bs);
     const L = c.cum[c.cum.length - 1];
-    if (c.mode !== 'ahead' && L - c.s < 2.5) { this.stop(c.arrive || `You arrive at ${c.name}.`, 'good'); return; }
+    if (c.mode !== 'ahead' && L - c.s < 2.5) { this.stop(c.arrive || `You arrive at ${c.name}.`, 'good', false); return; }
     // aim a few paces ahead along the way, so the bends are walked round, not cut zig-zag
     const look = Math.min(L, c.s + 7); let q = c.seg; while (q < c.cum.length - 2 && c.cum[q + 1] < look) q++;
     const f = (look - c.cum[q]) / ((c.cum[q + 1] - c.cum[q]) || 1), tx = lerp(c.pts[q][0], c.pts[q + 1][0], f), tz = lerp(c.pts[q][1], c.pts[q + 1][1], f);
@@ -119,7 +124,7 @@ const Travel = {
     if (c.detourT > 0) { c.detourT -= h; const a = c.detour, cs = Math.cos(a), sn = Math.sin(a); [dx, dz] = [dx * cs - dz * sn, dx * sn + dz * cs]; }
     // the water's edge, the sea or the mere, ends a cross-country walk
     const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3, ah = terrainH(ax, az), M = SITES[2];
-    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.'); return; }
+    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.', undefined, false); return; }
     const ox = P.pos.x, oz = P.pos.z, st = spd * h;
     P.pos.x += dx * st; P.pos.z += dz * st;
     collide(G.area, P.pos, 0.38, P.pos.y + 1.5, 0.3); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y); // a traveller climbs the stiles: hedges, field walls and fences under two metres do not stop the journey
@@ -127,7 +132,9 @@ const Travel = {
     P.pos.y = groundAt(G.area, P.pos.x, P.pos.z, 0.38, P.pos.y + 0.6); P.vy = 0; P.onGround = true;
     const moved = Math.hypot(P.pos.x - ox, P.pos.z - oz); c.moved += moved; P.bob += moved * 0.4;
     P.stepT -= moved / 1.15; if (P.stepT <= 0) { P.stepT = 1.9 * 3; SFX.play('step'); } // (fewer steps heard at speed)
-    if (this.lookT <= 0) { const want = Math.atan2(-dx, -dz); let d = want - P.yaw; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; P.yaw += d * Math.min(1, h * 1.5); P.pitch = lerp(P.pitch, -0.03, Math.min(1, h)); }
+    { const L2 = c.cum[c.cum.length - 1], far = Math.min(L2, c.s + 16); let q2 = c.seg; while (q2 < c.cum.length - 2 && c.cum[q2 + 1] < far) q2++; // the way ahead, a little further on, so the view swings round a bend as it comes
+      const f2 = (far - c.cum[q2]) / ((c.cum[q2 + 1] - c.cum[q2]) || 1), hx = lerp(c.pts[q2][0], c.pts[q2 + 1][0], f2) - P.pos.x, hz = lerp(c.pts[q2][1], c.pts[q2 + 1][1], f2) - P.pos.z;
+      const want = Math.hypot(hx, hz) > 1 ? Math.atan2(-hx, -hz) : Math.atan2(-dx, -dz); let d = want - c.head; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; c.head += d * Math.min(1, h * 1.8); }
     // blocked: try to step round it, then give up
     // (progress is measured along the way, so sliding to and fro along a hedge does not count)
     c.chk.t += h; if (c.chk.t > 2.5) { const prog = c.s - c.chk.s; c.chk = { s: c.s, t: 0 };
@@ -137,7 +144,7 @@ const Travel = {
     const site = Sites.update(P.pos.x, P.pos.z); if (site && this.cur) { this.stop(`You come upon ${site.name}.`, 'good'); return; }
     const poi = POI.update(P.pos.x, P.pos.z); if (poi && this.cur) { this.stop(`You come upon ${poi.name}.`, 'good'); return; }
     if (rpgUI() && nearbyHostiles(35)) { this.stop('Something stirs nearby. You stop.', 'bad'); return; }
-    if (c.mode === 'ahead' && (rimDist(P.pos.x, P.pos.z) < 300)) { this.stop('The mountains rise sheer ahead of you.'); }
+    if (c.mode === 'ahead' && (rimDist(P.pos.x, P.pos.z) < 300)) { this.stop('The mountains rise sheer ahead of you.', undefined, false); }
   },
   banner() {
     const c = this.cur; if (!c) return; const L = c.cum[c.cum.length - 1], left = Math.max(0, L - c.s);
@@ -145,12 +152,24 @@ const Travel = {
     $('travelinfo').textContent = `${where} · ×${Math.round(this.k())} · ${clockString(G.time)}  (${Input.touch ? 'tap here' : 'any key'} to stop)`;
   },
 
+  showPaused() { const p = this.paused; if (!p) return; const c = p.c, L = c.cum[c.cum.length - 1], left = Math.max(0, L - c.s), el = $('travelinfo');
+    el.textContent = `${c.mode === 'ahead' ? (c.road ? 'Road walk' : 'Walk') : `Journey to ${c.name}${c.mode === 'road' ? ' by road' : ''}, ${left >= 1000 ? (left / 1000).toFixed(1) + ' km' : Math.round(left) + ' m'} left,`} paused · ${Input.touch ? 'tap here' : 'press Enter'} to go on`; el.hidden = false; },
+  clearPaused() { if (!this.paused) return; this.paused = null; if (!this.cur) $('travelinfo').hidden = true; },
+  // each frame while not travelling: a paused journey is forgotten once you have wandered off, or gone indoors
+  watchPaused() { const p = this.paused; if (!p) return; const P = G.player; if (!P || G.area !== G.city || Math.hypot(P.pos.x - p.x, P.pos.z - p.z) > 150) this.clearPaused(); else $('travelinfo').hidden = !!G.uiOpen || !!G.mapOpen; },
+  resume() {
+    const p = this.paused; if (!p) return false; const P = G.player, c = p.c; this.clearPaused();
+    if (c.mode !== 'ahead') { const g = c.pts[c.pts.length - 1], ok = this.toward(g[0], g[1], c.name, c.mode === 'road', true); return ok; }
+    let bq = 0, bd = 1e9; for (let q = 0; q < c.pts.length - 1; q++) { const r = segDist(P.pos.x, P.pos.z, c.pts[q][0], c.pts[q][1], c.pts[q + 1][0], c.pts[q + 1][1]); if (r.d < bd) { bd = r.d; bq = q; } }
+    return this.start({ mode: c.mode, road: c.road, name: c.name, arrive: c.arrive, resumed: true, pts: [[P.pos.x, P.pos.z], ...c.pts.slice(bq + 1)] });
+  },
+
   /* ---------- the ways to set off ---------- */
-  toward(x, z, name, byRoad) {
+  toward(x, z, name, byRoad, resumed = false) {
     const P = G.player;
-    if (!byRoad) return this.start({ mode: 'straight', pts: [[P.pos.x, P.pos.z], [x, z]], name, road: false });
+    if (!byRoad) return this.start({ mode: 'straight', pts: [[P.pos.x, P.pos.z], [x, z]], name, road: false, resumed });
     const r = this.route(P.pos.x, P.pos.z, x, z); if (!r) { msg('There is no road there that you know of.'); return false; }
-    return this.start({ mode: 'road', pts: r.pts, name, road: r.road });
+    return this.start({ mode: 'road', pts: r.pts, name, road: r.road, resumed });
   },
   ahead(followRoad) {
     const P = G.player;
@@ -162,7 +181,7 @@ const Travel = {
   goals() {
     const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
     if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Daggerfall', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
-    for (const S of SITES) if (found[S.id] || heard[S.id]) out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
+    for (const S of SITES) if (found[S.id] || heard[S.id] || S.kind === 'town') out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
     for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
     return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);
   },

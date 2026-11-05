@@ -401,7 +401,7 @@ function frame(now) {
     let sdt = dt; // the world's own time step: faster while travelling
     if (G.resting) updateRest(dt);
     else if (!frozen) {
-      if (Travel.cur) sdt = Travel.update(dt); else updatePlayer(dt);
+      if (Travel.cur) sdt = Travel.update(dt); else { updatePlayer(dt); Travel.watchPaused(); }
       G.time += sdt * TIME_SCALE; updateWeather();
       if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); for (const T of TOWNS) T.updateFolk(G.player.pos.x, G.player.pos.z, sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
@@ -460,6 +460,7 @@ function onKey(e) {
     case 'KeyI': case 'KeyC': case 'Tab': if (rpgUI()) UI.openCharacter(); break;
     case 'KeyJ': case 'KeyL': UI.openJournal(); break;
     case 'KeyM': MapView.open(); break;
+    case 'Enter': case 'NumpadEnter': if (Travel.paused) Travel.resume(); break;
     case 'KeyR': UI.openRest(); break;
     case 'KeyT': case 'KeyV': UI.openTravel(); break;
     case 'KeyQ': startCast(); break;
@@ -501,7 +502,7 @@ function bindInput() {
   document.addEventListener('pointerlockchange', () => {
     Input.locked = document.pointerLockElement === renderer.domElement;
     if (!Input.locked) { if (Input.expectUnlock) Input.expectUnlock = false; else if (G.state === 'play' && !G.uiOpen && !G.resting && G.player && !G.player.dead) UI.openPause(); }
-    else { Input.expectUnlock = false; Input.everLocked = true; }
+    else { Input.expectUnlock = false; Input.everLocked = true; if (G.mapOpen || G.uiOpen) exitLock(); } // a capture that lands after a map or panel opened is let go at once, so the cursor can click it
   });
   document.addEventListener('pointerlockerror', () => onLockError());
   $('resume').addEventListener('click', () => { SFX.init(); requestLock(true); });
@@ -535,7 +536,7 @@ function bindInput() {
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
   for (const [id, k] of [['mapzin', 1.25], ['mapzout', 0.8]]) $(id).addEventListener('click', () => MapView.setZoom(MapView.zoom * k));
   $('restinfo').addEventListener('click', () => { if (G.resting) stopRest('You stop resting.'); });
-  $('travelinfo').addEventListener('click', () => { if (Travel.cur) Travel.stop('You stop.'); });
+  $('travelinfo').addEventListener('click', () => { if (Travel.cur) Travel.stop('You stop.'); else if (Travel.paused) Travel.resume(); });
   addEventListener('resize', () => { resize(); if (G.mapOpen) MapView.draw(); });
 }
 function boot(hotData) {
