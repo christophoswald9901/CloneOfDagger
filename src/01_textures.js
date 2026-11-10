@@ -635,7 +635,21 @@ function drawSimple(kind, frame = 0) {
       }
       break; }
     case 'fern': { [c, x] = cnv(20, 10); const rr = new RNG(23);
-      for (let f = 0; f < 7; f++) { const a = -2.5 + f * 0.83 + rr.range(-0.2, 0.2), L = rr.range(6, 10); for (let t = 0; t < L; t++) { const k = t / L, px = 10 + Math.cos(a) * t * 0.95, py = 9 - Math.sin(Math.abs(a) < 1.57 ? 1.1 - k * 0.5 : 1.1 - k * 0.5) * t * (0.9 - 0.35 * k) * (1 - Math.abs(a + 0.8) * 0.12); R(Math.round(px), Math.round(py), 1, 1, t % 2 ? '#3e6428' : '#4e7630'); if (t % 2 === 0 && t > 1) R(Math.round(px), Math.round(py) - 1, 1, 1, '#5a8436'); } }
+      for (let f = 0; f < 7; f++) { const a = -2.5 + f * 0.83 + rr.range(-0.2, 0.2), L = rr.range(6, 10); for (let t = 0; t < L; t++) { const k = t / L, px = 10 + Math.cos(a) * t * 0.95, py = 9 - Math.sin(Math.abs(a) < 1.57 ? 1.1 - k * 0.5 : 1.1 - k * 0.5) * t * (0.9 - 0.35 * k) * (1 - Math.abs(a + 0.8) * 0.12); R(Math.round(px), Math.round(py), 1, 1, t % 2 ? '#35522a' : '#42622c'); if (t % 2 === 0 && t > 1) R(Math.round(px), Math.round(py) - 1, 1, 1, '#4c6e30'); } }
+      break; }
+    case 'tgrass': { [c, x] = cnv(16, 16); const rr = new RNG(41); // tall grass gone to seed: thin stems, a few pale heads nodding over
+      for (let i = 0; i < 13; i++) { const px = rr.int(2, 13), top = rr.int(2, 9), lean = rr.range(-0.3, 0.3); for (let y = top; y < 16; y++) R(Math.round(px + (16 - y) * lean * 0.35), y, 1, 1, y < top + 2 && i % 3 === 0 ? '#9c9858' : y > 12 ? '#34481f' : i % 3 ? '#52692b' : '#627634'); }
+      break; }
+    case 'weed': { [c, x] = cnv(12, 16); const rr = new RNG(43 + frame);
+      if (frame === 0) { for (const [px, top] of [[4, 3], [8, 6]]) { R(px, top + 2, 1, 14 - top, '#4a6030'); R(px - 1, top, 3, 2, '#8a5a98'); R(px, top - 1, 1, 1, '#a878b4'); for (let y = top + 4; y < 15; y += 3) { R(px - 2, y, 2, 1, '#56703a'); R(px + 1, y + 1, 2, 1, '#56703a'); } } } // thistles
+      else if (frame === 1) { for (const [px, top] of [[3, 4], [6, 1], [9, 5]]) { for (let y = top; y < 11; y++) R(px + (y % 2 ? 0 : (y % 4 ? 1 : -1)), y, 1, 1, y % 3 ? '#7a3e26' : '#94502e'); R(px, 11, 1, 5, '#4e5a2a'); } for (let i = 0; i < 6; i++) R(rr.int(1, 10), rr.int(12, 15), 2, 1, '#4a6a2c'); } // dock: rusty seed spikes over broad leaves
+      else { for (const [px, top] of [[3, 3], [7, 1], [9, 5]]) { R(px, top + 1, 1, 15 - top, '#587434'); R(px - 2, top, 5, 1, '#e8e8dc'); R(px - 1, top - 1, 3, 1, '#f4f4ea'); } for (let i = 0; i < 5; i++) R(rr.int(1, 10), rr.int(10, 15), 1, 1, '#4a6a2c'); } // cow parsley: white umbels
+      break; }
+    case 'rush': { [c, x] = cnv(14, 12); const rr = new RNG(47); // a tussock of rushes: stiff dark stems, brown flower tufts near the tips
+      for (let i = 0; i < 14; i++) { const a = -0.8 + i * 0.123 + rr.range(-0.06, 0.06), L = rr.int(7, 11); for (let t = 0; t < L; t++) R(Math.round(7 + Math.sin(a) * t * 0.75), 11 - t, 1, 1, t === L - 2 && i % 3 === 0 ? '#6a4a26' : t < 2 ? '#26361c' : i % 2 ? '#3a5226' : '#466030'); }
+      break; }
+    case 'pebbles': { [c, x] = cnv(16, 6); const rr = new RNG(53); // a scatter of stones showing through the turf
+      for (const [px, w, h] of [[1, 3, 2], [6, 4, 3], [12, 3, 2], [9, 2, 1]]) { R(px, 6 - h, w, h, '#6a685e'); R(px + 1, 6 - h, w - 1, 1, '#8c897c'); x.clearRect(px, 6 - h, 1, 1); x.clearRect(px + w - 1, 6 - h, 1, 1); R(px, 5, w, 1, '#4c4a42'); if (rr.chance(0.6)) R(px + 1, 6 - h, 1, 1, '#6c7448'); }
       break; }
     case 'torch': [c, x] = cnv(16, 32); R(7, 14, 2, 18, '#5a3a1e'); R(6, 14, 4, 2, '#3a3a3a');
       for (let i = 0; i < 14; i++) { const w = Math.max(1, Math.round((1 - i / 14) * 4 + (frame ? Math.sin(i) : Math.cos(i)))); R(8 - w, 13 - i, w * 2, 1, i < 4 ? '#f0f0a0' : i < 9 ? '#f0a030' : '#c04010'); } break;
@@ -674,7 +688,7 @@ function drawSimple(kind, frame = 0) {
     case 'kingstatue': { const g = '#9a9a96'; return drawHuman({ skin: g, shirt: g, pants: g, boots: '#8a8a86', hair: '#8a8a86', hairStyle: 1, beard: true, eyes: '#6a6a66', crown: true, cape: '#8e8e8a', weapon: 'sword', handCol: g }, 0); }
     case 'statue': return drawHuman({ skin: '#9a9a96', shirt: '#9a9a96', pants: '#9a9a96', boots: '#8a8a86', robe: '#8e8e8a', hair: '#8a8a86', hairStyle: 2, beard: true, eyes: '#6a6a66', weapon: 'staff', handCol: '#9a9a96' }, 0);
   }
-  if (!['fireball', 'spark', 'heal', 'orb', 'cobweb', 'spray', 'tuft', 'flowers', 'fern', 'reeds'].includes(kind)) outline(c, kind === 'heather' ? [30, 24, 20] : undefined);
+  if (!['fireball', 'spark', 'heal', 'orb', 'cobweb', 'spray', 'tuft', 'flowers', 'fern', 'reeds', 'tgrass', 'weed', 'rush', 'pebbles', 'heather'].includes(kind)) outline(c);
   return c;
 }
 
@@ -742,6 +756,13 @@ function initTextures() {
   T('grass', genSpeckle(11, '#566a36', 0.22, 64, [['#62783e', 140, 1, 2], ['#465a2c', 140, 1, 2], ['#6e8446', 40, 1, 1], ['#7a7a48', 30, 2, 1]]));
   T('dirt', genEarth(12, '#6c5a40'));
   T('yard', genEarth(64, '#6e604a', { stones: 160, straw: 30 }));
+  { const c = genEarth(13, '#6c5a40', { size: 64, stones: 40, straw: 10 }), x = c.getContext('2d'), rr = new RNG(77); // a cart track, across the image: two worn ruts, grass down the middle and creeping in at the sides
+    for (let u = 0; u < 64; u++) {
+      for (const [v0, v1] of [[13, 19], [44, 50]]) for (let v = v0; v <= v1; v++) if (rr.chance(0.75)) { x.fillStyle = rr.pick(['#54452f', '#5c4c34', '#4c3e2a']); x.fillRect(u, v + (rr.chance(0.2) ? 1 : 0), 1, 1); }
+      const hw = 4 + rr.int(0, 3); for (let v = 32 - hw; v <= 31 + hw; v++) if (rr.chance(Math.abs(v - 31.5) < hw - 1.5 ? 0.9 : 0.5)) { x.fillStyle = rr.pick(['#566a36', '#62783e', '#465a2c', '#6a7a40']); x.fillRect(u, v, 1, 1); }
+      for (const [v, d] of [[0, 1], [63, -1]]) { const n = rr.int(1, 5); for (let k = 0; k < n; k++) if (rr.chance(0.8)) { x.fillStyle = rr.pick(['#566a36', '#62783e', '#465a2c']); x.fillRect(u, v + d * k, 1, 1); } }
+    }
+    T('cart', c); }
   T('sand', genSpeckle(13, '#b8a478', 0.2, 64, [['#a89468', 100, 1, 1], ['#c8b488', 80, 1, 1]]));
   T('cobble', genCobbles(14, '#8a8274', '#4a4234'));
   T('cobbleDark', genCobbles(65, '#6e6a62', '#3c3830', { rowH: 8, wMin: 6, wMax: 11 }));

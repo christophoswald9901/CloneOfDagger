@@ -88,7 +88,7 @@ const CITY_MATS = {
   // layers laid over it: polygon offset decides what is drawn on top (overlays < roads < squares)
   gDirt: { tex: 'yard', po: 1 }, gSand: { tex: 'sand', po: 1 }, gGrass: { tex: 'meadow', po: 1 },
   fWheat: { tex: 'wheat', po: 1 }, fBarley: { tex: 'barley', po: 1 }, fPlowed: { tex: 'plowed', po: 1 }, fGreens: { tex: 'greens', po: 1 }, fMeadow: { tex: 'meadow', po: 1 },
-  rCobble: { tex: 'cobble', po: 2 }, rFlag: { tex: 'setts', po: 2 }, rGravel: { tex: 'gravel', po: 2 }, rDirt: { tex: 'dirt', po: 2 }, rMud: { tex: 'mud', po: 2 }, rAve: { tex: 'paveLight', po: 2 },
+  rCobble: { tex: 'cobble', po: 2 }, rFlag: { tex: 'setts', po: 2 }, rGravel: { tex: 'gravel', po: 2 }, rDirt: { tex: 'dirt', po: 2 }, rDirtCart: { tex: 'cart', po: 2 }, rMud: { tex: 'mud', po: 2 }, rAve: { tex: 'paveLight', po: 2 },
   // soft margins of the unpaved ways, and the kerbs that edge the paved ones
   rGravelF: { tex: 'gravel', po: 2, transparent: true, double: true }, rDirtF: { tex: 'dirt', po: 2, transparent: true, double: true }, rMudF: { tex: 'mud', po: 2, transparent: true, double: true }, kerb: { tex: 'kerb', po: 3 },
   sqPlaza: { tex: 'paveLight', po: 3 }, sqCobble: { tex: 'cobble', po: 3 }, sqFlag: { tex: 'flag', po: 3 },
@@ -691,7 +691,10 @@ function buildCity() {
     let f = fbm(x / 190 + 3, z / 190, 3, 77) + 0.3 * smoothstep(250, 700, r) * (1 - wild) + 0.25 * smoothstep(40, 90, h) - 0.05;
     // out in the wild the woods come and go with the lie of the land: clearings, heaths and open valley floors
     if (wild > 0) f += wild * (0.22 * fbm(x / 520 + WSEED * 1.7, z / 520, 3, 78) - 0.06 * smoothstep(90, 150, h - 0.6 * (wildTreeLine(x, z) - 150)) - 0.9 * smoothstep(wildTreeLine(x, z) - 35, wildTreeLine(x, z), h));
+    // ...and with its shape: woods hang on the valley sides and in the shelter below the hills, the open tops are bare, the wet floors are meadow
+    if (wild > 0) { const L = landAt(x, z); f = lerp(f, 0.7 * f + 0.4 * L.side + 0.12 * (1 - L.expo) - 0.15 - 0.75 * smoothstep(0.4, 0.85, L.expo) - 0.4 * L.wet * (1 - L.side) - 0.08 * L.sun, wild); }
     f -= 1.1 * wildCult(x, z); // farmed land: the woods are cleared back to copses
+    if (wild > 0) { const rd = riverD(x, z); if (rd < 90) f = Math.max(f, wild * (0.42 * (1 - smoothstep(10, 60, rd)) * smoothstep(-0.05, 0.3, fbm(x / 90 + 9, z / 90, 2, 79)) - 0.08)); } // alder and willow carr in a broken line along the rivers, farmed valley or not
     const m = smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd), st = r > 1500 ? siteAt(x, z) : null;
     return st ? lerp(m, siteForest(st.S, x, z, h), st.w) : m; // a site's own woods, the same in every world
 
@@ -723,9 +726,17 @@ function buildCity() {
     r = lerp(r, 0.4, fm * 0.92); g = lerp(g, 0.55, fm * 0.92); b = lerp(b, 0.36, fm * 0.92); // the floor of a wood reads dark from afar
     const heath = smoothstep(60, 110, h); r = lerp(r, 1.12, heath * 0.5); b = lerp(b, 0.78, heath * 0.5);
     if (outK > 0) { const vale = (1 - smoothstep(40, 380, riverD(x, z))) * outK, rough = smoothstep(0.05, 0.45, fbm(x / 340 + 7, z / 340, 2, 48)) * outK * (1 - fm0), dry = smoothstep(-0.1, 0.5, fbm(x / 900, z / 900, 2, 49)) * outK;
-      r = lerp(r, 0.86, vale * 0.45); g = lerp(g, 1.04, vale * 0.45); b = lerp(b, 0.66, vale * 0.45); // lush meadow along the rivers
-      r = lerp(r, 1.14, rough * 0.25); g = lerp(g, 0.95, rough * 0.25); b = lerp(b, 0.7, rough * 0.25); // rough grazing, tawny
-      r *= 1 + 0.07 * dry; b *= 1 - 0.08 * dry; }
+      r = lerp(r, 0.74, vale * 0.7); g = lerp(g, 1.07, vale * 0.7); b = lerp(b, 0.58, vale * 0.7); // lush meadow along the rivers
+      r = lerp(r, 1.16, rough * 0.4); g = lerp(g, 0.95, rough * 0.4); b = lerp(b, 0.68, rough * 0.4); // rough grazing, tawny
+      r *= 1 + 0.07 * dry; b *= 1 - 0.08 * dry;
+      // out in the country the turf is never one green. Its colour follows the lie of the land: deep green where water gathers and on the
+      // valley floors, pale pasture on the sunny slopes, cooler on the shaded ones, tawny moor grass on the open tops; patches over all of it
+      const open = outK * (1 - fm0), L = landAt(x, z), mot = fbm(x / 37, z / 37, 2, 57), mot2 = fbm(x / 11, z / 11, 1, 58);
+      const lush = Math.max(0.9 * L.wet, 0.55 * L.floor) * open * (1 - 0.6 * vale); r = lerp(r, 0.72, lush * 0.7); g = lerp(g, 1.06, lush * 0.7); b = lerp(b, 0.56, lush * 0.7);
+      const pale = L.side * open * clamp(0.4 + 0.45 * L.sun, 0, 1); r = lerp(r, 1.2, pale * 0.5); g = lerp(g, 0.97, pale * 0.5); b = lerp(b, 0.68, pale * 0.5);
+      const shade = L.side * open * Math.max(0, -L.sun); r *= 1 - 0.1 * shade; g *= 1 - 0.03 * shade; b *= 1 + 0.05 * shade;
+      const TLm = wildTreeLine(x, z), moor = Math.max(smoothstep(0.35, 0.8, L.expo + 0.25 * mot), smoothstep(TLm - 90, TLm - 10, h + 20 * mot)) * open * (1 - lush); r = lerp(r, 1.27, moor * 0.6); g = lerp(g, 0.94, moor * 0.6); b = lerp(b, 0.7, moor * 0.6);
+      r *= 1 + open * (0.11 * mot + 0.04 * mot2); g *= 1 + open * (0.035 * mot + 0.03 * mot2); b *= 1 - open * 0.09 * mot; }
     { const hw = wildHeath(x, z, h) * (1 - fm); if (hw > 0) { r = lerp(r, h > 70 ? 1.02 : 1.12, hw * 0.92); g = lerp(g, h > 70 ? 0.72 : 0.82, hw * 0.92); b = lerp(b, h > 70 ? 0.84 : 0.58, hw * 0.92); } } // heather purples the uplands, bracken browns the lower heath
     if (Math.max(Math.abs(x), Math.abs(z)) <= TG.R) { const bare = smoothstep(118, 165, h); r = lerp(r, 1.05, bare); g = lerp(g, 1.0, bare); b = lerp(b, 1.02, bare); } // thin turf and bare rock above the tree line
     else { const TL = wildTreeLine(x, z), turf = smoothstep(TL - 20, TL + 70, h), bare = smoothstep(TL + 110, TL + 230, h); r = lerp(lerp(r, 1.1, turf * 0.7), 1.02, bare); g = lerp(lerp(g, 0.97, turf * 0.7), 0.98, bare); b = lerp(lerp(b, 0.74, turf * 0.7), 0.96, bare); } // out in the country: tawny alpine turf, then bare stone

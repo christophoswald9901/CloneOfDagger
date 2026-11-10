@@ -75,6 +75,7 @@ class CDP:
     async def key(self, code, down=True):
         await self.ev(f"dispatchEvent(new KeyboardEvent('{'keydown' if down else 'keyup'}',{{code:'{code}'}}))")
     async def boot(self, url='http://127.0.0.1:8765/index.html', w=1568, h=800, timeout=120):
+        if os.environ.get('GAME_PORT'): url = url.replace(':8765/', f":{os.environ['GAME_PORT']}/")  # another checkout may already serve 8765
         await self.start(url, w, h)
         for _ in range(timeout):
             await asyncio.sleep(1)
