@@ -3,7 +3,7 @@
 
 Writes:
   index.html              full standalone page (double-click to play; needs internet for three.js + fonts)
-  dist/daggerfall.html    body fragment for publishing as a claude.ai artifact
+  dist/aldhaven.html      body fragment for publishing as a claude.ai artifact
 """
 import pathlib
 import re
@@ -27,7 +27,7 @@ full = (
 )
 (ROOT / "index.html").write_text(full)
 (ROOT / "dist").mkdir(exist_ok=True)
-(ROOT / "dist" / "daggerfall.html").write_text(f"{head}\n{body}\n")
+(ROOT / "dist" / "aldhaven.html").write_text(f"{head}\n{body}\n")
 # the whole game must parse: one stray `//` inside a one-line statement breaks everything after it
 import shutil, subprocess, tempfile
 if shutil.which("node"):

@@ -22,7 +22,7 @@ function addSky(area) {
   const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, depthWrite: false });
   const stars = new THREE.Points(sg, starMat); stars.renderOrder = -9; stars.frustumCulled = false; sc.add(stars);
   const mk = (tex, s) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, fog: false, depthWrite: false, transparent: true })); m.scale.set(s, s, 1); m.renderOrder = -8; sc.add(m); return m; };
-  const sun = mk(TEX.sun, 110), masser = mk(TEX.masser, 70), secunda = mk(TEX.secunda, 30);
+  const sun = mk(TEX.sun, 110), moon = mk(TEX.moon, 62);
   const cg = new THREE.CircleGeometry(1400, 48); const cc = new Float32Array(cg.attributes.position.count * 4);
   for (let i = 0; i < cg.attributes.position.count; i++) { cc[i * 4] = cc[i * 4 + 1] = cc[i * 4 + 2] = 1; cc[i * 4 + 3] = i === 0 ? 1 : 0; }
   cg.setAttribute('color', new THREE.BufferAttribute(cc, 4)); TEX.clouds.repeat.set(7, 7);
@@ -34,7 +34,7 @@ function addSky(area) {
   const rp = new Float32Array(900 * 6); const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3));
   const rain = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x9aa8b8, transparent: true, opacity: 0.45, fog: false })); rain.frustumCulled = false; rain.visible = false; sc.add(rain);
   for (let i = 0; i < 900; i++) { rp[i * 6] = rnd.range(-30, 30); rp[i * 6 + 1] = rnd.range(0, 25); rp[i * 6 + 2] = rnd.range(-30, 30); }
-  area.sky = { sky, geo, stars, starMat, sun, masser, secunda, clouds, cloudMat, mountains, mountMat, rain, rp };
+  area.sky = { sky, geo, stars, starMat, sun, moon, clouds, cloudMat, mountains, mountMat, rain, rp };
   sc.fog = new THREE.Fog(0x9ab0c8, 60, 200);
 }
 const _c1 = new THREE.Color(), _c2 = new THREE.Color(), _c3 = new THREE.Color(), _c4 = new THREE.Color();
@@ -69,9 +69,7 @@ function updateSky(area, dt) {
   const a = (h - 6) / 12.5 * Math.PI; const sd = new THREE.Vector3(Math.cos(a), Math.sin(a) * 0.9, 0.4).normalize();
   S.sun.position.copy(cp).addScaledVector(sd, 800); S.sun.visible = sd.y > -0.05 && wx === 'clear';
   const ma = (h - 18.5) / 12 * Math.PI; const md = new THREE.Vector3(Math.cos(ma) * 0.9, Math.sin(ma) * 0.8, -0.3).normalize();
-  S.masser.position.copy(cp).addScaledVector(md, 800); S.masser.visible = md.y > 0 && L < 0.8;
-  const md2 = new THREE.Vector3(Math.cos(ma + 0.5), Math.sin(ma + 0.5) * 0.9, -0.1).normalize();
-  S.secunda.position.copy(cp).addScaledVector(md2, 800); S.secunda.visible = md2.y > 0 && L < 0.8;
+  S.moon.position.copy(cp).addScaledVector(md, 800); S.moon.visible = md.y > 0 && L < 0.8;
   S.cloudMat.opacity = wx === 'clear' ? 0.55 : wx === 'overcast' ? 0.92 : 1; S.cloudMat.color.copy(G.tint).lerp(hor, 0.3);
   TEX.clouds.offset.x = (G.clock * 0.0025) % 1; TEX.clouds.offset.y = (G.clock * 0.0012) % 1;
   S.mountMat.color.copy(hor).lerp(_c3.setRGB(0.5, 0.55, 0.66).multiplyScalar(Math.max(L, 0.35)), 0.3);
@@ -110,7 +108,7 @@ function populateCity(area) {
   area.stalls.forEach(([x, z], i) => { const g = i % 2 ? 'f' : 'm'; const look = randomLook(new RNG(90 + i), g); look.apron = '#c8c0a8'; spawnNPC(area, { name: personName(new RNG(80 + i), g), look, gender: g, x, z, role: 'static', dialog: 'vendor', spriteKey: 'vendor' + i, building: { id: 'stall' + i, type: 'vendor', name: i === 2 ? 'Fish market stall' : 'Market stall' }, data: { fixed: true, vendor: true } }); });
   area.stops.forEach((st, i) => { const r = new RNG(300 + i); const look = { ...randomLook(r, 'm'), hat: '#2a2a2a', cape: '#3a2a1a', robe: null }; spawnNPC(area, { name: personName(r, 'm'), look, gender: 'm', x: st.coachman[0], z: st.coachman[1], role: 'static', dialog: 'coach', spriteKey: 'coach' + i, data: { fixed: true, stop: st.id, coachman: true } }); });
   const M = area.memorial;
-  const ghost = spawnNPC(area, { name: 'Ghost of King Lysandus', frames: enemySprite('lysandus').tex, x: M.x, z: M.z + 11, role: 'ghost', dialog: 'ghost', transparent: true, opacity: 0.6, fly: 0.25, speed: 1.0, hp: 9999 });
+  const ghost = spawnNPC(area, { name: 'Ghost of King Aldwin', frames: enemySprite('ghostking').tex, x: M.x, z: M.z + 11, role: 'ghost', dialog: 'ghost', transparent: true, opacity: 0.6, fly: 0.25, speed: 1.0, hp: 9999 });
   ghost.wanderR = 12; ghost.data.fixedHome = true;
   area.spawnT = 20;
 }
@@ -206,7 +204,7 @@ function leaveCurrentArea() { if (G.area && G.area !== G.city) { disposeArea(G.a
 function tryEnter(b) {
   const P = G.player;
   if (b.type === 'mausoleum') {
-    if (!hasItem('catakey')) { SFX.play('locked'); msg('The mausoleum gate is sealed with a heavy iron lock. Someone at Castle Daggerfall must hold the key.'); return; }
+    if (!hasItem('catakey')) { SFX.play('locked'); msg('The mausoleum gate is sealed with a heavy iron lock. Someone at Aldhaven Castle must hold the key.'); return; }
     SFX.play('unlock'); transition(() => { const a = buildDungeon(); setArea(a, a.spawn.x, a.spawn.z, a.spawn.yaw); msg('You descend into the Catacombs. The air is cold and smells of old bones.'); });
     return;
   }
@@ -246,7 +244,7 @@ function leaveDungeon() {
 function reviveAtTemple() {
   const P = G.player; P.dead = false; P.hp = P.maxHp; P.fat = P.maxFat; P.gold = Math.floor(P.gold / 2); G.time += 8 * 60; camera.rotation.z = 0;
   leaveCurrentArea(); const t = G.buildings.find(b => b.id === 'temple'); const a = buildInterior(t); setArea(a, 0, -2, Math.PI);
-  msg('You wake on a cold altar. The priests of Arkay dragged you back from the brink — and took half your purse for the trouble.');
+  msg('You wake on a cold altar. The priests of Saint Hallam dragged you back from the brink — and took half your purse for the trouble.');
 }
 let _musicT = 0;
 function pickMusic(force) {
@@ -295,7 +293,11 @@ function serialize() {
     area: G.area.kind === 'interior' ? { kind: 'interior', id: G.area.building.id } : { kind: G.area.kind },
   };
 }
-function readSave() { try { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+// a game saved before the names were changed (2026-11-12) is read with the new ones
+const RENAMED = [[/Daggerfall/g, 'Aldhaven'], [/the Iliac Bay|Iliac Bay/g, 'Merrow Bay'], [/Arkay/g, 'Saint Hallam'], [/Mages Guild/g, 'Philosophers’ Society'], [/Fighters Guild/g, 'Fencing School'], [/Lysandus/g, 'Aldwin'], [/Gothryd/g, 'Ottmar'], [/Vharzal/g, 'Corvin Ash'],
+  [/Soul Gem/g, 'Black Stone'], [/Emperor/g, 'Stadtholder'], [/a Welkynd Stone/g, 'the Great Burning-Glass'], [/\bDaedric\b/g, 'Meteoric'], [/\bEbony\b/g, 'Blackened'], [/\bDwarven\b/g, 'Damascus'], [/\bElven\b/g, 'Blued'], [/"daedric"/g, '"meteoric"'], [/"ebony"/g, '"blackened"'], [/"dwarven"/g, '"damascus"'], [/"elven"/g, '"blued"'],
+  [/"magicka"/g, '"spirit"'], [/Magicka/g, 'Spirit'], [/"Breton"/g, '"Townborn"'], [/"Redguard"/g, '"Marcher"'], [/"Nord"/g, '"Highlander"'], [/"Dark Elf"/g, '"Portborn"'], [/"High Elf"/g, '"Courtborn"'], [/"Wood Elf"/g, '"Forester"'], [/"Khajiit"/g, '"Wanderer"'], [/"Argonian"/g, '"Fenlander"'], [/"Spellsword"/g, '"Adept"'], [/"Mage"/g, '"Scholar"']];
+function readSave() { try { let s = localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY); if (!s) return null; for (const [a, b] of RENAMED) s = s.replace(a, b); return JSON.parse(s); } catch (e) { return null; } }
 function saveGame() {
   if (!G.player || G.player.dead) { msg('You cannot save now.'); return false; }
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); return true; } catch (e) { msg('Saving is unavailable in this browser.', 'bad'); return false; }
@@ -316,7 +318,7 @@ function loadGame(data) {
   if ((data.v || 1) < 3) { // the city was rebuilt since this save: start again at the Grand Market
     area = G.city; const s = G.city.stops.find(q => q.id === 'market'); P.pos.set(s.arrive[0], 0, s.arrive[1]); P.yaw = s.arrive[2];
     for (const q of G.quests) if (q.type === 'deliver' && q.status === 'active') q.status = 'failed';
-    setTimeout(() => msg('Daggerfall has grown since this journey was recorded. You find yourself at the Grand Market.'), 400);
+    setTimeout(() => msg('Aldhaven has grown since this journey was recorded. You find yourself at the Grand Market.'), 400);
   }
   setArea(area, P.pos.x, P.pos.z, P.yaw); if ((data.v || 1) >= 3) P.pos.y = Math.max(P.pos.y, sp.pos[1]);
   G.lastDistrict = G.area.kind === 'city' ? districtAt(P.pos.x, P.pos.z).id : null;
@@ -324,9 +326,9 @@ function loadGame(data) {
 }
 
 /* ---------------- game flow ---------------- */
-const INTRO = `<p>The year is 3E 405. In the Imperial City, Emperor Uriel Septim VII summons you and speaks of a matter too delicate for his legions.</p>
-<p>In the High Rock kingdom of Daggerfall, the ghost of the late King Lysandus has risen. Each night it stalks the streets of his capital, crying out for vengeance. And a letter the Emperor sent to the court of Daggerfall has vanished before anyone could read it.</p>
-<p>A storm wrecked your ship in the Iliac Bay. Fishermen pulled you from the surf of a village up the coast, and three days on foot have brought you, with your wits, your sheathed sword and a light purse, to the crag travellers call Pilgrim's Rise. The morning mist is lifting. Below you lies Daggerfall.</p>
+const INTRO = `<p>The year is 1652. In his cabinet at the court, the Stadtholder sends for you and speaks of a matter too delicate for his regiments.</p>
+<p>In the port of Aldhaven, the ghost of the late King Aldwin has risen. Each night it stalks the streets of his city, crying out for vengeance. And a letter the Stadtholder sent to the court of Aldhaven has vanished before anyone could read it.</p>
+<p>A storm wrecked your ship on Merrow Bay. Fishermen pulled you from the surf of a village up the coast, and three days on foot have brought you, with your wits, your sheathed sword and a light purse, to the crag travellers call Pilgrim's Rise. The morning mist is lifting. Below you lies Aldhaven.</p>
 <p>Find out what binds the dead king to this world. Recover the letter. And whatever you do, <em>do not anger the city guard</em>.</p>`;
 function beginNewGame(cfg) {
   SFX.init();
@@ -338,10 +340,10 @@ function beginNewGame(cfg) {
   // the story introduction (INTRO) is set aside while the project concentrates on the world itself; the hints wait so the first look is clear
   setTimeout(() => { if (G.state !== 'play') return;
     if (Input.touch) {
-      msg('Welcome to Daggerfall. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
+      msg('Welcome to Aldhaven. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
       msg('Carriages wait at signposts marked with a wheel. Tap Use at one, or Travel near one, to ride across the city.');
     } else {
-      msg(`Welcome to Daggerfall. J opens your journal, M the map${rpgUI() ? ', I your character' : ''}. Click the view to capture the mouse.`);
+      msg(`Welcome to Aldhaven. J opens your journal, M the map${rpgUI() ? ', I your character' : ''}. Click the view to capture the mouse.`);
       msg('Carriages wait at signposts marked with a wheel. Press E at one, or T near one, to ride across the city.');
     }
   }, 6000);
@@ -380,7 +382,7 @@ function updateTextHUD(dt) {
   if (G.state === 'play' && P && G.area.kind === 'city') {
     const d = districtAt(P.pos.x, P.pos.z); const inside = insideCity(P.pos.x, P.pos.z, -2);
     const T = TOWNS.find(t => t.inside(P.pos.x, P.pos.z, -1)), td = T && T.districtAt(P.pos.x, P.pos.z);
-    const id = inside ? d.id : T ? T.id + ':' + td.id : 'outside'; where = inside ? `Daggerfall · ${capFirst(d.name)}` : T ? `${T.name} · ${capFirst(td.name)}` : Math.hypot(P.pos.x, P.pos.z) < 1200 ? 'Outside the walls of Daggerfall' : 'The open country';
+    const id = inside ? d.id : T ? T.id + ':' + td.id : 'outside'; where = inside ? `Aldhaven · ${capFirst(d.name)}` : T ? `${T.name} · ${capFirst(td.name)}` : Math.hypot(P.pos.x, P.pos.z) < 1200 ? 'Outside the walls of Aldhaven' : 'The open country';
     if (G.lastDistrict && G.lastDistrict !== id && !P.dead) msg(inside ? `You enter ${d.name} — ${d.blurb}.` : T ? `You enter ${td.name} of ${T.name} — ${td.blurb}.` : (G.lastDistrict.includes(':') ? `You leave the walls of ${capFirst(G.lastDistrict.split(':')[0])} behind.` : G.lastDistrict === 'outside' ? '' : 'You leave the city walls behind.'), 'district');
     G.lastDistrict = id;
   }
@@ -557,7 +559,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { HALL, hallW, hallL, hallWet, siteWild, TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

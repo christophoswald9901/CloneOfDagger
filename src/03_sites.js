@@ -10,7 +10,7 @@
 // rc: wholly fixed within this radius; rb: wholly generated beyond it. road: from the site out to where the generated tracks take over
 const SITES = [
   { id: 'greywatch', name: 'Greywatch', kind: 'ruin', x: -2400, z: -2900, rc: 280, rb: 820, discR: 240, bare: 110,
-    blurb: 'the broken keep of Greywatch on its crag, abandoned since the War of Betony',
+    blurb: 'the broken keep of Greywatch on its crag, abandoned since the Succession War',
     road: [[26, 26], [52, 50], [92, 82], [140, 112], [196, 140], [262, 168], [330, 202], [400, 246], [470, 300], [540, 360]] },
   { id: 'stones', name: 'the Ninefold Stones', kind: 'stones', x: 3600, z: -5600, rc: 300, rb: 860, discR: 200, bare: 260,
     blurb: 'a ring of nine standing stones on a bare hilltop, older than any kingdom of the Bay',
@@ -98,6 +98,7 @@ function siteFix(x, z, h) {
 
 /* ---------------- what grows there: woods (0..1) and heath (0..1), fixed ---------------- */
 function siteForest(S, x, z, h) {
+  if (S.forest) return S.forest(x, z, h);
   const dx = x - S.x, dz = z - S.z, n = fbm(x / 150, z / 150, 2, 950), n2 = fbm(x / 60, z / 60, 2, 951), r = Math.hypot(dx, dz) + 70 * fbm(x / 120 + 3, z / 120, 2, 952); // (a ragged radius: no wood edge runs round a site in a circle)
   switch (S.id) {
     case 'greywatch': return smoothstep(0.0, 0.3, n + 0.15 * n2) * smoothstep(150, 240, r) * smoothstep(40, -160, dz + dx * 0.4); // an oakwood under the north cliffs
@@ -122,7 +123,7 @@ function siteHeath(S, x, z, h) {
 
 /* ---------------- the buildings, built once and kept: each can be seen from far off ---------------- */
 const Sites = {
-  group: null, cols: [], glows: [], spawned: {}, lights: [],
+  group: null, cols: [], glows: [], spawned: {}, lights: [], folk: {},
   build(area, mats) {
     const gb = new GB(), saved = area.colliders; area.colliders = [];
     const H = (x, z) => terrainRaw(x, z);
@@ -137,6 +138,7 @@ const Sites = {
   // true where a site keeps the ground clear: its solids (for any plant), its yards and courts (for trees and bushes)
   clearAt(x, z, r) {
     for (const c of this.near(x, z)) if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+    for (const S of SITES) if (S.keep && S.keep(x, z, r)) return true;
     if (r >= 2) for (const S of SITES) if (S.clear && Math.abs(x - S.x) < 400 && Math.abs(z - S.z) < 400) for (const [cx, cz, cr] of S.clear) if (Math.hypot(x - cx, z - cz) < cr) return true;
     return false;
   },
@@ -154,6 +156,13 @@ const Sites = {
       return spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 0.7), gender: g, x: vx, z: vz, role: 'wander', wanderR: 8, speed: 1.0, dialog: 'villager', spriteKey: 'mere' + k, data: { site: 'mirrormere' } }); });
     else if (dm > 700 && this.vill) { for (const e of this.vill) if (!e.removed) e.remove(); this.vill = null; }
     if (this.vill) { const night = isNight(G.time); for (const e of this.vill) if (!e.dead) e.active = !night; }
+    // a great house's people, each about their own work
+    for (const S of SITES) { if (!S.folk) continue; const d = Math.hypot(x - S.x, z - S.z); let F = this.folk[S.id];
+      if (F && F[0].removed) F = this.folk[S.id] = null;
+      if (d < S.rc + 140 && !F) F = this.folk[S.id] = S.folk.map((f, k) => { const r = new RNG(7650 + k), g = f.gender || (r.chance(0.5) ? 'f' : 'm');
+        return spawnNPC(G.city, { name: personName(r, g), look: { ...lookByWealth(r, g, 1.0), ...f.look }, gender: g, x: f.at[0], z: f.at[1], role: 'wander', wanderR: f.r, speed: 0.9, dialog: 'household', spriteKey: S.id + k, data: { site: S.id, trade: f.trade, lines: f.lines } }); });
+      else if (d > S.rb && F) { for (const e of F) if (!e.removed) e.remove(); this.folk[S.id] = null; }
+      if (F) { const night = isNight(G.time); for (const e of F) if (!e.dead) e.active = !night; } }
     return hit;
   },
 };

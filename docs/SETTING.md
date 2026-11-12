@@ -70,6 +70,13 @@ Most of the sections below describe one side of such a pair.
 ## The world as it stands
 
 - What's in the game now leans medieval, and that's fine.
+- On 2026-11-12 every Elder Scrolls name and term was replaced with a stand-in, chosen to fit these notes rather than as decisions:
+  - **Places:** Daggerfall became **Aldhaven**, a port on **Merrow Bay**; Vellaro and Brakkenburg are distant cities in rumours.
+  - **Faith:** the Temple of Arkay became the **Church of Saint Hallam**, with its rector and churchyard.
+  - **Learning and arms:** the Mages Guild became the **Philosophers' Society**, whose "spells" are its arts and whose magicka is **spirit**; the Fighters Guild became the **Fencing School**.
+  - **The parked story:** the Emperor became the **Stadtholder**, King Lysandus **King Aldwin** (the ghost), King Gothryd **King Ottmar**, Queen Aubk-i **Queen Isabeau**, the court mage a **court philosopher**, the necromancer **Corvin Ash**, and the soul gem a **black stone**.
+  - **Origins** replace the races: Townborn, Marcher, Highlander, Portborn, Courtborn, Forester, Wanderer and Fenlander, which follows the rural-to-urban idea above.
+  - **Other:** weapon materials run Iron, Steel, Silver, Blued, Damascus, Blackened, Meteoric. The calendar is ordinary months and weekdays in the year 1652, under one moon. People's names are Dutch, English and Italian.
 - Old, outdated architecture standing around everywhere is a good thing. It gives the setting texture, and it's one of the "at the same time" layers in its own right.
 - A new game already starts on a lookout called Pilgrim's Rise.
 

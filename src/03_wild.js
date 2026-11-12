@@ -192,7 +192,7 @@ const Wild = {
     const rh = new Map(); this.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const k = Math.floor(R.P[q][0] / 32) * 8192 + Math.floor(R.P[q][1] / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
     this.bridges = [];
     this.tracks.forEach((T, ti) => { for (let q = 1; q < T.length; q++) {
-      const [ax, az] = T[q - 1], [bx, bz] = T[q], l = rh.get(Math.floor(bx / 32) * 8192 + Math.floor(bz / 32)); if (!l) continue;
+      const [ax, az] = T[q - 1], [bx, bz] = T[q], l = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const c = rh.get((Math.floor(bx / 32) + i) * 8192 + Math.floor(bz / 32) + j); if (c) l.push(...c); } if (!l.length) continue; // (the river's point can lie in the next cell over from the crossing)
       for (let m = 0; m < l.length; m += 2) { const R = this.rivers[l[m]], p = l[m + 1], [cx, cz] = R.P[p - 1], [dx, dz] = R.P[p]; if (!segCross(ax, az, bx, bz, cx, cz, dx, dz)) continue;
         if (this.bridges.some(b => b.ti === ti && Math.abs(b.q - q) < 8)) continue;
         const w = R.w[p], wl = R.wl[p], ang = Math.atan2(bx - ax, bz - az);
@@ -653,6 +653,7 @@ const Wild = {
     // plants: one chance on a jittered 5.5 m grid, as dense as the woods round the city
     const SP = 5.5, DENS = (SP / 5) * (SP / 5);
     const tree = (kind, x, z, h, s) => { const def = WILD_KINDS[kind]; fl[kind].push([x, h - 0.15, z, s]); if (def[4]) c.cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: h - 1, y1: h + def[4] * s }); };
+    for (const S of SITES) if (S.plants) for (const [kind, px, pz, sc] of S.plants) if (px >= x0 && px < x0 + WC && pz >= z0 && pz < z0 + WC) tree(kind, px, pz, this.heightAt(px, pz), sc); // a site's planted trees: its avenues and rows
     const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400), townHere = TOWNS.some(T => Math.abs(x0 + WC / 2 - T.x) < T.cfg.A + T.cfg.B + 500 && Math.abs(z0 + WC / 2 - T.z) < T.cfg.A + T.cfg.B + 500);
     for (let b = 0; b < WC / SP; b++) {
       for (let a = 0; a < WC / SP; a++) {

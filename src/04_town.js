@@ -9,7 +9,7 @@
    and around it looser quarters, each cut into blocks along its own
    road at its own angle and scale, inside an irregular polygonal wall.
    The first is Corrinvale, a lowland canal town in the north.
-   See CITIES.md for what Daggerfall and this town taught about cities.
+   See CITIES.md for what Aldhaven and this town taught about cities.
    ===================================================================== */
 
 // One config per town. Lengths in metres; u runs along the town's long axis, v across it (+v is south when ang is 0)
@@ -228,7 +228,7 @@ class Town {
       const used = new Set();
       for (let i = -nI2; i < nI2; i++) for (let j = j0; j < nJp; j++) { if (used.has(i * 4096 + j)) continue;
         // now and then two cells make one block, so a lane ends at a T and the next one runs on offset
-        const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp ? 'v' : null;
+        const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp && !used.has(i * 4096 + j + 1) ? 'v' : null; // (never into a cell the last column's block already took)
         const quad = mg === 'u' ? [P(i, j), P(i + 1, j), P(i + 2, j), P(i + 2, j + 1), P(i + 1, j + 1), P(i, j + 1)] : mg === 'v' ? [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i + 1, j + 2), P(i, j + 2), P(i, j + 1)] : [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)], cen = tCentroid(quad), side = j >= 0 ? 1 : -1;
         if (mg === 'u') used.add((i + 1) * 4096 + j); if (mg === 'v') used.add(i * 4096 + j + 1);
         if (this.wallOut(cen[0], cen[1]) > -R || coreOut(cen[0], cen[1]) < 0 || !inSector(sc, cen)) continue;
@@ -269,6 +269,23 @@ class Town {
           this.lots.push(l); mine.push(l); last = l; lastEnd = s + ok.w; s += ok.w; }
         if (last) last.corner = true; } };
     for (const b of this.blocks) if (b.use === 'lots') placeLots(b, this.kindAt(b.uc, b.vc));
+    { // a plot that reaches into a street is given up (where two roads close in on a block's corner): checked after all are placed, so the draw for every other plot stays the same
+      const od = (o, u, v) => { const du = u - o.x, dv = v - o.z, lx = du * o.c - dv * o.s, lz = du * o.s + dv * o.c; return Math.hypot(Math.max(0, Math.abs(lx) - o.hx), Math.max(0, Math.abs(lz) - o.hz)); }, drop = new Set();
+      for (const l of this.lots) { const r = Math.hypot(l.w, l.d) / 2 + 8; for (const st of this.streets) { if (Math.min(st.u0, st.u1) > l.u + r || Math.max(st.u0, st.u1) < l.u - r || Math.min(st.v0, st.v1) > l.v + r || Math.max(st.v0, st.v1) < l.v - r) continue;
+        const L = Math.hypot(st.u1 - st.u0, st.v1 - st.v0), n = Math.max(1, Math.ceil(L)); for (let k = 0; k <= n && !drop.has(l); k++) if (od(l.ob, lerp(st.u0, st.u1, k / n), lerp(st.v0, st.v1, k / n)) < st.w / 2 - 0.5) drop.add(l); if (drop.has(l)) break; } }
+      if (drop.size) { this.lots = this.lots.filter(l => !drop.has(l)); for (const b of this.blocks) if (b.lots) b.lots = b.lots.filter(l => !drop.has(l)); } }
+    // where a row of houses faces neither a street nor a square (a quarter's lattice meeting a road at a slant leaves a wedge of ground), the ground before it is paved out to the road
+    this.aprons = [];
+    { const near = (u, v, r) => this.streets.filter(st => Math.min(st.u0, st.u1) - r < u && Math.max(st.u0, st.u1) + r > u && Math.min(st.v0, st.v1) - r < v && Math.max(st.v0, st.v1) + r > v);
+      const onWay = (u, v, S) => S.some(st => segDist(u, v, st.u0, st.v0, st.u1, st.v1).d < st.w / 2 + 0.3);
+      const covered = (u, v) => this.blocks.some(b => b.poly && b.use !== 'lots' && pointInPoly(u, v, b.poly)) || this.gateSquares.some(P => pointInPoly(u, v, P));
+      for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots || !b.lots.length || !b.edgeD) continue;
+        for (const h of tEdgesIn(b.poly)) { if (!(h.i in b.edgeD) || h.L < 6) continue;
+          const mu = (h.a[0] + h.b[0]) / 2, mv = (h.a[1] + h.b[1]) / 2, S = near(mu, mv, h.L / 2 + 24);
+          if (onWay(mu - h.nu * 2, mv - h.nv * 2, S) || covered(mu - h.nu * 3, mv - h.nv * 3)) continue; // (a street or a square before it already)
+          const reach = p => { for (let t = 0; t <= 16; t += 0.5) if (onWay(p[0] - h.nu * t, p[1] - h.nv * t, S)) return t; return null; };
+          const n = Math.max(2, Math.ceil(h.L / 3)), P = [], D = []; for (let k = 0; k <= n; k++) { const p = [lerp(h.a[0], h.b[0], k / n), lerp(h.a[1], h.b[1], k / n)], r = reach(p); if (r === null) { P.length = 0; break; } P.push(p); D.push(r > 0 ? r + 1 : 0); } // (a metre over the road's own paving, so no seam of grass shows between them) // (measured all along the row: a wedge can bulge between two streets)
+          for (let k = 1; k < P.length; k++) if (D[k - 1] + D[k] > 0.4) this.aprons.push([P[k - 1], P[k], [P[k][0] - h.nu * D[k], P[k][1] - h.nv * D[k]], [P[k - 1][0] - h.nu * D[k - 1], P[k - 1][1] - h.nv * D[k - 1]]]); } } }
     // what each lot is: shops and inns where the trade is, warehouses on the canal, the rest homes
     const pick = types => { for (const [type, n, f] of types) for (let k = 0; k < n; k++) { const c = this.lots.filter(l => !l.type && l.w >= 7 && f(l)); if (!c.length) continue; const l = c[rng.int(0, c.length - 1)]; l.type = type; } };
     const nearGate = l => this.gates.some(g => Math.hypot(l.u - g.u, l.v - g.v) < 140);
@@ -533,6 +550,7 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
   for (const g of this.gates) { const o0 = C.moat.off + C.moat.w + 8, pts = []; for (let t = o0; t <= o0 + 190; t += 10) pts.push(this.w(g.u + g.nu * t, g.v + g.nv * t)); for (let k = 1; k < pts.length; k++) if (inC(...pts[k - 1])) drapeStrip(gb, 'rCobble', [pts[k - 1], pts[k]], 7, { lift: 0.07 }); }
   // the squares just inside the gates
   for (const P of this.gateSquares) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.052); }
+  for (const P of this.aprons) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.051); } // the ground paved before rows that face no street
   // yards and gardens inside the blocks: the ground before the houses paved, the gardens behind them walled, with trees, sheds and bushes; orchards in the commons
   for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / (b.kind === 'commons' ? 120 : 200));
     { for (const h of tEdgesIn(b.poly)) { const dk = (b.edgeD && b.edgeD[h.i] || 2.4) + 0.6; drapePoly(gb, 'rCobble', [h.a, h.b, [h.b[0] + h.nu * dk, h.b[1] + h.nv * dk], [h.a[0] + h.nu * dk, h.a[1] + h.nv * dk]].map(([u, v]) => this.w(u, v)), H0 + 0.05); } let Y = b.poly; // (the ground before the houses paved, each row's depth back) for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
@@ -616,7 +634,7 @@ Town.prototype.buildLasting = function (area, mats) {
     sg.tint = null; this.far = sg.build(fm); this.far.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); o.frustumCulled = false; }); area.scene.add(this.far); }
   if (this.hall) { const b = this.hall, [hx, hz] = this.w(b.uc, this.fv > 0 ? b.v1 - 9 : b.v0 + 9), [fx, fz] = xfP(makeXf(hx, hz, C.ang + (this.fv > 0 ? 0 : Math.PI)), 0.2, 6); makeFlag(area, TEX.bannerRed, fx, H0 + 79.6, fz, C.ang, 2.6, 1.5); }
   if (this.citadel) { const b = this.citadel, S2 = Math.min(b.u1 - b.u0, b.v1 - b.v0) / 2 - 4, [kx, kz] = this.w(b.uc, b.vc - S2 * 0.25); makeFlag(area, TEX.bannerRed, kx + 0.1, H0 + 41, kz, C.ang, 2.6, 1.5); }
-  // the doors: every house, shop and inn can be entered, as in Daggerfall
+  // the doors: every house, shop and inn can be entered, as in Aldhaven
   const used = new Set();
   for (const l of this.lots) {
     const r = new RNG(l.seed + 11), K = TK[l.kind], wealth = { old: 2, grand: 3, close: 2.2, citadel: 1.5, canal: 2.2, commons: 0.7, weavers: 1.3, tanners: 0.9, suburb: 0.8 }[l.kind], owner = makeOwner(r, l.type, wealth);

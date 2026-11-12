@@ -3,13 +3,13 @@
    ===================================================================== */
 
 const RUMORS = [
-  'They say old King Lysandus walks the streets after dark, howling for vengeance. I bar my door at sunset.',
-  "Strange lights flicker in Arkay's graveyard at night. The priests won't speak of it.",
-  'The city guard never forgets. Cross them once and they will chase you from here to Wayrest.',
-  'Sentinel and Wayrest are circling each other like hungry dogs. War is coming to the Iliac Bay, mark my words.',
-  'The Mages Guild sells spells to anyone with coin. Fireballs! In a city built of timber!',
+  'They say old King Aldwin walks the streets after dark, howling for vengeance. I bar my door at sunset.',
+  "Strange lights flicker in Saint Hallam’s churchyard at night. The priests won't speak of it.",
+  'The city guard never forgets. Cross them once and they will chase you from here to Brakkenburg.',
+  'Vellaro and Brakkenburg are circling each other like hungry dogs. War is coming to Merrow Bay, mark my words.',
+  'The Philosophers’ Society teaches its fire arts to anyone with coin. Fireballs! In a city built of timber!',
   'Only silver or finer steel will bite a wraith. My uncle learned that the hard way.',
-  'The Fighters Guild pays good coin to anyone brave or foolish enough to go into the Catacombs.',
+  'The Fencing School pays good coin to anyone brave or foolish enough to go into the Catacombs.',
   'Merchants shut their doors at six in the evening. The taverns never close, thank the Divines.',
   'Someone saw a hooded man slip into the old mausoleum. Nobody has seen him come out.',
   'The Underking? A tale to frighten children. ...Is it not?',
@@ -19,19 +19,19 @@ const RUMORS = [
   'The House of Mercy takes in anyone, even Warrens folk. Mother Ysolde is a saint, or mad.',
   'In Kingsward they have hedges trimmed into the shape of griffons. In the Warrens we have rats shaped like rats.',
   "The bell in the Bell Tower cracked during the old king's funeral. Nobody has had the heart to recast it.",
-  "They built the memorial to Lysandus on the castle road. Now his ghost walks right past his own statue every night.",
+  "They built the memorial to Aldwin on the castle road. Now his ghost walks right past his own statue every night.",
   'Half the cargo in the dockside warehouses never saw a customs clerk. The other half never saw daylight.',
-  "Tanners' Row stinks worse than a troll's armpit, but the leather is the best on the Iliac Bay.",
-  'Queen Aubk-i hails from Sentinel, you know. Some of the old nobles still grumble about it.',
-  "They say Daggerfall is the only city worth seeing on the whole Iliac Bay. Lucky, since it's the only one you'll ever see.",
-  'The Emperor sends his agents here and there. Most of them leave in a box.',
-  'My cousin swears he found a Daedric dagger in a crypt once. He is a liar, but an entertaining one.',
+  "Tanners' Row stinks worse than a troll's armpit, but the leather is the best on Merrow Bay.",
+  'Queen Isabeau hails from Vellaro, you know. Some of the old nobles still grumble about it.',
+  "They say Aldhaven is the only city worth seeing on the whole of Merrow Bay. Lucky, since it's the only one you'll ever see.",
+  'The Stadtholder sends his agents here and there. Most of them leave in a box.',
+  'My cousin swears he found a dagger of star-iron in a crypt once. He is a liar, but an entertaining one.',
   'The court mage says the dead king is bound to this world by something. Or someone.',
   'Rats the size of dogs in the Catacombs, I hear. Bats too. And worse.',
   'If the guards come for you, pay your fine at the castle. Or lie low for a day and pray.',
 ];
 const GREET = {
-  day: ['Good day to you.', 'Aye? What is it?', 'Make it quick, stranger.', 'Well met, traveler.', "Blessings of Arkay upon you.", 'You are not from around here, are you?', 'Lovely weather for the Iliac Bay.'],
+  day: ['Good day to you.', 'Aye? What is it?', 'Make it quick, stranger.', 'Well met, traveler.', "God keep you.", 'You are not from around here, are you?', 'Lovely weather for Merrow Bay.'],
   night: ["It's late. You should be indoors.", 'The dead walk this city at night. Did you know that?', 'Keep your voice down.', 'What do you want at this hour?'],
 };
 
@@ -47,10 +47,10 @@ const Quests = {
     const L = G.player.level; const types = giver === 'fighters' ? ['undead', 'bounty'] : giver === 'mages' ? ['deliver', 'fetch'] : ['undead', 'deliver'];
     const type = rnd.pick(types); const id = 'q' + Date.now().toString(36);
     const q = { id, giver, type, status: 'active', day: dayOf(G.time) };
-    const giverName = { fighters: 'the Fighters Guild', mages: 'the Mages Guild', temple: 'the Temple of Arkay' }[giver];
+    const giverName = { fighters: 'the Fencing School', mages: 'the Philosophers’ Society', temple: 'the Church of Saint Hallam' }[giver];
     if (type === 'undead') {
       q.need = rnd.int(3, 5); q.count = 0; q.title = giver === 'temple' ? 'Lay the Dead to Rest' : 'Cleanse the Catacombs';
-      q.desc = `Destroy ${q.need} undead in the Catacombs beneath the mausoleum in Arkay's graveyard, then report to ${giverName}.`;
+      q.desc = `Destroy ${q.need} undead in the Catacombs beneath the mausoleum in Saint Hallam’s churchyard, then report to ${giverName}.`;
       q.reward = { gold: 80 + q.need * 25 + L * 10, xp: 50 + q.need * 12 };
     } else if (type === 'bounty') {
       const g = rnd.chance(0.5) ? 'm' : 'f'; q.target = `${rnd.pick(g === 'm' ? FIRST_M : FIRST_F)} ${rnd.pick(['the Knife', 'Blackhand', 'the Weasel', 'Redcloak', 'the Butcher', 'Quickfingers'])}`;
@@ -68,7 +68,7 @@ const Quests = {
       markDiscovered(b);
       addItem(G.player, makeQuestItem(q.itemBase, q.item), true);
     } else {
-      const names = giver === 'mages' ? ['the Codex of Vharzal', 'a Welkynd Stone', 'the Tome of Hollow Stars'] : ['the Reliquary of Arkay'];
+      const names = giver === 'mages' ? ['the Codex of Corvin Ash', 'the Great Burning-Glass', 'the Tome of Hollow Stars'] : ['the Reliquary of Saint Hallam'];
       q.itemName = rnd.pick(names); q.itemBase = 'relic_' + id; q.title = `Retrieve ${q.itemName}`;
       q.desc = `Recover ${q.itemName} from the Catacombs beneath the mausoleum and bring it to ${giverName}.`;
       q.reward = { gold: 150 + L * 20, xp: 70 };
@@ -82,7 +82,7 @@ const Quests = {
     msg(`Quest complete: ${q.title}. You receive ${q.reward.gold} gold.`, 'quest');
   },
   onKill(e) {
-    if (e.etype === 'necro') { G.flags.necroDead = true; msg('Vharzal the Necromancer crumples to the floor. The air in the Catacombs grows lighter.', 'quest'); }
+    if (e.etype === 'necro') { G.flags.necroDead = true; msg('Corvin Ash the Necromancer crumples to the floor. The air in the Catacombs grows lighter.', 'quest'); }
     for (const q of this.active()) {
       if (q.status !== 'active') continue;
       if (q.type === 'undead' && e.def && e.def.undead && G.area.kind === 'dungeon') {
@@ -94,9 +94,9 @@ const Quests = {
   },
   onPickup(it) {
     if ((it.base === 'soulgem' || it.base === 'letter') && this.mq() < 2 && hasItem('soulgem') && hasItem('letter')) {
-      this.setMQ(2, 'You have recovered the Soul Gem of King Lysandus and the Emperor\'s Letter. Lysandus\'s ghost walks the streets at night — confront him with the gem.');
+      this.setMQ(2, 'You have recovered the Black Stone of King Aldwin and the Stadtholder’s Letter. Aldwin\'s ghost walks the streets at night — confront him with the gem.');
     }
-    for (const q of this.active()) if (q.type === 'fetch' && q.status === 'active' && it.base === q.itemBase) { q.status = 'done'; msg(`You found ${q.itemName}. Return it to ${q.giver === 'mages' ? 'the Mages Guild' : 'the Temple'}.`, 'quest'); SFX.play('quest'); }
+    for (const q of this.active()) if (q.type === 'fetch' && q.status === 'active' && it.base === q.itemBase) { q.status = 'done'; msg(`You found ${q.itemName}. Return it to ${q.giver === 'mages' ? 'the Philosophers’ Society' : 'the Temple'}.`, 'quest'); SFX.play('quest'); }
   },
   populateDungeon(area, rooms, cs, freeSpot) {
     for (const q of this.active()) {
@@ -124,11 +124,11 @@ const Quests = {
   },
   mainJournal() {
     switch (this.mq()) {
-      case 0: return 'The Emperor has sent me to Daggerfall. I should present myself to King Gothryd at Castle Daggerfall, at the north end of the city, and learn why the ghost of his father haunts the streets.';
-      case 1: return "King Gothryd believes a necromancer has bound his father's spirit and stolen the Emperor's letter. The Catacombs lie beneath the old mausoleum in Arkay's Graveyard, behind the Temple of Arkay in the west of the city. The King gave me the key. A carriage from the Grand Market would save my legs.";
-      case 2: return 'I carry the Soul Gem of King Lysandus and the Emperor\'s Letter. The ghost walks between 8 in the evening and dawn around the Lysandus Memorial, on the road from the Grand Market to the castle. I must confront him with the gem.';
-      case 3: return "King Lysandus is at peace. I should bring the Emperor's Letter to King Gothryd.";
-      default: return 'The ghost of Lysandus is at rest and the letter is delivered. Daggerfall is in my debt.';
+      case 0: return 'The Stadtholder has sent me to Aldhaven. I should present myself to King Ottmar at Aldhaven Castle, at the north end of the city, and learn why the ghost of his father haunts the streets.';
+      case 1: return "King Ottmar believes a necromancer has bound his father's spirit and stolen the Stadtholder’s letter. The Catacombs lie beneath the old mausoleum in Saint Hallam’s Churchyard, behind the Church of Saint Hallam in the west of the city. The King gave me the key. A carriage from the Grand Market would save my legs.";
+      case 2: return 'I carry the Black Stone of King Aldwin and the Stadtholder’s Letter. The ghost walks between 8 in the evening and dawn around the Aldwin Memorial, on the road from the Grand Market to the castle. I must confront him with the gem.';
+      case 3: return "King Aldwin is at peace. I should bring the Stadtholder’s Letter to King Ottmar.";
+      default: return 'The ghost of Aldwin is at rest and the letter is delivered. Aldhaven is in my debt.';
     }
   },
 };
@@ -145,8 +145,8 @@ function describeDir(fx, fz, tx, tz, from = 'here') {
 function nearestStop(x, z) { let best = null, bd = 1e9; for (const s of G.city.stops || []) { const d = Math.hypot(s.x - x, s.z - z); if (d < bd) { bd = d; best = s; } } return best; }
 const WHERE_TOPICS = [
   ['tavern', 'a tavern'], ['general', 'a general store'], ['weaponsmith', 'a weaponsmith'], ['armorer', 'an armorer'], ['alchemist', 'an alchemist'],
-  ['temple', 'the Temple of Arkay'], ['hospice', 'the House of Mercy'], ['mages', 'the Mages Guild'], ['fighters', 'the Fighters Guild'], ['castle', 'Castle Daggerfall'], ['mausoleum', 'the Catacombs'],
-  ['coach', 'a carriage stop'], ['lm:market', 'the Grand Market'], ['lm:memorial', 'the Lysandus Memorial'], ['lm:garden', "the Queen's Garden"], ['lm:bell', 'the Bell Tower'], ['lm:lighthouse', 'the lighthouse'],
+  ['temple', 'the Church of Saint Hallam'], ['hospice', 'the House of Mercy'], ['mages', 'the Philosophers’ Society'], ['fighters', 'the Fencing School'], ['castle', 'Aldhaven Castle'], ['mausoleum', 'the Catacombs'],
+  ['coach', 'a carriage stop'], ['lm:market', 'the Grand Market'], ['lm:memorial', 'the Aldwin Memorial'], ['lm:garden', "the Queen's Garden"], ['lm:bell', 'the Bell Tower'], ['lm:lighthouse', 'the lighthouse'],
 ];
 function whereIs(npc, type) {
   const origin = G.area.kind === 'city' ? npc.pos : (G.area.building ? { x: G.area.building.door.x, z: G.area.building.door.z } : { x: 0, z: 0 });
@@ -194,36 +194,36 @@ function dialogFor(npc) {
   }
   const guildQuest = (giver) => {
     const q = Quests.byGiver(giver);
-    if (q && q.status === 'done') opts.push({ label: 'Report success', fn: () => { if (q.type === 'fetch') { const it = hasItem(q.itemBase); if (it) removeItem(P, it); } Quests.complete(q); return `"Well done. The ${giver === 'temple' ? 'temple' : 'guild'} remembers those who deliver." You receive ${q.reward.gold} gold.`; } });
+    if (q && q.status === 'done') opts.push({ label: 'Report success', fn: () => { if (q.type === 'fetch') { const it = hasItem(q.itemBase); if (it) removeItem(P, it); } Quests.complete(q); return `"Well done. The ${giver === 'temple' ? 'church' : giver === 'mages' ? 'Society' : 'School'} remembers those who deliver." You receive ${q.reward.gold} gold.`; } });
     else opts.push({ label: 'Ask for work', fn: () => { const cur = Quests.byGiver(giver); if (cur) return `"You already have a task from us: ${cur.title}. Finish it first."`; const nq = Quests.generate(giver); return `"${nq.desc}" (Added to your journal.)${nq.gaveKey ? ' You are given a key to the Catacombs.' : ''}`; } });
   };
   switch (npc.dialog) {
     case 'king': {
-      sub = 'King of Daggerfall'; const mq = Quests.mq();
+      sub = 'King of Aldhaven'; const mq = Quests.mq();
       if (mq === 0) {
-        text = '"So, the Emperor\'s agent arrives at last. Welcome to Daggerfall. I would that you had come in happier times."';
-        opts.push({ label: 'Ask about the ghost', fn: () => { Quests.setMQ(1, 'Journal updated. The King has given you the Catacombs Key.'); if (!hasItem('catakey')) addItem(P, { id: iid(), kind: 'key', base: 'catakey', name: 'Catacombs Key', value: 0 }, true); return '"My father, King Lysandus, fell at Cryngaine Field. Every night since, his shade stalks these streets crying for vengeance, and my people cower behind their doors. Mynaste — my court mage — believes something holds his spirit here. Something unnatural.\n\nWorse: a letter the Emperor sent to my mother vanished from these very halls. My spies trace both troubles to the Catacombs beneath the mausoleum in Arkay\'s graveyard. A necromancer lurks there, they say.\n\nTake this key. Find the villain. Free my father, and bring me that letter."'; } });
-      } else if (mq === 1) text = '"The Catacombs lie beneath the old mausoleum in the graveyard beside the Temple of Arkay, in the south-west of the city. Go with Arkay\'s blessing — and a good blade."';
+        text = '"So, the Stadtholder’s agent arrives at last. Welcome to Aldhaven. I would that you had come in happier times."';
+        opts.push({ label: 'Ask about the ghost', fn: () => { Quests.setMQ(1, 'Journal updated. The King has given you the Catacombs Key.'); if (!hasItem('catakey')) addItem(P, { id: iid(), kind: 'key', base: 'catakey', name: 'Catacombs Key', value: 0 }, true); return '"My father, King Aldwin, fell on Harrow Moor. Every night since, his shade stalks these streets crying for vengeance, and my people cower behind their doors. Anselm Brandt — my court mage — believes something holds his spirit here. Something unnatural.\n\nWorse: a letter the Stadtholder sent to my mother vanished from these very halls. My spies trace both troubles to the Catacombs beneath the mausoleum in Saint Hallam\'s graveyard. A necromancer lurks there, they say.\n\nTake this key. Find the villain. Free my father, and bring me that letter."'; } });
+      } else if (mq === 1) text = '"The Catacombs lie beneath the old mausoleum in the graveyard beside the Church of Saint Hallam, in the south-west of the city. Go with God’s blessing — and a good blade."';
       else if (mq === 2) text = '"You have the gem? I can almost hear him through it. Go to my father — he walks the streets at night, near the plaza and the castle road. Release him, I beg you."';
       else if (mq === 3) {
         text = '"His voice... it no longer echoes through my halls. My father is at peace?"';
-        opts.push({ label: "Hand over the Emperor's Letter", fn: () => { const it = hasItem('letter'); if (it) removeItem(P, it); P.gold += 1500; addItem(P, makeWeapon('longsword', 'daedric'), true); giveXP(400); Quests.setMQ(4); setTimeout(() => UI.openVictory(), 50); return '"The seal is unbroken. You have done what no priest or mage in this city could. Take this gold — and this blade, forged in fires not of this world. Daggerfall will not forget you."'; } });
-      } else text = '"Daggerfall owes you a debt, friend. Stay as long as you like. The city is yours."';
+        opts.push({ label: "Hand over the Stadtholder’s Letter", fn: () => { const it = hasItem('letter'); if (it) removeItem(P, it); P.gold += 1500; addItem(P, makeWeapon('longsword', 'meteoric'), true); giveXP(400); Quests.setMQ(4); setTimeout(() => UI.openVictory(), 50); return '"The seal is unbroken. You have done what no priest or mage in this city could. Take this gold — and this blade, forged in fires not of this world. Aldhaven will not forget you."'; } });
+      } else text = '"Aldhaven owes you a debt, friend. Stay as long as you like. The city is yours."';
       break;
     }
-    case 'queen': sub = 'Queen of Daggerfall';
-      text = Quests.mq() >= 4 ? '"My husband speaks of little else but your deeds. The court is grateful."' : '"The Emperor\'s letter was meant for my husband\'s mother. What it says is a matter of state — which is to say, a matter of war. Find it."';
+    case 'queen': sub = 'Queen of Aldhaven';
+      text = Quests.mq() >= 4 ? '"My husband speaks of little else but your deeds. The court is grateful."' : '"The Stadtholder’s letter was meant for my husband\'s mother. What it says is a matter of state — which is to say, a matter of war. Find it."';
       opts.push(rumor); break;
-    case 'courtmage': sub = 'Court Mage';
-      text = '"The dead king is anchored to our world by a soul gem — a black one. Whoever holds it holds him. Shatter it in his presence and he will finally rest. Mind the wraiths: only silver, finer metals or magic will touch them."';
+    case 'courtmage': sub = 'Court Philosopher';
+      text = '"The dead king is anchored to our world by a stone — a black one, cut and bound by a necromancer. Whoever holds it holds him. Shatter it in his presence and he will finally rest. Mind the wraiths: only silver, finer metals or magic will touch them."';
       opts.push(where); break;
     case 'palaceguard': sub = 'Palace Guard'; text = rnd.pick(['"Keep your hands where I can see them."', '"The King receives petitioners until eight in the evening."', '"Move along."']); opts.push(where); break;
     case 'ghost': {
       sub = 'A restless spirit'; const mq = Quests.mq();
-      if (mq < 2) text = '"VENGEANCE! ...The gem... the dark one binds me... beneath Arkay\'s garden... VENGEANCE!"';
+      if (mq < 2) text = '"VENGEANCE! ...The gem... the dark one binds me... beneath the saint’s garden... VENGEANCE!"';
       else if (mq === 2 && hasItem('soulgem')) {
-        text = 'The ghost of King Lysandus turns towards the gem in your hand. Its hollow eyes burn.';
-        opts.push({ label: 'Shatter the soul gem', fn: () => { const it = hasItem('soulgem'); if (it) removeItem(P, it); Quests.setMQ(3, "King Lysandus is at peace. Bring the Emperor's Letter to King Gothryd."); npc.data.fading = 1; giveXP(150); SFX.play('ghost'); return 'The gem cracks with a sound like breaking ice. The ghost sighs, and for a moment you see a tired old man instead of a monster.\n\n"At last... the chains are broken. Tell my son... I am proud. Tell the Emperor... the letter holds the truth..."\n\nHe fades into the night air.'; } });
+        text = 'The ghost of King Aldwin turns towards the gem in your hand. Its hollow eyes burn.';
+        opts.push({ label: 'Shatter the black stone', fn: () => { const it = hasItem('soulgem'); if (it) removeItem(P, it); Quests.setMQ(3, "King Aldwin is at peace. Bring the Stadtholder’s Letter to King Ottmar."); npc.data.fading = 1; giveXP(150); SFX.play('ghost'); return 'The gem cracks with a sound like breaking ice. The ghost sighs, and for a moment you see a tired old man instead of a monster.\n\n"At last... the chains are broken. Tell my son... I am proud. Tell the Stadtholder... the letter holds the truth..."\n\nHe fades into the night air.'; } });
       } else text = 'The ghost stares through you.';
       break;
     }
@@ -235,16 +235,16 @@ function dialogFor(npc) {
     case 'shop': case 'vendor': sub = b ? `${TYPE_LABEL[b.type]} — ${b.name}` : 'Market vendor';
       text = rnd.pick(['"Take a look. Everything is of the finest quality."', '"Buying or selling?"', '"No haggling. Well — a little haggling."']);
       opts.push({ label: 'Buy', fn: () => { UI.openShop(npc, 'buy'); return null; } }, { label: 'Sell', fn: () => { UI.openShop(npc, 'sell'); return null; } }, where); break;
-    case 'priest': sub = 'High Priest of Arkay';
-      text = '"Arkay watches over the living and the dead alike. How may the temple serve you?"';
+    case 'priest': sub = 'Rector of Saint Hallam’s';
+      text = '"Saint Hallam keeps the dying and the dead alike. How may the church serve you?"';
       opts.push({ label: 'Heal my wounds', fn: () => { const miss = P.maxHp - P.hp; if (miss <= 0) return '"You are hale, child. Go in peace."'; const cost = Math.ceil(miss * 0.5 + 5); if (P.gold < cost) return `"The temple asks a donation of ${cost} gold for healing."`; P.gold -= cost; P.hp = P.maxHp; SFX.play('heal'); return `The priest lays hands upon you. You are fully healed. (-${cost} gold)`; } });
       opts.push({ label: 'Buy potions', fn: () => { UI.openShop(npc, 'buy', 'alchemist'); return null; } });
       guildQuest('temple'); opts.push(where); break;
-    case 'magister': sub = 'Guild Magister';
-      text = '"The Mages Guild welcomes seekers of knowledge — and their gold."';
+    case 'magister': sub = 'Secretary of the Philosophers’ Society';
+      text = '"The Society welcomes seekers of knowledge — and their gold."';
       opts.push({ label: 'Learn spells', fn: () => { UI.openSpells(npc); return null; } }, { label: 'Buy potions', fn: () => { UI.openShop(npc, 'buy', 'alchemist'); return null; } });
       guildQuest('mages'); opts.push(rumor); break;
-    case 'guildmaster': sub = 'Master of the Fighters Guild';
+    case 'guildmaster': sub = 'Master of the Fencing School';
       text = '"Another sword arm looking for coin? Good. We have more trouble than blades."';
       guildQuest('fighters');
       opts.push({ label: `Train (${60 * P.level} gold)`, fn: () => { const st = G.bState.fighters || (G.bState.fighters = {}); if (st.trainDay === dayOf(G.time)) return '"Enough for today. Your arms need rest. Come back tomorrow."'; const cost = 60 * P.level; if (P.gold < cost) return `"Training costs ${cost} gold."`; P.gold -= cost; st.trainDay = dayOf(G.time); const gain = Math.round(xpToNext(P.level) * 0.3); giveXP(gain); P.fat = 0; return `You spar for hours until your arms burn. (+${gain} experience)`; } });
@@ -258,17 +258,18 @@ function dialogFor(npc) {
       text = rnd.pick(['"Mind the bucket. Please."', '"Fell off a roof in the Warrens. The roof fell with me."', '"The Mother says I will walk again. Soon. Probably."', '"Do not drink from Beggar\'s Well. Trust me."', '"Got stabbed on the docks. Over a fish. A fish!"']); opts.push(rumor); break;
     case 'clerk': sub = b ? `Clerk of ${b.name}` : 'Clerk';
       text = rnd.pick(['"Deliveries round the back. Everything here is counted twice."', '"If you are from customs, I have never seen you before in my life."']); opts.push(rumor, where); break;
-    case 'servant': sub = 'Household servant'; text = rnd.pick(['"The master is not receiving visitors."', '"Mind the carpet, it came all the way from Sentinel."']); opts.push(rumor, where); break;
+    case 'servant': sub = 'Household servant'; text = rnd.pick(['"The master is not receiving visitors."', '"Mind the carpet, it came all the way from Vellaro."']); opts.push(rumor, where); break;
     case 'coach': {
-      sub = 'Coachman of the Daggerfall Carriage Company'; const stop = G.city.stops.find(s => s.id === npc.data.stop);
+      sub = 'Coachman of the Aldhaven Carriage Company'; const stop = G.city.stops.find(s => s.id === npc.data.stop);
       text = rnd.pick(['"Where to? Anywhere inside the walls, if you have the coin."', '"Climb aboard. Mind the horse, he bites."', '"Kingsward, the Docks, the Warrens if you are brave. Name it."']);
       opts.push({ label: 'Travel by carriage', fn: () => { UI.openTravel(stop); return null; } }, rumor, where); break;
     }
     case 'villager': sub = `A villager of ${npc.data.hamlet || 'Mirrormere'}`;
-      text = npc.data.hamlet ? rnd.pick(['"Not many come through here. Fewer stop."', '"The harvest was thin this year. The one before, thinner."', '"Follow the track and you will reach Daggerfall, in the end. Everything ends up in Daggerfall."', '"Mind the dog. He is friendlier than he looks. No, wait, the other way round."', `"${npc.data.hamlet}? Five families and a well. Been that way since my grandmother's day."`]) : rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Daggerfall, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
+      text = npc.data.hamlet ? rnd.pick(['"Not many come through here. Fewer stop."', '"The harvest was thin this year. The one before, thinner."', '"Follow the track and you will reach Aldhaven, in the end. Everything ends up in Aldhaven."', '"Mind the dog. He is friendlier than he looks. No, wait, the other way round."', `"${npc.data.hamlet}? Five families and a well. Been that way since my grandmother's day."`]) : rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Aldhaven, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
       opts.push(siteRumor(npc), rumor); break;
+    case 'household': sub = npc.data.trade; text = rnd.pick(npc.data.lines); opts.push(siteRumor(npc), rumor); break;
     case 'traveler': sub = npc.data.trade || 'A traveller on the road';
-      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Daggerfall, the gates shut at no hour, but the guards ask questions after dark."']);
+      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Aldhaven, the gates shut at no hour, but the guards ask questions after dark."']);
       opts.push(siteRumor(npc), rumor); break;
     case 'bard': sub = 'Traveling bard'; text = '"Care for a song? No? A rumor, then — bards hear everything."'; opts.push(rumor); break;
     case 'resident':
@@ -278,6 +279,6 @@ function dialogFor(npc) {
       opts.push(where, rumor); break;
     default: opts.push(where, rumor);
   }
-  if (!['king', 'ghost', 'villager', 'traveler'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
+  if (!['king', 'ghost', 'villager', 'traveler', 'household'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
   return { title: npc.name, sub, text, opts };
 }

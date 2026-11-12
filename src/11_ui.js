@@ -107,8 +107,8 @@ const UI = {
   },
   openSpells(npc) {
     const P = G.player;
-    const render = () => `<h2>Spells of the Mages Guild</h2><div class="list scroll">${Object.entries(SPELLS).map(([k, s]) => `<div class="row"><div class="nm">${esc(s.name)} <small>${esc(s.desc)} Costs ${s.cost} magicka.</small></div><div class="pr">${s.price} g</div>${P.spells.includes(k) ? '<span class="dim">Known</span>' : `<button class="db sm" data-a="${k}" ${P.gold < s.price ? 'disabled' : ''}>Learn</button>`}</div>`).join('')}</div>
-      <p class="note">Cast your selected spell with Q or the right mouse button. Choose it with 1–3.${P.maxMp < 20 ? ' Your magicka reserves are meager — consider Potions of Magicka.' : ''}</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Done</button></div>`;
+    const render = () => `<h2>Arts of the Philosophers’ Society</h2><div class="list scroll">${Object.entries(SPELLS).map(([k, s]) => `<div class="row"><div class="nm">${esc(s.name)} <small>${esc(s.desc)} Costs ${s.cost} spirit.</small></div><div class="pr">${s.price} g</div>${P.spells.includes(k) ? '<span class="dim">Known</span>' : `<button class="db sm" data-a="${k}" ${P.gold < s.price ? 'disabled' : ''}>Learn</button>`}</div>`).join('')}</div>
+      <p class="note">Cast your selected spell with Q or the right mouse button. Choose it with 1–3.${P.maxMp < 20 ? ' Your spirit runs thin — consider Potions of Spirit.' : ''}</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Done</button></div>`;
     this.open('spells', render, { cls: 'mid', onAct: (a) => { const s = SPELLS[a]; if (!s || P.gold < s.price || P.spells.includes(a)) return; P.gold -= s.price; P.spells.push(a); SFX.play('levelup'); msg(`You have learned ${s.name}.`, 'good'); this.render(); } });
   },
 
@@ -145,7 +145,7 @@ const UI = {
         ${it.kind === 'potion' ? `<button class="db sm" data-a="u${i}">Drink</button>` : ''}${it.kind === 'weapon' || it.kind === 'armor' ? `<button class="db sm" data-a="u${i}">${isEquipped(it) ? 'Remove' : 'Equip'}</button>` : ''}${it.kind === 'quest' || it.kind === 'key' ? `<button class="db sm" data-a="u${i}">Examine</button>` : `<button class="db sm ghost" data-a="d${i}">Drop</button>`}</div>`).join('') || '<p class="dim">Your pack is empty.</p>';
       return `<div class="sheet"><div class="col"><h2>${esc(P.name)}</h2><div class="sub">Level ${P.level} ${esc(P.race)} ${esc(P.cls)}</div>
         <div class="xpbar"><i style="width:${Math.round(P.xp / next * 100)}%"></i></div><div class="sub">${P.xp} / ${next} experience</div>
-        <div class="vitals"><span class="hp">Health ${Math.ceil(P.hp)}/${P.maxHp}</span><span class="mp">Magicka ${Math.floor(P.mp)}/${P.maxMp}</span><span class="ft">Fatigue ${Math.floor(P.fat)}/${P.maxFat}</span></div>
+        <div class="vitals"><span class="hp">Health ${Math.ceil(P.hp)}/${P.maxHp}</span><span class="mp">Spirit ${Math.floor(P.mp)}/${P.maxMp}</span><span class="ft">Fatigue ${Math.floor(P.fat)}/${P.maxFat}</span></div>
         <div class="attrs">${attrs}</div>${P.points ? `<p class="note good">${P.points} attribute points to spend.</p>` : ''}
         <div class="attr"><span>Armor rating</span><b>${playerAC()}</b></div><div class="attr"><span>Damage</span><b>${w.min + (w.dmgBonus || 0)}–${w.max + (w.dmgBonus || 0)}</b></div><div class="attr"><span>Gold</span><b>${P.gold}</b></div></div>
         <div class="col"><h3>Equipment</h3>${eq}<h3>Spells</h3><div class="spells">${spells}</div><h3>Pack</h3><div class="list scroll">${inv}</div></div></div>
@@ -166,8 +166,8 @@ const UI = {
     const render = () => {
       const act = Quests.active().map(q => `<div class="quest ${q.status}"><h3>${esc(q.title)}${q.status === 'done' ? ' — report back' : ''}</h3><p>${esc(q.desc)}${q.type === 'undead' ? ` (${q.count}/${q.need})` : ''}</p><small>Reward: ${q.reward.gold} gold</small></div>`).join('');
       const old = G.quests.filter(q => q.status === 'complete' || q.status === 'failed').map(q => `<li>${esc(q.title)} — ${q.status}</li>`).join('');
-      return `<h2>Journal</h2><div class="scroll journal"><div class="quest main"><h3>The Emperor's Business</h3><p>${esc(Quests.mainJournal())}</p></div>${act}
-        ${G.wanted ? `<div class="quest bad"><h3>Wanted</h3><p>The city guard hunts you. Pay your fine of ${G.wanted.fine} gold at Castle Daggerfall, or keep out of sight until ${clockString(G.wanted.until)} on ${dateString(G.wanted.until)}.</p></div>` : ''}
+      return `<h2>Journal</h2><div class="scroll journal"><div class="quest main"><h3>The Stadtholder’s Business</h3><p>${esc(Quests.mainJournal())}</p></div>${act}
+        ${G.wanted ? `<div class="quest bad"><h3>Wanted</h3><p>The city guard hunts you. Pay your fine of ${G.wanted.fine} gold at Aldhaven Castle, or keep out of sight until ${clockString(G.wanted.until)} on ${dateString(G.wanted.until)}.</p></div>` : ''}
         ${old ? `<h3>Past deeds</h3><ul>${old}</ul>` : ''}</div><div class="btns"><button class="db" data-a="close">Close (J)</button></div>`;
     };
     this.open('journal', render, { cls: 'mid' });
@@ -224,8 +224,8 @@ const UI = {
   },
   openDeath() {
     const hasSave = !!readSave();
-    this.open('death', () => `<h2 class="bad">You have died</h2><p class="story">Your vision darkens. The cold stones of Daggerfall are the last thing you feel.</p>
-      <div class="btns col">${hasSave ? '<button class="db" data-a="load">Load last save</button>' : ''}<button class="db" data-a="revive">Wake in the Temple of Arkay (lose half your gold)</button><button class="db" data-a="quit">Quit to title</button></div>`,
+    this.open('death', () => `<h2 class="bad">You have died</h2><p class="story">Your vision darkens. The cold stones of Aldhaven are the last thing you feel.</p>
+      <div class="btns col">${hasSave ? '<button class="db" data-a="load">Load last save</button>' : ''}<button class="db" data-a="revive">Wake in the Church of Saint Hallam (lose half your gold)</button><button class="db" data-a="quit">Quit to title</button></div>`,
       { cls: 'small', closable: false, onAct: (a) => { if (a === 'load') loadGame(); if (a === 'revive') { this.close(true); reviveAtTemple(); } if (a === 'quit') { this.close(true); toTitle(); } } });
   },
   openStory(title, text, btn, cb, cls = 'mid') {
@@ -233,7 +233,7 @@ const UI = {
       { cls, closable: false, leave: () => { this.close(true); cb && cb(); }, onAct: (a) => { if (a === 'go') { this.close(true); cb && cb(); } } });
   },
   openVictory() {
-    this.openStory('The Ghost Is at Rest', `<p>King Lysandus no longer walks the streets of Daggerfall. The Emperor's letter is in royal hands, and whatever it says will set the Iliac Bay on a new course — but that is a story for another city.</p><p>For now, Daggerfall sleeps soundly for the first time in months. Its taverns, guilds and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Daggerfall: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
+    this.openStory('The Ghost Is at Rest', `<p>King Aldwin no longer walks the streets of Aldhaven. The Stadtholder’s letter is in royal hands, and whatever it says will set Merrow Bay on a new course — but that is a story for another city.</p><p>For now, Aldhaven sleeps soundly for the first time in months. Its taverns, halls and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Aldhaven: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
   },
   // fast travel on foot: straight on, along the road underfoot, or to a place you know of (by road or across country)
   openFoot() {
@@ -268,7 +268,7 @@ const UI = {
     if (nearbyHostiles(18)) { msg('The horses shy away. You cannot board with enemies nearby.', 'bad'); return; }
     const h = hourOf(G.time); const night = h < 5 || h >= 23;
     const routes = carriageRoutes(stop);
-    const render = () => `<h2>Daggerfall Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
+    const render = () => `<h2>Aldhaven Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
       <div class="list scroll">${routes.map((r, i) => `<div class="row"><div class="nm">${esc(capFirst(r.stop.name))}<small>${esc(capFirst(districtAt(r.stop.x, r.stop.z).name))} · about ${r.mins} minutes${r.via.length ? ' · via ' + esc(r.via.join(', ')) : ''}</small></div><div class="pr">${r.fare * (night ? 2 : 1)} g</div><button class="db sm" data-a="t${i}" ${P.gold < r.fare * (night ? 2 : 1) ? 'disabled' : ''}>Travel</button></div>`).join('')}</div>
       <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="foot">Travel on foot</button><button class="db" data-a="close">Stay here</button></div>`;
     this.open('travel', render, { cls: 'mid', onAct: (a) => { if (a === 'foot') { this.openFoot(); return; } const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
@@ -387,7 +387,7 @@ const MapView = {
     const markers = [];
     const mq = Quests.mq();
     const bld = id => G.buildings.find(b => b.id === id);
-    if (mq === 0 || mq === 3) markers.push([bld('castle').door, 'King Gothryd']);
+    if (mq === 0 || mq === 3) markers.push([bld('castle').door, 'King Ottmar']);
     if (mq === 1 && !G.flags.necroDead) markers.push([bld('mausoleum').door, 'The Catacombs']);
     if (mq === 2) markers.push([G.city.memorial, 'The ghost (at night)']);
     for (const q of Quests.active()) {
@@ -398,7 +398,7 @@ const MapView = {
     }
     const t = performance.now() / 300;
     if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
-    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
+    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Aldhaven', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
     // the towns: moat, walls, canal, streets and squares, their great buildings named once the town is found
     for (const T of TOWNS) { const C = T.cfg, f = (G.flags.found || {})[T.id], P2 = (u, v) => { const [wx, wz] = T.w(u, v); return [X(wx), Z(wz)]; };
       const poly = (pts, close) => { x.beginPath(); pts.forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); if (close) x.closePath(); };
@@ -422,8 +422,8 @@ const MapView = {
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
     this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Daggerfall — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
-      : 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
+    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+      : 'Aldhaven — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
   },
   drawDungeon(x, W, H) {
     const D = G.area.dg; const cell = Math.floor(Math.min(W, H) * 0.9 / D.N); const ox = (W - cell * D.N) / 2, oz = (H - cell * D.N) / 2; const P = G.player;
@@ -520,7 +520,7 @@ function drawHUD() {
 
 /* ---------------- title & character creation ---------------- */
 const Create = {
-  race: 'Breton', cls: 'Spellsword', name: '', attr: null,
+  race: 'Townborn', cls: 'Adept', name: '', attr: null,
   quick() { if (!this.attr) this.roll(); return { name: this.name || 'Traveller', race: this.race, cls: this.cls, attr: { ...this.attr } }; },
   roll() { this.attr = {}; for (const a of ATTRS) this.attr[a] = clamp(40 + rnd.int(0, 15) + (RACES[this.race].mods[a] || 0) + (CLASSES[this.cls].mods[a] || 0), 20, 95); },
   open() {
@@ -529,10 +529,10 @@ const Create = {
       const R = RACES[this.race], C = CLASSES[this.cls]; const hp = 25 + Math.floor(this.attr.END / 4) + C.hp, mp = Math.round(this.attr.INT * C.mp);
       return `<h2>Create Your Character</h2><div class="create scroll">
         <div class="field"><label for="c_name">Name</label><input id="c_name" type="text" maxlength="24" value="${esc(this.name)}" placeholder="Nameless" autocomplete="off"></div>
-        <h3>Race</h3><div class="grid">${Object.keys(RACES).map(r => `<button class="db sm ${r === this.race ? 'on' : ''}" data-a="r:${r}">${r}</button>`).join('')}</div><p class="dim">${esc(R.desc)}</p>
+        <h3>Origin</h3><div class="grid">${Object.keys(RACES).map(r => `<button class="db sm ${r === this.race ? 'on' : ''}" data-a="r:${r}">${r}</button>`).join('')}</div><p class="dim">${esc(R.desc)}</p>
         <h3>Class</h3><div class="grid">${Object.keys(CLASSES).map(c => `<button class="db sm ${c === this.cls ? 'on' : ''}" data-a="c:${c}">${c}</button>`).join('')}</div><p class="dim">${esc(C.desc)}${rpgUI() ? ` Starts with: ${esc(startingKit(this.cls).items.map(i => i.name).join(', '))}${startingKit(this.cls).spells.length ? '; spells: ' + startingKit(this.cls).spells.map(s => SPELLS[s].name).join(', ') : ''}.` : ''}</p>
         ${rpgUI() ? `<h3>Attributes <button class="db xs" data-a="reroll">Reroll</button></h3><div class="attrs two">${ATTRS.map(a => `<div class="attr"><span>${ATTR_NAMES[a]}</span><b>${this.attr[a]}</b></div>`).join('')}</div>
-        <p>Health ${hp} · Magicka ${mp} · Fatigue ${this.attr.END + this.attr.STR} · Gold ${C.gold}</p>` : ''}</div>
+        <p>Health ${hp} · Spirit ${mp} · Fatigue ${this.attr.END + this.attr.STR} · Gold ${C.gold}</p>` : ''}</div>
         <div class="btns"><button class="db" data-a="back">Back</button><button class="db primary" data-a="start">Begin</button></div>`;
     };
     UI.open('create', render, {

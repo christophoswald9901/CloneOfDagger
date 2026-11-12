@@ -1,5 +1,5 @@
 /* =====================================================================
-   The city of Daggerfall: an irregular walled port with seven quarters,
+   The city of Aldhaven: an irregular walled port with seven quarters,
    a hierarchical street network that grows from the market outwards,
    buildings that face their street, landmarks, carriage stops, harbour
    and the countryside beyond the walls
@@ -28,13 +28,13 @@ const CASTLE_Z = -58; // the castle's frame: its north wall is part of the city 
 const RAMP = { x0: 40, xw: -24, xe: 10, z1: -72, z2: -79, w: 6 };
 const LOOK_AT = [-12, 26]; // what the lookout on Pilgrim's Rise faces
 
-const FIRST_M = ['Aldric', 'Bertrand', 'Cedric', 'Gaston', 'Pierre', 'Remy', 'Theodore', 'Lucien', 'Guillaume', 'Mathieu', 'Roland', 'Edouard', 'Gilles', 'Anton', 'Basile', 'Corvin', 'Darien', 'Emeric', 'Florian', 'Hugo', 'Jourdain', 'Lothaire', 'Marius', 'Olivier', 'Rainier', 'Tristan', 'Valentin', 'Kharjo', 'Sigurd', 'Azzan', 'Tavi', 'Hazadir', 'Brond', 'Ferrin'];
-const FIRST_F = ['Jehanne', 'Marguerite', 'Odile', 'Sabine', 'Yvette', 'Aurore', 'Isolde', 'Nadine', 'Celestine', 'Fiona', 'Helene', 'Adele', 'Blanche', 'Clemence', 'Elodie', 'Genevieve', 'Liliane', 'Mirabelle', 'Oriane', 'Perrine', 'Rosalind', 'Solene', 'Viviane', 'Iszara', 'Saadia', 'Freyja', 'Nirasha'];
-const SURNAMES = ['Belmont', 'Carrard', 'Dufresne', 'Fontaine', 'Gautier', 'Lamoreaux', 'Marchand', 'Montclair', 'Rochefort', 'Sauveur', 'Thibault', 'Vautrin', 'Duvall', 'Leclerc', 'Moreau', 'Pelletier', 'Renaud', 'Arcand', 'Beaumont', 'Chastel', 'Delacroix', 'Estienne', 'Fauconnier', 'Girard', 'Hennequin', 'Jardin', 'Lefort', 'Mercier', 'Noirel', 'Oriel', 'Pontbriand', 'Quintard', 'Rivard', 'Sorel', 'Tremblay', 'Valmont'];
+const FIRST_M = ['Pieter', 'Willem', 'Jan', 'Hendrik', 'Cornelis', 'Joost', 'Maarten', 'Thomas', 'Edmund', 'Nathaniel', 'Gideon', 'Josiah', 'Ralph', 'Walter', 'Hugh', 'Giacomo', 'Lorenzo', 'Matteo', 'Bartolomeo', 'Niccolò', 'Ambrose', 'Jasper', 'Tobias', 'Reinier', 'Claes', 'Dirk', 'Gerrit', 'Silas', 'Abel', 'Benedict', 'Crispin', 'Fabrizio', 'Lambert', 'Rufus'];
+const FIRST_F = ['Margriet', 'Neeltje', 'Grietje', 'Trijntje', 'Aaltje', 'Judith', 'Susanna', 'Prudence', 'Mercy', 'Agnes', 'Joan', 'Alice', 'Beatrix', 'Lucia', 'Caterina', 'Lucrezia', 'Ottavia', 'Isabella', 'Hester', 'Marijke', 'Rosalind', 'Cecily', 'Tabitha', 'Elspeth', 'Geertruid', 'Maddalena', 'Sophia'];
+const SURNAMES = ['de Vries', 'Bakker', 'Visser', 'Janssen', 'van Dijk', 'Hoekstra', 'Brouwer', 'Kuiper', 'Ashdown', 'Fairweather', 'Thornbury', 'Whitlock', 'Cole', 'Pennington', 'Hartley', 'Mercer', 'Rossi', 'Bellini', 'Moretti', 'Contarini', 'Vos', 'Smit', 'van der Meer', 'Oriel', 'Pruitt', 'Blackwood', 'Tanner', 'Fletcher', 'Ruysch', 'Graaf', 'Lombardi', 'Ferrante', 'Wyck', 'Haverkamp', 'Stoke', 'Verhoef'];
 const TAV_ADJ = ['Laughing', 'Drunken', 'Silver', 'Rusty', 'Howling', 'Dancing', 'Bloated', 'Crimson', 'Sleeping', 'Wandering', 'Salty', 'Screaming', 'Golden', 'Tipsy', 'Bearded', 'Merry'];
-const TAV_NOUN = ['Unicorn', 'Goat', 'Knight', 'Dragon', 'Mermaid', 'Flagon', 'Barrel', 'Wolf', 'Hound', 'Chicken', 'Rat', 'Kraken', 'Stag', 'Minotaur', 'Harpy', 'Mudcrab'];
+const TAV_NOUN = ['Unicorn', 'Goat', 'Knight', 'Dragon', 'Mermaid', 'Flagon', 'Barrel', 'Wolf', 'Hound', 'Chicken', 'Rat', 'Kraken', 'Stag', 'Minotaur', 'Harpy', 'Herring'];
 const OPEN_HOURS = { tavern: [0, 24], general: [6, 18], weaponsmith: [6, 18], armorer: [6, 18], alchemist: [6, 18], temple: [0, 24], mages: [6, 23], fighters: [6, 23], castle: [6, 20], house: [6, 20], mausoleum: [0, 24], hospice: [0, 24], warehouse: [6, 18] };
-const TYPE_LABEL = { tavern: 'Tavern', general: 'General Store', weaponsmith: 'Weaponsmith', armorer: 'Armorer', alchemist: 'Alchemist', temple: 'Temple', mages: 'Guild Hall', fighters: 'Guild Hall', castle: 'Palace', house: 'Residence', mausoleum: 'Mausoleum', hospice: 'Hospice', warehouse: 'Warehouse' };
+const TYPE_LABEL = { tavern: 'Tavern', general: 'General Store', weaponsmith: 'Weaponsmith', armorer: 'Armorer', alchemist: 'Alchemist', temple: 'Church', mages: 'Society Hall', fighters: 'Fencing School', castle: 'Palace', house: 'Residence', mausoleum: 'Mausoleum', hospice: 'Hospice', warehouse: 'Warehouse' };
 const LOCKABLE = { house: true, warehouse: true };
 function personName(rng, gender) { return rng.pick(gender === 'f' ? FIRST_F : FIRST_M) + ' ' + rng.pick(SURNAMES); }
 function isOpen(b, t = G.time) { const [a, z] = OPEN_HOURS[b.type] || [0, 24]; const h = hourOf(t); return h >= a && h < z; }
@@ -44,8 +44,8 @@ const capFirst = s => s.charAt(0).toUpperCase() + s.slice(1);
 const DISTRICTS = [
   { id: 'kingsward', name: 'Kingsward', kind: 'noble', blurb: 'where the nobility keep their manors in the shadow of the castle', seeds: [[-85, -105], [0, -135], [-40, -85], [30, -95]] },
   { id: 'market', name: 'the Market Ward', kind: 'market', blurb: 'crowded timber houses around the Grand Market', seeds: [[0, 12], [-35, -25], [35, -25], [0, 48]] },
-  { id: 'temple', name: 'the Temple Quarter', kind: 'temple', blurb: "quiet streets around the Temple of Arkay", seeds: [[-130, -10], [-122, -62], [-125, 40]] },
-  { id: 'forges', name: 'the Forges', kind: 'crafts', blurb: 'smithies, workshops and the Fighters Guild', seeds: [[125, -5], [118, -58], [88, 18], [100, -110]] },
+  { id: 'temple', name: 'the Church Quarter', kind: 'temple', blurb: "quiet streets around the Church of Saint Hallam", seeds: [[-130, -10], [-122, -62], [-125, 40]] },
+  { id: 'forges', name: 'the Forges', kind: 'crafts', blurb: 'smithies, workshops and the Fencing School', seeds: [[125, -5], [118, -58], [88, 18], [100, -110]] },
   { id: 'docks', name: 'the Docks', kind: 'harbor', blurb: 'warehouses, sailors and the smell of fish', seeds: [[-45, 135], [15, 130], [75, 132]] },
   { id: 'warrens', name: 'the Warrens', kind: 'slum', blurb: 'a maze of shacks where the guard seldom goes', seeds: [[-108, 108], [-150, 78], [-72, 98]] },
   { id: 'tanners', name: "Tanners' Row", kind: 'poor', blurb: 'tanneries, dye-works and the homes of the people who work them', seeds: [[132, 92], [95, 88], [152, 45]] },
@@ -78,6 +78,7 @@ const CITY_MATS = {
   door: { tex: 'door' }, doorDark: { tex: 'doorDark' }, doorA: { tex: 'doorA' }, doorB: { tex: 'doorB' }, doorC: { tex: 'doorC' }, doorD: { tex: 'doorD' }, doorE: { tex: 'doorE' }, doorF: { tex: 'doorF' }, doorG: { tex: 'doorG' }, portcullis: { tex: 'portcullis', alpha: true, double: true }, iron: { tex: 'iron' },
   cloth: { tex: 'cloth', double: true }, stallA: { tex: 'stallA', double: true }, stallB: { tex: 'stallB', double: true }, stallC: { tex: 'stallC', double: true },
   banner: { tex: 'banner', double: true }, bannerRed: { tex: 'bannerRed', double: true }, bannerGuild: { tex: 'bannerGuild', double: true }, sail: { tex: 'sail', double: true },
+  hBrod: { tex: 'broderie', po: 4 }, hBedTop: { tex: 'bed' }, ashlar: { tex: 'ashlar' }, balus: { tex: 'balus', alpha: true, double: true }, sash: { tex: 'sash' }, sashS: { tex: 'sashS' }, hLawn: { tex: 'lawn', po: 1 }, hGravel: { tex: 'gravelPale', po: 2 }, hBed: { tex: 'bed', po: 4 }, hLawn2: { tex: 'lawn', po: 3 }, hWater: { tex: 'water', po: 5 }, // the great house's windows, lawns, gravel and flower beds
   hedge: { tex: 'hedge' }, rock: { tex: 'rock' }, signLook: { tex: 'signLook', double: true },
   roofCopper: { tex: 'roofCopper', double: true }, roofBlue: { tex: 'roofBlue', double: true }, roofBrown: { tex: 'roofBrown', double: true },
   // the terrain itself
@@ -352,7 +353,7 @@ function buildingName(rng, type, owner, wealth = 1.5) {
   const sur = owner.name.split(' ')[1];
   switch (type) {
     case 'tavern': return `The ${rng.pick(TAV_ADJ)} ${rng.pick(TAV_NOUN)}`;
-    case 'general': return rng.pick([`${sur}'s General Store`, 'Iliac Bay Provisions', `The ${rng.pick(['Honest', 'Thrifty', 'Wandering'])} Merchant`]);
+    case 'general': return rng.pick([`${sur}'s General Store`, 'Merrow Bay Provisions', `The ${rng.pick(['Honest', 'Thrifty', 'Wandering'])} Merchant`]);
     case 'weaponsmith': return rng.pick([`${sur}'s Smithy`, 'The Iron Anvil', 'The Keen Edge', 'The Red Forge']);
     case 'armorer': return rng.pick([`${sur}'s Armory`, 'The Steel Bulwark', 'The Dented Shield', 'The Riveted Hauberk']);
     case 'alchemist': return rng.pick([`The ${rng.pick(['Bubbling', 'Green', 'Smoking'])} Cauldron`, `${sur}'s Apothecary`]);
@@ -396,7 +397,7 @@ function chainAt(ch, t) {
 
 function buildCity() {
   planLand(); // the rivers of the whole country, and the valleys they cut, before any ground is laid
-  const area = newArea('city'); G.city = area; area.floorY = 0; area.name = 'Daggerfall'; area.heightAt = terrainH;
+  const area = newArea('city'); G.city = area; area.floorY = 0; area.name = 'Aldhaven'; area.heightAt = terrainH;
   const rng = new RNG(40521);
   const gb = new GB();
   const mats = worldMats(area, CITY_MATS);
@@ -838,12 +839,12 @@ function buildCity() {
     addCol(area, x - 4.3, z - 4.3, x + 4.3, z + 4.3, g - 2, g + 15); caster(mkObb(x, z, 0, 4.4, 4.4), g + 19); addCol(area, x - 3, z - 3, x + 3, z + 3, g + 15, g + 18.5); addCol(area, x - 1.4, z - 1.4, x + 1.4, z + 1.4, g + 18.5, g + 21.5);
   }
 
-  /* ---------- Castle Daggerfall (north), on its knoll ---------- */
+  /* ---------- Aldhaven Castle (north), on its knoll ---------- */
   const CH = castlePad.h;
   gb.setXf(0, CASTLE_Z, 0, CH);
   gb.quad('sqCobble', [-30.5, 0.03, -41.5], [1, 0, 0], [0, 0, -1], 61, 59, 3, 3); // the ward is cobbled
   gb.quad('sqFlag', [-2.5, 0.06, -40], [1, 0, 0], [0, 0, -1], 5, 26, 3, 3);
-  // Castle Daggerfall: a tall curtain on a battered plinth; one great tower and a keep lead a clear hierarchy of towers,
+  // Aldhaven Castle: a tall curtain on a battered plinth; one great tower and a keep lead a clear hierarchy of towers,
   // a projecting twin-towered gatehouse, the royal palace with crow-stepped gables and a chapel whose spire tops its ridge
   const CW = 15; // wall-walk height above the ward: half as high again as the city wall
   const cmerX = (x0, x1, z, h) => { for (let x = x0 + 0.6; x < x1 - 1.2; x += 2.7) gb.box(x, h, z - 0.5, x + 1.5, h + 1.7, z + 0.5, 'castle', 4, 4); };
@@ -960,7 +961,7 @@ function buildCity() {
   const castleFlags = [];
   for (const [cx, cz, tt, red] of [[STX, STZ, STH + 9, true], [-31.2, -106, 49, true], [-8.2, -36.5, GT + 4.6, false], [8.2, -36.5, GT + 4.6, false]]) { gb.box(cx - 0.2, tt - 1.5, cz - 0.2, cx + 0.2, tt + 5.8, cz + 0.2, 'woodDark', 1, 1); gb.box(cx - 0.35, tt + 5.8, cz - 0.35, cx + 0.35, tt + 6.3, cz + 0.35, 'iron', 1, 1); const p = wp(cx, cz); castleFlags.push([p[0], CH + tt + 4.9, p[1], red ? TEX.bannerRed : TEX.banner]); }
   for (const [x, z] of [[-24, -48], [24, -48], [-24, -60], [24, -60]]) { const p = wp(x, z); tree('cypress', p[0], p[1], 1.1); }
-  registerBuilding(area, { id: 'castle', type: 'castle', name: 'Castle Daggerfall', district: 'kingsward', wealth: 3, door: { x: 0, z: PZ1 + 1.1 + CASTLE_Z, y: CH, nx: 0, nz: 1 }, poly: footprintPoly(gb.xf, { x0: PX0, z0: PZ0, x1: PX1, z1: PZ1 }), owner: { name: 'King Gothryd', gender: 'm' } });
+  registerBuilding(area, { id: 'castle', type: 'castle', name: 'Aldhaven Castle', district: 'kingsward', wealth: 3, door: { x: 0, z: PZ1 + 1.1 + CASTLE_Z, y: CH, nx: 0, nz: 1 }, poly: footprintPoly(gb.xf, { x0: PX0, z0: PZ0, x1: PX1, z1: PZ1 }), owner: { name: 'King Ottmar', gender: 'm' } });
   area.castleWalls = footprintPoly(gb.xf, { x0: -32, z0: -102, x1: 32, z1: -40 });
   area.castleTowers = [[-31.2, -106], [31.2, -106], [-31.2, -41], [31.2, -41], [-31.2, -73], [31.2, -73], [-8.2, -36.5], [8.2, -36.5], [STX, STZ]].map(([x, z]) => wp(x, z));
   gb.xf = null;
@@ -1062,7 +1063,7 @@ function buildCity() {
   const spray = makeBillboard(simpleSprite('spray', 2).tex[0], 1.3, 2.4, { transparent: true, opacity: 0.8 }); spray.position.set(MARKET[0], marketPad.h + 2.2, MARKET[1]); area.scene.add(spray); area.bbs.push(spray);
   area.anim.push((dt, t) => { spray.material.map = simpleSprite('spray', 2).tex[Math.floor(t * 6) % 2]; });
 
-  /* ---------- the Lysandus Memorial ---------- */
+  /* ---------- the Aldwin Memorial ---------- */
   gb.setXf(MEMORIAL[0], MEMORIAL[1], 0, memPad.h);
   gb.box(-1.8, -0.3, -1.8, 1.8, 0.5, 1.8, { side: 'stone', top: 'stone' }, 2, 2); gb.box(-1.2, 0.5, -1.2, 1.2, 2.0, 1.2, { side: 'stoneLight', top: 'stoneLight' }, 2, 2); col(-1.8, -1.8, 1.8, 1.8, -1, 0.5); col(-1.2, -1.2, 1.2, 1.2, 0.5, 6.4);
   for (const [x, z] of [[-2.6, 0], [2.6, 0], [0, 2.6], [0, -2.6]]) { const p = wp(x, z); flower(p[0], p[1]); }
@@ -1070,7 +1071,7 @@ function buildCity() {
   { const st = makeBillboard(simpleSprite('kingstatue').tex[0], 2.2, 4.4); st.position.set(MEMORIAL[0], memPad.h + 2.0, MEMORIAL[1]); area.scene.add(st); area.bbs.push(st); area.tintMats.push(st.material); }
   area.memorial = { x: MEMORIAL[0], z: MEMORIAL[1] };
 
-  /* ---------- Temple of Arkay with its spire, the graveyard on the slope and the old mausoleum ---------- */
+  /* ---------- Church of Saint Hallam with its spire, the graveyard on the slope and the old mausoleum ---------- */
   {
     gb.setXf(TEMPLE.x, TEMPLE.z, TEMPLE.ang, templePad.h);
     const fp = { x0: -10, z0: -13, x1: 10, z1: 13 };
@@ -1080,7 +1081,7 @@ function buildCity() {
     col(1, -15, 12, -4, -1.5, 48); col(3, -13, 10, -6, 48, 60); col(5.5, -10.5, 7.5, -8.5, 60, 82); casterL(1, -15, 12, -4, 70); casterL(-10, -13, 10, 13, 19);
     for (const y of [16, 24, 32, 40]) gb.quad('winA', [5.9, y, -3.97], [1, 0, 0], [0, 1, 0], 1.2, 2.4, 1, 1, { fixedUV: true });
     for (const x of [-4.5, 4.5]) { const p = wp(x, 15.5); tree('cypress', p[0], p[1], 1.1); }
-    registerBuilding(area, { id: 'temple', type: 'temple', name: 'The Temple of Arkay', district: 'temple', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'High Priest Odric Maleveil', gender: 'm', look: LOOKS.priest } });
+    registerBuilding(area, { id: 'temple', type: 'temple', name: 'The Church of Saint Hallam', district: 'temple', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Rector Thomas Ashdown', gender: 'm', look: LOOKS.priest } });
     gb.xf = null;
     const g = GRAVE;
     drapePatch(gb, 'gGrass', null, g.x0, g.z0, g.x1, g.z1, { cell: 4, lift: 0.05, tw: 4 });
@@ -1113,7 +1114,7 @@ function buildCity() {
     registerBuilding(area, { id: 'hospice', type: 'hospice', name: 'The House of Mercy', district: 'market', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Mother Ysolde Carrard', gender: 'f', look: hl } });
     gb.xf = null;
   }
-  /* ---------- Mages Guild and its blue-roofed tower ---------- */
+  /* ---------- the Philosophers’ Society and its blue-roofed observatory tower ---------- */
   {
     gb.setXf(MAGES.x, MAGES.z, MAGES.ang, magesPad.h);
     const fp = { x0: -12, z0: -7.5, x1: 12, z1: 7.5 };
@@ -1124,10 +1125,10 @@ function buildCity() {
     for (const [x, z] of [[-8, -9.5], [-4, -10]]) { const p = wp(x, z); trees.bush.push([p[0], H(p[0], p[1]), p[1], 1]); }
     { const p = wp(-10, 9.5); tree('cypress', p[0], p[1], 1); }
     { const p = wp(6, -12.5); glows.push([p[0], magesPad.h + 30.5, p[1], 1.6]); }
-    registerBuilding(area, { id: 'mages', type: 'mages', name: 'The Mages Guild', district: 'kingsward', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Magistrix Celestine Vautrin', gender: 'f', look: LOOKS.mage } });
+    registerBuilding(area, { id: 'mages', type: 'mages', name: 'The Philosophers’ Society', district: 'kingsward', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Doctor Margriet Vos', gender: 'f', look: LOOKS.mage } });
     gb.xf = null;
   }
-  /* ---------- Fighters Guild with its training yard ---------- */
+  /* ---------- the Fencing School with its training yard ---------- */
   {
     gb.setXf(FIGHTERS.x, FIGHTERS.z, FIGHTERS.ang, fightPad.h);
     const fp = { x0: -12, z0: -7.5, x1: 12, z1: 7.5 };
@@ -1138,7 +1139,7 @@ function buildCity() {
     gb.box(-12, -0.5, fz, 12, 1.0, fz + 0.15, { side: 'woodDark', top: 'woodDark' }, 2, 2); col(-12, fz, 12, fz + 0.15, -1, 1.0);
     for (const x of [-12, 11.85]) { gb.box(x, -0.5, fz, x + 0.15, 1.0, -7.5, { side: 'woodDark', top: 'woodDark' }, 2, 2); col(x, fz, x + 0.15, -7.5, -1, 1.0); }
     for (const x of [-8, -3, 2, 7]) { const p = wp(x, -16); dummies.push([p[0], fightPad.h, p[1], 1]); addCol(area, p[0] - 0.3, p[1] - 0.3, p[0] + 0.3, p[1] + 0.3, fightPad.h - 1, fightPad.h + 1.8); }
-    registerBuilding(area, { id: 'fighters', type: 'fighters', name: 'The Fighters Guild', district: 'forges', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Guildmaster Ulfgar Stone-Arm', gender: 'm', look: LOOKS.fighter } });
+    registerBuilding(area, { id: 'fighters', type: 'fighters', name: 'The Fencing School', district: 'forges', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Master of Arms Jacob Ruysch', gender: 'm', look: LOOKS.fighter } });
     area.fightersYard = footprintPoly(gb.xf, { x0: -12, z0: fz, x1: 12, z1: -7.5 });
     gb.xf = null;
   }
@@ -1293,7 +1294,7 @@ function buildCity() {
     else if (l.K !== DK.market && l.K !== DK.harbor && hr.chance(0.05)) l.type = 'garden';
     else l.type = 'house';
   }
-  const FIXED_NAMES = { warrens: "The Rat's Nest", kingsward: 'The Gilded Griffon', docks: 'The Salty Mudcrab' };
+  const FIXED_NAMES = { warrens: "The Rat's Nest", kingsward: 'The Gilded Griffon', docks: 'The Salty Herring' };
   const usedNames = new Set();
   for (const l of lots) {
     const hr = new RNG(l.seed); const K = l.K; const type = l.type;
@@ -1385,8 +1386,8 @@ function buildCity() {
 
   /* ---------- carriage stops ---------- */
   const STOP_DEFS = [
-    ['market', 'the Grand Market', 22, 22], ['castle', 'Castle Daggerfall', 9, CASTLE_Z - 30], ['temple', 'the Temple of Arkay', -108, 4], ['hospice', 'the House of Mercy', -55, 64],
-    ['mages', 'the Mages Guild', 72, -84], ['fighters', 'the Fighters Guild', 128, 14], ['garden', "the Queen's Garden", -43, -100], ['bell', 'the Bell Tower', 50, 50],
+    ['market', 'the Grand Market', 22, 22], ['castle', 'Aldhaven Castle', 9, CASTLE_Z - 30], ['temple', 'the Church of Saint Hallam', -108, 4], ['hospice', 'the House of Mercy', -55, 64],
+    ['mages', 'the Philosophers’ Society', 72, -84], ['fighters', 'the Fencing School', 128, 14], ['garden', "the Queen's Garden", -43, -100], ['bell', 'the Bell Tower', 50, 50],
     ['docks', 'the Docks', -30, 143], ['lighthouse', 'Lighthouse Quay', 112, 143], ['warrens', "Beggar's Well", -100, 101], ['tanners', "Tanners' Row", 128, 90],
     ...GATES.map(g => [g.id, capFirst(g.name.replace('the ', '')), g.inner[0] + g.nx * 6, g.inner[1] + g.nz * 6]),
   ];
@@ -1635,10 +1636,10 @@ function buildCity() {
   area.guardPosts.push([-3, CASTLE_Z - 35], [3, CASTLE_Z - 35], [PIERS[1] - 3.2, SHORE - 1.5], [PIERS[1] + 3.2, SHORE - 1.5]);
   { const s = xfP(lookXf, 0, 2.55); area.start = { x: s[0], z: s[1], y: LOOKY, yaw: Math.atan2(-lookDir[0], -lookDir[1]), pitch: -0.25 }; }
   area.landmarks = [
-    { id: 'market', name: 'the Grand Market', x: MARKET[0], z: MARKET[1] }, { id: 'memorial', name: 'the Lysandus Memorial', x: MEMORIAL[0], z: MEMORIAL[1] },
+    { id: 'market', name: 'the Grand Market', x: MARKET[0], z: MARKET[1] }, { id: 'memorial', name: 'the Aldwin Memorial', x: MEMORIAL[0], z: MEMORIAL[1] },
     { id: 'garden', name: "the Queen's Garden", x: GARDEN[0], z: GARDEN[1] }, { id: 'bell', name: 'the Bell Tower', x: BELL[0], z: BELL[1] },
     { id: 'well', name: "Beggar's Well", x: WELL[0], z: WELL[1] }, { id: 'fish', name: 'the Fish Market', x: FISH[0], z: FISH[1] },
-    { id: 'lighthouse', name: 'the Lighthouse', x: BREAK, z: 210 }, { id: 'rise', name: "Pilgrim's Rise", x: RISE_LOOK[0], z: RISE_LOOK[1] }, { id: 'graveyard', name: "Arkay's Graveyard", x: -128, z: 76 },
+    { id: 'lighthouse', name: 'the Lighthouse', x: BREAK, z: 210 }, { id: 'rise', name: "Pilgrim's Rise", x: RISE_LOOK[0], z: RISE_LOOK[1] }, { id: 'graveyard', name: "Saint Hallam’s Churchyard", x: -128, z: 76 },
     ...GATES.map(g => ({ id: g.id, name: g.name, x: g.x, z: g.z })),
   ];
   // everything the automap needs

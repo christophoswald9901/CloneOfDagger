@@ -202,10 +202,10 @@ function furnish(P, b, R, rng) {
       FURN.wallBanner(P, -4.5, 3.5, z0, 1, 'banner'); FURN.wallBanner(P, 4.5, 3.5, z0, 1, 'banner');
       FURN.brazier(P, -5, z0 + 6); FURN.brazier(P, 5, z0 + 6); FURN.brazier(P, -4, z1 - 5); FURN.brazier(P, 4, z1 - 5);
       P.op(gb => { for (let z = z0 + 8; z < z1 - 3; z += 6) { gb.quad('winLit', [x0 + 0.02, 6, z + 0.5], [0, 0, -1], [0, 1, 0], 1, 2.4, 1, 1, { fixedUV: true }); gb.quad('winLit', [x1 - 0.02, 6, z - 0.5], [0, 0, 1], [0, 1, 0], 1, 2.4, 1, 1, { fixedUV: true }); } });
-      P.person({ name: 'King Gothryd', look: LOOKS.king, spriteKey: 'king', x: -1.6, z: z0 + 2.3, role: 'static', dialog: 'king', data: { fixed: true } });
-      P.person({ name: 'Queen Aubk-i', look: LOOKS.queen, spriteKey: 'queen', x: 1.6, z: z0 + 2.3, role: 'static', dialog: 'queen', gender: 'f', data: { fixed: true } });
+      P.person({ name: 'King Ottmar', look: LOOKS.king, spriteKey: 'king', x: -1.6, z: z0 + 2.3, role: 'static', dialog: 'king', data: { fixed: true } });
+      P.person({ name: 'Queen Isabeau', look: LOOKS.queen, spriteKey: 'queen', x: 1.6, z: z0 + 2.3, role: 'static', dialog: 'queen', gender: 'f', data: { fixed: true } });
       for (const [gx, gz] of [[-3, z0 + 9], [3, z0 + 9], [-3, z1 - 6], [3, z1 - 6]]) P.person({ name: 'Palace Guard', look: LOOKS.guard, spriteKey: 'guard', x: gx, z: gz, role: 'static', dialog: 'palaceguard', data: { fixed: true } });
-      P.person({ name: 'Court Mage Mynaste', look: { ...LOOKS.mage, robe: '#3a1a1a', hair: '#c8c8c8', beard: true, hairStyle: 1 }, spriteKey: 'courtmage', x: 5, z: z0 + 4, role: 'static', dialog: 'courtmage', data: { fixed: true } });
+      P.person({ name: 'Court Philosopher Anselm Brandt', look: { ...LOOKS.mage, robe: '#3a1a1a', hair: '#c8c8c8', beard: true, hairStyle: 1 }, spriteKey: 'courtmage', x: 5, z: z0 + 4, role: 'static', dialog: 'courtmage', data: { fixed: true } });
       break;
     }
     case 'hospice': {

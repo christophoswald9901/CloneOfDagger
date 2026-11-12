@@ -33,6 +33,7 @@ const Travel = {
     for (const pts of M.outside || []) line(pts);
     if (M.hillPath) line(M.hillPath);
     for (const T of Wild.tracks) line(T, 4);
+    for (const S of SITES) if (S.lane) line(S.lane);
     for (const S of SITES) if (S.id === 'mirrormere') line([[S.x + 126, S.z + 2], [S.x + 200, S.z - 2], [S.x + 280, S.z]]);
     for (const Tn of TOWNS) { const b0 = X.length; for (const n of Tn.nodes) add(n.x, n.z); Tn.nodes.forEach((n, i) => { for (const j of n.n) link(b0 + i, b0 + j); }); // a town's streets, and its gates out to the roads that leave them
       const own = new Set(Tn.nodes.map((_, i) => b0 + i)); for (const g of Tn.gates) { const j = near(g.ox, g.oz, 90, own); if (j >= 0) link(b0 + g.node, j); } }
@@ -124,7 +125,7 @@ const Travel = {
     if (c.detourT > 0) { c.detourT -= h; const a = c.detour, cs = Math.cos(a), sn = Math.sin(a); [dx, dz] = [dx * cs - dz * sn, dx * sn + dz * cs]; }
     // the water's edge, the sea or the mere, ends a cross-country walk
     const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3, ah = terrainH(ax, az), M = SITES[2];
-    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.', undefined, false); return; }
+    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3) || hallWet(ax, az))) { this.stop('The water bars your way.', undefined, false); return; }
     const ox = P.pos.x, oz = P.pos.z, st = spd * h;
     P.pos.x += dx * st; P.pos.z += dz * st;
     collide(G.area, P.pos, 0.38, P.pos.y + 1.5, 0.3); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y); // a traveller climbs the stiles: hedges, field walls and fences under two metres do not stop the journey
@@ -180,7 +181,7 @@ const Travel = {
   // the places you can name as a goal: the city, and the landmarks you have found or heard of
   goals() {
     const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
-    if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Daggerfall', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
+    if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Aldhaven', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
     for (const S of SITES) if (found[S.id] || heard[S.id] || S.kind === 'town') out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
     for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
     return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);

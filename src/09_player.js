@@ -32,6 +32,7 @@ function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
   const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
     if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
+    if (hallWet(x, z) && !hallWet(ox, oz)) return true; // the long water and the fountain at Halewood
     for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40) && groundAt(G.area, x, z, 0.3, p.pos.y) < T.wl() + 0.3) return true; // a town's moat and canal: not to be waded into (but a bridge over it is walked on)
     return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
@@ -73,12 +74,12 @@ function useItem(it) {
   const p = G.player;
   if (it.kind === 'potion') {
     if (it.base === 'heal') { const h = Math.min(p.maxHp - p.hp, 35); p.hp += h; msg(`You drink the potion and recover ${h} health.`, 'good'); }
-    if (it.base === 'magicka') { const h = Math.min(p.maxMp - p.mp, 35); p.mp += h; msg(`Magicka surges through you (+${h}).`, 'good'); }
+    if (it.base === 'spirit') { const h = Math.min(p.maxMp - p.mp, 35); p.mp += h; msg(`Your spirit rallies (+${h}).`, 'good'); }
     if (it.base === 'stamina') { p.fat = Math.min(p.maxFat, p.fat + 60); msg('Your weariness fades.', 'good'); }
     removeItem(p, it); SFX.play('drink'); return true;
   }
   if (it.kind === 'weapon' || it.kind === 'armor') { equipItem(it); return true; }
-  if (it.kind === 'quest' || it.kind === 'key') { msg(it.base === 'letter' ? 'The seal is unbroken. It is addressed to the Queen of Daggerfall.' : it.base === 'soulgem' ? 'Inside the black gem a tiny crowned figure pounds silently against the facets.' : `It is ${it.name}.`); return false; }
+  if (it.kind === 'quest' || it.kind === 'key') { msg(it.base === 'letter' ? 'The seal is unbroken. It is addressed to the Queen of Aldhaven.' : it.base === 'soulgem' ? 'Deep inside the black stone a tiny crowned figure pounds silently against its walls.' : `It is ${it.name}.`); return false; }
   return false;
 }
 function quickPotion() {
@@ -223,9 +224,9 @@ function resolveMelee() {
 }
 function startCast() {
   const p = G.player; if (p.dead || p.castT >= 0 || p.swingT >= 0 || !rpgUI()) return;
-  if (!p.spells.length) { msg('You know no spells. The Mages Guild teaches them for a price.'); return; }
+  if (!p.spells.length) { msg('You know no arts. The Philosophers’ Society teaches them for a price.'); return; }
   const sp = SPELLS[p.spells[p.spell % p.spells.length]];
-  if (p.mp < sp.cost) { msg(`Not enough magicka to cast ${sp.name} (${sp.cost} needed).`, 'bad'); SFX.play('locked'); return; }
+  if (p.mp < sp.cost) { msg(`Not enough spirit to cast ${sp.name} (${sp.cost} needed).`, 'bad'); SFX.play('locked'); return; }
   p.mp -= sp.cost; p.castT = 0; p.castDone = false; p.castSpell = p.spells[p.spell % p.spells.length];
 }
 function resolveSpell() {

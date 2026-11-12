@@ -1,4 +1,4 @@
-<title>One-City Daggerfall</title>
+<title>Aldhaven</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=IM+Fell+English:ital@0;1&family=VT323&display=swap">
@@ -172,29 +172,29 @@
 <div id="status"></div>
 <div id="restinfo" class="panel" hidden></div>
 <div id="travelinfo" class="panel" hidden></div>
-<div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Daggerfall</p></div></div>
+<div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Aldhaven</p></div></div>
 <div id="backdrop" hidden></div>
 <div id="panel" class="panel" hidden role="dialog" aria-modal="true"></div>
 <div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
 <div id="touch" aria-hidden="true"></div>
 <div id="title" hidden>
   <div class="title-wrap">
-    <div class="logo"><div class="pre">The Iliac Bay, 3E 405</div><h1>Daggerfall</h1><div class="post">~ One City ~</div></div>
+    <div class="logo"><div class="pre">Merrow Bay, 1652</div><h1>Aldhaven</h1><div class="post">~ A Port and its Country ~</div></div>
     <nav class="menu" aria-label="Main menu">
       <button class="db" data-t="new">New Game</button>
       <button class="db" data-t="continue">Continue</button>
       <button class="db" data-t="controls">Controls</button>
       <button class="db" data-t="settings">Settings</button>
     </nav>
-    <p class="foot">Keyboard and mouse: WASD to move, mouse to look, click to swing, E to interact. On a tablet, touch controls appear on screen.<br>An unofficial fan tribute to <i>The Elder Scrolls II: Daggerfall</i>. Not affiliated with Bethesda Softworks.</p>
+    <p class="foot">Keyboard and mouse: WASD to move, mouse to look, click to swing, E to interact. On a tablet, touch controls appear on screen.<br>Every texture, sprite and sound is made in code as the game loads.</p>
   </div>
 </div>
-<div id="loading">Raising the walls of Daggerfall…</div>
+<div id="loading">Raising the walls of Aldhaven…</div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 /* =====================================================================
-   ONE CITY: DAGGERFALL — an unofficial tribute to The Elder Scrolls II
+   ALDHAVEN — a walled port on Merrow Bay, and the country round it
    core: utilities, global state, input plumbing
    ===================================================================== */
 
@@ -233,9 +233,9 @@ const v3dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const v3norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
 /* ---------------- calendar ---------------- */
-const MONTHS = ['Morning Star', "Sun's Dawn", 'First Seed', "Rain's Hand", 'Second Seed', 'Midyear', "Sun's Height", 'Last Seed', 'Hearthfire', 'Frostfall', "Sun's Dusk", 'Evening Star'];
-const WEEKDAYS = ['Sundas', 'Morndas', 'Tirdas', 'Middas', 'Turdas', 'Fredas', 'Loredas'];
-const START_MONTH = 7, START_DOM = 4, START_WD = 1; // Morndas, 4th of Last Seed
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const YEAR = 1652, START_MONTH = 7, START_DOM = 4, START_WD = 1; // Monday, 4th of August
 const hourOf = t => (t / 60) % 24;
 const dayOf = t => Math.floor(t / 1440);
 function dateString(t) {
@@ -243,7 +243,7 @@ function dateString(t) {
   const idx = d + START_DOM - 1;
   const dom = idx % 30 + 1;
   const month = (START_MONTH + Math.floor(idx / 30)) % 12;
-  return `${WEEKDAYS[(d + START_WD) % 7]}, ${ordinal(dom)} of ${MONTHS[month]}, 3E 405`;
+  return `${WEEKDAYS[(d + START_WD) % 7]}, ${ordinal(dom)} of ${MONTHS[month]}, ${YEAR}`;
 }
 function clockString(t) {
   const m = Math.floor(t) % 1440;
@@ -272,13 +272,13 @@ const G = {
   dmgFlash: 0,
   hotStart: null,
 };
-const SETTINGS_KEY = 'onecity_daggerfall_settings';
-const SAVE_KEY = 'onecity_daggerfall_save';
+const SETTINGS_KEY = 'onecity_aldhaven_settings', OLD_SETTINGS_KEY = 'onecity_daggerfall_settings'; // (settings and saves made under the old name are still read)
+const SAVE_KEY = 'onecity_aldhaven_save', OLD_SAVE_KEY = 'onecity_daggerfall_save';
 const settings = { pixelScale: 0, sens: 1, music: 0.5, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, travelSpeed: 20, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
 // the minimalist interface hides character stats and combat until Settings → Interface turns them back on
 const rpgUI = () => !!settings.showRPG;
 function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); if (s) Object.assign(settings, s); } catch (e) { /* storage unavailable */ }
+  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(OLD_SETTINGS_KEY) || 'null'); if (s) Object.assign(settings, s); } catch (e) { /* storage unavailable */ }
 }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* storage unavailable */ }
@@ -608,6 +608,44 @@ function genWindow(lit) {
     if (!lit) { x.fillStyle = 'rgba(200,220,255,0.35)'; x.fillRect(x0 + 2, y0 + 2, 2, 5); }
   }
   x.fillStyle = '#4a3220'; x.fillRect(0, 29, 32, 3);
+  return c;
+}
+// a quarter of a parterre de broderie: scrolls of clipped box on sand, with fields of brick dust and coloured earth
+function genBroderie() {
+  const W = 192, Hh = 96, [c, x] = cnv(W, Hh), G = '#2c4a20', G2 = '#3e6228';
+  const line = (w, col) => { x.lineWidth = w; x.strokeStyle = col; x.stroke(); };
+  // a border of flowers within a band of box
+  x.fillStyle = '#5c4832'; x.fillRect(0, 0, W, Hh);
+  { const fr = new RNG(93); for (let k = 0; k < 2600; k++) { const px = fr.int(0, W - 1), py = fr.int(0, Hh - 1); if (px > 11 && px < W - 12 && py > 11 && py < Hh - 12) continue; x.fillStyle = fr.pick(['#c8403a', '#e0c840', '#ece8dc', '#8a56aa', '#3f6a2c', '#3f6a2c', '#4c7a34']); x.fillRect(px, py, 1, 1); } } // a ribbon of flowers
+  x.fillStyle = '#cdb98c'; x.fillRect(11, 11, W - 22, Hh - 22);
+  x.beginPath(); x.rect(11.5, 11.5, W - 23, Hh - 23); line(2, G);
+  // the middle: a lozenge with a round bed, red earth within
+  x.beginPath(); x.moveTo(W / 2 - 46, Hh / 2); x.lineTo(W / 2, Hh / 2 - 27); x.lineTo(W / 2 + 46, Hh / 2); x.lineTo(W / 2, Hh / 2 + 27); x.closePath(); x.fillStyle = '#b4502f'; x.fill(); line(4, G);
+  x.beginPath(); x.arc(W / 2, Hh / 2, 13, 0, 6.283); x.fillStyle = '#cdb98c'; x.fill(); line(3, G); x.beginPath(); x.arc(W / 2, Hh / 2, 6, 0, 6.283); x.fillStyle = G2; x.fill();
+  // scrolls in the four corners, each a pair of volutes turning out from a stem, and a leaf between
+  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { const P = (u, v) => [W / 2 + sx * u, Hh / 2 + sy * v];
+    const spiral = (cu, cv, r0, turns, dir) => { x.beginPath(); for (let k = 0; k <= 40; k++) { const a = k / 40 * turns * 6.283, r = r0 * (1 - 0.8 * k / 40), [px, py] = P(cu + Math.cos(a) * r * dir, cv + Math.sin(a) * r); if (k) x.lineTo(px, py); else x.moveTo(px, py); } line(3.4, G); };
+    spiral(66, 22, 12, 1.6, 1); spiral(40, 30, 8, 1.4, -1); spiral(74, 6, 7, 1.3, -1);
+    x.beginPath(); x.moveTo(...P(48, 2)); x.quadraticCurveTo(...P(60, 10), ...P(54, 22)); x.quadraticCurveTo(...P(46, 14), ...P(48, 2)); x.fillStyle = '#b8a23a'; x.fill(); line(1.6, G);
+    x.beginPath(); x.moveTo(...P(20, 30)); x.quadraticCurveTo(...P(30, 34), ...P(28, 24)); line(2.2, G);
+    x.beginPath(); x.arc(...P(78, 30), 3, 0, 6.283); x.fillStyle = G2; x.fill(); }
+  noiseImg(x, W, Hh, 0.07, new RNG(92)); return c;
+}
+// a run of turned balusters, seen against whatever lies behind (alpha)
+function genBalus() {
+  const [c, x] = cnv(16, 16); x.clearRect(0, 0, 16, 16); const w = [3, 3, 5, 7, 8, 8, 7, 5, 3, 3, 4, 5, 5, 4, 3, 3];
+  for (let j = 0; j < 16; j++) { const ww = w[j]; x.fillStyle = j % 5 === 0 ? '#b9ae94' : '#d4cab0'; x.fillRect(8 - Math.ceil(ww / 2), j, ww, 1); x.fillStyle = '#a89e84'; x.fillRect(8 + Math.floor(ww / 2) - 1, j, 1, 1); }
+  return c;
+}
+// a tall sash window in its stone surround: broad white bars and large panes, so the grid still reads from across a court
+function genSash(rows) {
+  const W = 16, Hh = rows > 2 ? 32 : 18, [c, x] = cnv(W, Hh);
+  x.fillStyle = '#cdc4ac'; x.fillRect(0, 0, W, Hh); x.fillStyle = '#b4aa90'; x.fillRect(0, Hh - 2, W, 2); x.fillRect(6, 0, 4, 2);
+  x.fillStyle = '#f4f1e8'; x.fillRect(2, 2, 12, Hh - 4);
+  const ph = (Hh - 4 - (rows + 1)) / rows;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < 2; i++) { const x0 = 3 + i * 5.5, y0 = 3 + j * (ph + 1);
+    x.fillStyle = j < rows / 2 ? '#1e2a36' : '#283848'; x.fillRect(Math.round(x0), Math.round(y0), 5, Math.round(ph));
+    if ((i + j) % 2 === 0) { x.fillStyle = 'rgba(200,222,255,0.3)'; x.fillRect(Math.round(x0) + 1, Math.round(y0) + 1, 1, 2); } }
   return c;
 }
 function genPortcullis() {
@@ -987,7 +1025,7 @@ const LOOKS = {
   guard: { skin: '#e0b088', hair: '#4a3020', hairStyle: 1, shirt: '#7a808a', chain: true, tabard: '#7a1818', pants: '#2e2e30', boots: '#1a1a1a', helmet: true, weapon: 'spear' },
   king: { skin: '#e0b088', hair: '#6a4526', hairStyle: 1, beard: true, robe: '#8a1c1c', trim: '#e0b840', ermine: true, boots: '#2a1c12', crown: true, cape: '#6a1010' },
   queen: { skin: '#8a5a38', hair: '#1a1210', hairStyle: 2, robe: '#4a2a6a', trim: '#e0b840', boots: '#2a1c12', crown: true, cape: '#3a1a5a' },
-  lysandus: { skin: '#d8c8b8', hair: '#8a8a8a', hairStyle: 1, beard: true, shirt: '#9aa0aa', chain: true, pants: '#6a707a', boots: '#4a4a50', crown: true, cape: '#5a2020', weapon: 'sword' },
+  ghostking: { skin: '#d8c8b8', hair: '#8a8a8a', hairStyle: 1, beard: true, shirt: '#9aa0aa', chain: true, pants: '#6a707a', boots: '#4a4a50', crown: true, cape: '#5a2020', weapon: 'sword' },
   thief: { skin: '#cc946a', hair: '#2a1c12', hairStyle: 1, shirt: '#3a2e24', pants: '#2a2420', boots: '#1a1410', hood: '#262420', mask: '#1a1814', weapon: 'dagger' },
   bandit: { skin: '#a8724c', hair: '#7a2a18', hairStyle: 1, beard: true, shirt: '#4a2a1a', pants: '#2a2420', boots: '#1a1410', hood: '#5a1a1a', weapon: 'axe' },
   zombie: { skin: '#7c8a5c', hair: '#3a3a2a', hairStyle: 2, shirt: '#4a3e2e', pants: '#3a3228', boots: '#2a241c', eyes: '#c02010', handCol: '#6c7a4c' },
@@ -1018,7 +1056,7 @@ function enemySprite(kind) {
     case 'bandit': return humanSprite('bandit', LOOKS.bandit);
     case 'necro': return humanSprite('necro', LOOKS.necro);
     case 'guard': return humanSprite('guard', LOOKS.guard);
-    case 'lysandus': return sprite('lysandus', () => [0, 1, 2, 3].map(f => ghostify(drawHuman(LOOKS.lysandus, f))));
+    case 'ghostking': return sprite('ghostking', () => [0, 1, 2, 3].map(f => ghostify(drawHuman(LOOKS.ghostking, f))));
   }
   return humanSprite('thief', LOOKS.thief);
 }
@@ -1084,6 +1122,11 @@ function initTextures() {
   T('gravel', genGravel(48, '#7a705c'));
   T('hedge', genSpeckle(49, '#2f4a22', 0.35, 64, [['#48682c', 170, 2, 2], ['#1e3016', 150, 1, 2]]));
   T('crag', genStrata(58));
+  T('ashlar', genBlocks({ seed: 84, bw: 32, bh: 16, base: '#cdc3a8', mortar: '#a2987e', vary: 0.07, noise: 0.1 })); T('balus', genBalus(), { mip: false }); T('broderie', genBroderie(), { repeat: false });
+  T('sash', genSash(4), { repeat: false }); T('sashS', genSash(2), { repeat: false });
+  T('lawn', genSpeckle(81, '#587036', 0.18, 64, [['#62783e', 130, 1, 2], ['#4c6230', 120, 1, 2], ['#6a8244', 40, 1, 1]]));
+  T('gravelPale', genGravel(82, '#b2a37e', { pal: ['#c2b48e', '#a2946e', '#d0c4a0', '#b0a078', '#948664'] }));
+  T('bed', genSpeckle(83, '#4c3c2a', 0.2, 64, [['#3f6a2c', 150, 2, 2], ['#c8403a', 130, 2, 2], ['#e0c840', 110, 2, 2], ['#ece8dc', 90, 2, 2], ['#8a56aa', 70, 2, 2]]));
   T('rock', genVoronoi(52, '#9a9382', 16, 64, '#5e584c', 1.4, 0.45));
   T('wheat', genFurrows(53, '#a49868', '#8a7e52', 2, 5, [['#b4a674', 120, 1, 2]]));
   T('barley', genFurrows(54, '#8c8e64', '#767a52', 2, 5, [['#9c9e72', 90, 1, 2]]));
@@ -1099,11 +1142,10 @@ function initTextures() {
   for (const [k, sd, w, kind] of [['doorA', 70, '#6a4424', 'z'], ['doorB', 71, '#6e665a', 'z'], ['doorC', 72, '#44583e', 'panel'], ['doorD', 73, '#6a2a22', 'panel'], ['doorE', 74, '#3c4a62', 'panel'], ['doorF', 75, '#4a3020', 'studded'], ['doorG', 76, '#8a6a3a', 'z']]) T(k, genDoorV(sd, w, kind), { repeat: false });
   T('smoke', genPuff(62), { repeat: false, mip: false });
   T('gull1', genGull(true), { repeat: false, mip: false }); T('gull2', genGull(false), { repeat: false, mip: false });
-  T('signLook', genSignBoard(['Pilgrim\'s Rise', '← Daggerfall']), { repeat: false });
+  T('signLook', genSignBoard(['Pilgrim\'s Rise', '← Aldhaven']), { repeat: false });
   for (const k of ['tavern', 'weaponsmith', 'armorer', 'alchemist', 'general', 'mages', 'fighters', 'temple', 'coach', 'hospice']) T('sign_' + k, genSign(k), { repeat: false, mip: false });
   TEX.sun = texFrom(genGlow(255, 240, 190, 64), { repeat: false, mip: false });
-  TEX.masser = texFrom(genMoon(48, '#c89080', 5), { repeat: false, mip: false });
-  TEX.secunda = texFrom(genMoon(24, '#d8d8e0', 6), { repeat: false, mip: false });
+  TEX.moon = texFrom(genMoon(48, '#e4dccb', 5), { repeat: false, mip: false }); // one moon
   TEX.glow = texFrom(genGlow(255, 200, 120, 32), { repeat: false, mip: false });
   TEX.glowBlue = texFrom(genGlow(140, 180, 255, 32), { repeat: false, mip: false });
   TEX.glowGreen = texFrom(genGlow(140, 255, 120, 32), { repeat: false, mip: false });
@@ -1685,7 +1727,7 @@ const POI = {
 // rc: wholly fixed within this radius; rb: wholly generated beyond it. road: from the site out to where the generated tracks take over
 const SITES = [
   { id: 'greywatch', name: 'Greywatch', kind: 'ruin', x: -2400, z: -2900, rc: 280, rb: 820, discR: 240, bare: 110,
-    blurb: 'the broken keep of Greywatch on its crag, abandoned since the War of Betony',
+    blurb: 'the broken keep of Greywatch on its crag, abandoned since the Succession War',
     road: [[26, 26], [52, 50], [92, 82], [140, 112], [196, 140], [262, 168], [330, 202], [400, 246], [470, 300], [540, 360]] },
   { id: 'stones', name: 'the Ninefold Stones', kind: 'stones', x: 3600, z: -5600, rc: 300, rb: 860, discR: 200, bare: 260,
     blurb: 'a ring of nine standing stones on a bare hilltop, older than any kingdom of the Bay',
@@ -1773,6 +1815,7 @@ function siteFix(x, z, h) {
 
 /* ---------------- what grows there: woods (0..1) and heath (0..1), fixed ---------------- */
 function siteForest(S, x, z, h) {
+  if (S.forest) return S.forest(x, z, h);
   const dx = x - S.x, dz = z - S.z, n = fbm(x / 150, z / 150, 2, 950), n2 = fbm(x / 60, z / 60, 2, 951), r = Math.hypot(dx, dz) + 70 * fbm(x / 120 + 3, z / 120, 2, 952); // (a ragged radius: no wood edge runs round a site in a circle)
   switch (S.id) {
     case 'greywatch': return smoothstep(0.0, 0.3, n + 0.15 * n2) * smoothstep(150, 240, r) * smoothstep(40, -160, dz + dx * 0.4); // an oakwood under the north cliffs
@@ -1797,7 +1840,7 @@ function siteHeath(S, x, z, h) {
 
 /* ---------------- the buildings, built once and kept: each can be seen from far off ---------------- */
 const Sites = {
-  group: null, cols: [], glows: [], spawned: {}, lights: [],
+  group: null, cols: [], glows: [], spawned: {}, lights: [], folk: {},
   build(area, mats) {
     const gb = new GB(), saved = area.colliders; area.colliders = [];
     const H = (x, z) => terrainRaw(x, z);
@@ -1812,6 +1855,7 @@ const Sites = {
   // true where a site keeps the ground clear: its solids (for any plant), its yards and courts (for trees and bushes)
   clearAt(x, z, r) {
     for (const c of this.near(x, z)) if (x > c.x0 - r && x < c.x1 + r && z > c.z0 - r && z < c.z1 + r) return true;
+    for (const S of SITES) if (S.keep && S.keep(x, z, r)) return true;
     if (r >= 2) for (const S of SITES) if (S.clear && Math.abs(x - S.x) < 400 && Math.abs(z - S.z) < 400) for (const [cx, cz, cr] of S.clear) if (Math.hypot(x - cx, z - cz) < cr) return true;
     return false;
   },
@@ -1829,6 +1873,13 @@ const Sites = {
       return spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 0.7), gender: g, x: vx, z: vz, role: 'wander', wanderR: 8, speed: 1.0, dialog: 'villager', spriteKey: 'mere' + k, data: { site: 'mirrormere' } }); });
     else if (dm > 700 && this.vill) { for (const e of this.vill) if (!e.removed) e.remove(); this.vill = null; }
     if (this.vill) { const night = isNight(G.time); for (const e of this.vill) if (!e.dead) e.active = !night; }
+    // a great house's people, each about their own work
+    for (const S of SITES) { if (!S.folk) continue; const d = Math.hypot(x - S.x, z - S.z); let F = this.folk[S.id];
+      if (F && F[0].removed) F = this.folk[S.id] = null;
+      if (d < S.rc + 140 && !F) F = this.folk[S.id] = S.folk.map((f, k) => { const r = new RNG(7650 + k), g = f.gender || (r.chance(0.5) ? 'f' : 'm');
+        return spawnNPC(G.city, { name: personName(r, g), look: { ...lookByWealth(r, g, 1.0), ...f.look }, gender: g, x: f.at[0], z: f.at[1], role: 'wander', wanderR: f.r, speed: 0.9, dialog: 'household', spriteKey: S.id + k, data: { site: S.id, trade: f.trade, lines: f.lines } }); });
+      else if (d > S.rb && F) { for (const e of F) if (!e.removed) e.remove(); this.folk[S.id] = null; }
+      if (F) { const night = isNight(G.time); for (const e of F) if (!e.dead) e.active = !night; } }
     return hit;
   },
 };
@@ -1945,6 +1996,364 @@ const SITE_BUILD = {
     drapeStrip(gb, 'rDirt', resampleEven([[cx + 1, cz + 4], [lx - 1, lz - 6]], 3), 2.4, { lift: 0.07 });
   },
   glowAt(S, x, y, z, s = 5) { Sites.glows.push([x, y, z, s]); },
+};
+
+/* =====================================================================
+   Halewood House: a great brick house of the new fashion, some 4 km
+   south-west of Corrinvale. Everything hangs on one straight line of
+   about a kilometre: gate lodges on the road, an avenue of trees, a
+   railed forecourt, the house, a terrace, a parterre round a fountain,
+   a long water, and three rides fanning out through a wood, the middle
+   one closed by an obelisk on a rise. A sixth fixed landmark: its
+   ground, plants and buildings are the same in every world.
+   Local frame: +z runs from the house to the gate (east-south-east, the
+   side the morning sun lights), +x to the north-north-east.
+   ===================================================================== */
+const HALL = { x: -3900, z: -10300, ang: 1.012, H0: 118, gate: 460, ob: -520, GL: -1.4 };
+HALL.c = Math.cos(HALL.ang); HALL.s = Math.sin(HALL.ang);
+function hallW(lx, lz) { return [HALL.x + lx * HALL.c + lz * HALL.s, HALL.z - lx * HALL.s + lz * HALL.c]; }
+function hallL(x, z) { const dx = x - HALL.x, dz = z - HALL.z; return [dx * HALL.c - dz * HALL.s, dx * HALL.s + dz * HALL.c]; }
+// the three rides through the wood, from the head of the long water: [x0, z0, x1, z1] in the local frame
+const HALL_RIDES = [[0, -350, 0, -506], [0, -350, -98, -512], [0, -350, 98, -512]];
+
+// the ground: a level platform for the house and its courts, a long even fall down the avenue to the gate,
+// the gardens sunk a step below the terrace, the wood rising behind them to the obelisk's knoll; rolling parkland round about
+function hallH(x, z) {
+  const [lx, lz] = hallL(x, z), ax = Math.abs(lx);
+  let p = 0;
+  if (lz >= 75) p = -0.012 * (Math.min(lz, 640) - 75);
+  else if (lz < -25) {
+    p = HALL.GL * (1 - smoothstep(51, 64, ax)) * (ax < 9 ? smoothstep(-25.5, -27.5, lz) * 1.25 - 0.25 * smoothstep(-30, -34, lz) : smoothstep(-25, -31, lz)); // (the bank falls away sooner under the steps)
+    if (lz < -345) p += 0.03 * Math.min(-345 - lz, 230);
+  }
+  p += 5 * Math.exp(-((lz - HALL.ob) ** 2 + lx * lx) / 3600);
+  const m = Math.max(smoothstep(120, 300, ax), smoothstep(480, 650, lz), smoothstep(580, 720, -lz));
+  return HALL.H0 + p + m * (7 * fbm(x / 230, z / 230, 3, 971) + 2.2 * fbm(x / 60, z / 60, 2, 972));
+}
+// the long water and the fountain: not to be walked into
+function hallWet(x, z) {
+  if (Math.abs(x - HALL.x) > 400 || Math.abs(z - HALL.z) > 400) return false;
+  const [lx, lz] = hallL(x, z); return (Math.abs(lx) < 9.7 && lz < -130.3 && lz > -337.7) || Math.hypot(lx, lz + 77) < 6.8;
+}
+// where nothing grows of itself: the courts, the avenue, the gardens, the rides and the obelisk's foot
+function hallKeep(x, z, r) {
+  if (Math.abs(x - HALL.x) > 700 || Math.abs(z - HALL.z) > 700) return false;
+  const [lx, lz] = hallL(x, z), ax = Math.abs(lx);
+  if (ax < 104 + r && lz > -34 && lz < 84) return true;
+  if (ax < 29 && lz >= 84 && lz < 486) return true;
+  if (ax < 16 && lz >= 486 && lz < 730) return true; // the view up the road to the gate
+  if (ax < 72 && lz <= -34 && lz > -362) return true;
+  if (Math.hypot(lx, lz - HALL.ob) < 17) return true;
+  for (const [a, b, c, d] of HALL_RIDES) if (segDist(lx, lz, a, b, c, d).d < 6.5 + r * 0.5) return true;
+  return false;
+}
+// its woods: a fan of old wood behind the long water, cut by the rides; a belt behind each service court to frame the house
+function hallForest(x, z) {
+  const [lx, lz] = hallL(x, z), ax = Math.abs(lx), n = fbm(x / 70, z / 70, 2, 973);
+  const d = -338 - lz, hw = 48 + d * 0.8 + 16 * n, fan = d > 0 ? smoothstep(0, 22, d) * (1 - smoothstep(hw, hw + 30, ax)) * (1 - smoothstep(225 + 20 * n, 270 + 20 * n, d)) : 0;
+  // a belt of wood round the park, broken here and there, open where the road comes in
+  const e = Math.hypot(lx / 340, (lz - 20) / 620) + 0.09 * n, ring = smoothstep(0.82, 0.96, e) * (1 - smoothstep(1.14, 1.34, e)) * smoothstep(30, 60, ax);
+  return Math.max(fan, ring);
+}
+{ const [sx, sz] = hallW(0, -30);
+  SITES.push({ id: 'halewood', name: 'Halewood House', kind: 'house', x: sx, z: sz, rc: 560, rb: 1050, discR: 520,
+    blurb: 'a great brick house of the new fashion, set square at the end of its avenue among clipped gardens and a long water',
+    road: [[0, 468], [0, 520], [0, 580], [0, 640], [0, 700], [8, 760]].map(([a, b]) => hallW(a, b)),
+    lane: [[0, 468], [0, 300], [0, 150], [0, 66]].map(([a, b]) => hallW(a, b)),   // the drive, for travel by road
+    keep: hallKeep, forest: hallForest });
+  SITE_H.halewood = hallH; }
+
+// a hipped roof with a ridge along the longer side (a pyramid over a square)
+function hallRoof(gb, key, x0, z0, x1, z1, h, rh) {
+  const w = x1 - x0, d = z1 - z0, tw = 3;
+  if (w >= d) { const zc = (z0 + z1) / 2, q = d / 2, a = [x0 + q, h + rh, zc], b = [x1 - q, h + rh, zc], sl = Math.hypot(q, rh) / tw;
+    gb.quad4(key, [x0, h, z1], [x1, h, z1], b, a, [x0 / tw, 0], [x1 / tw, 0], [b[0] / tw, sl], [a[0] / tw, sl], [0, 1, 1]);
+    gb.quad4(key, [x1, h, z0], [x0, h, z0], a, b, [-x1 / tw, 0], [-x0 / tw, 0], [-a[0] / tw, sl], [-b[0] / tw, sl], [0, 1, -1]);
+    gb.tri(key, [x0, h, z0], [x0, h, z1], a, [z0 / tw, 0], [z1 / tw, 0], [zc / tw, sl], [-1, 1, 0]);
+    gb.tri(key, [x1, h, z1], [x1, h, z0], b, [-z1 / tw, 0], [-z0 / tw, 0], [-zc / tw, sl], [1, 1, 0]);
+  } else { const xc = (x0 + x1) / 2, q = w / 2, a = [xc, h + rh, z0 + q], b = [xc, h + rh, z1 - q], sl = Math.hypot(q, rh) / tw;
+    gb.quad4(key, [x1, h, z1], [x1, h, z0], a, b, [-z1 / tw, 0], [-z0 / tw, 0], [-a[2] / tw, sl], [-b[2] / tw, sl], [1, 1, 0]);
+    gb.quad4(key, [x0, h, z0], [x0, h, z1], b, a, [z0 / tw, 0], [z1 / tw, 0], [b[2] / tw, sl], [a[2] / tw, sl], [-1, 1, 0]);
+    gb.tri(key, [x0, h, z1], [x1, h, z1], b, [x0 / tw, 0], [x1 / tw, 0], [xc / tw, sl], [0, 1, 1]);
+    gb.tri(key, [x1, h, z0], [x0, h, z0], a, [-x1 / tw, 0], [-x0 / tw, 0], [-xc / tw, sl], [0, 1, -1]);
+  }
+}
+
+SITE_BUILD.halewood = function (gb, S, H, area) {
+  const rng = new RNG(7601), Y0 = HALL.H0, GL = HALL.GL, XF = makeXf(HALL.x, HALL.z, HALL.ang);
+  // a softer light than the open country's: the shaded fronts of a pale house still show their windows
+  const savedLight = gb.light;
+  gb.light = (p, n) => { const d = Math.max(0, v3dot(n, TERRAIN_LIGHT)), k = 0.72 + 0.56 * d + 0.06 * Math.max(0, n[1]); return [k * lerp(0.92, 1.14, d), k * lerp(0.9, 1.0, d), k * lerp(0.96, 0.8, d)]; };
+  const frame = (lx = 0, lz = 0, rot = 0, y = Y0) => { const [x, z] = hallW(lx, lz); return gb.setXf(x, z, HALL.ang + rot, y); };
+  const gy = (lx, lz) => H(...hallW(lx, lz));
+  const col = (x0, z0, x1, z1, y0, y1) => addOCol(area, gb.xf, x0, z0, x1, z1, y0, y1);
+  const plants = S.plants = [], plant = (kind, lx, lz, s) => plants.push([kind, ...hallW(lx, lz), s]);
+  const SL = { side: 'ashlar', top: 'ashlar' };
+
+  // windows in even bays along one face of a footprint, between t0 and t1 metres along it; rows: [sill height, width, height, key]
+  const wins = (fp, face, t0, t1, rows, skip = null, bay = 3.9) => {
+    const fi = faceInfo(fp, face), n = Math.max(1, Math.round((t1 - t0) / bay)), sp = (t1 - t0) / n;
+    for (let k = 0; k < n; k++) { const t = t0 + (k + 0.5) * sp;
+      rows.forEach(([y, w, h, key], ri) => { if (skip && skip(k, ri, n)) return;
+        gb.quad(key, [fi.o[0] + fi.U[0] * (t - w / 2) + fi.n[0] * 0.05, y, fi.o[2] + fi.U[2] * (t - w / 2) + fi.n[2] * 0.05], fi.U, [0, 1, 0], w, h, 1, 1, { fixedUV: true }); }); }
+  };
+  // a range of building: stone plinth, brick walls, stone quoins, string courses and cornice, a hipped slate roof
+  const range = (x0, z0, x1, z1, h, o = {}) => {
+    const pl = o.plinth ?? 1.0;
+    gb.box(x0 - 0.15, -1.8, z0 - 0.15, x1 + 0.15, pl, z1 + 0.15, SL, 3, 3);
+    gb.box(x0, pl, z0, x1, h, z1, { side: o.wall || 'brick', top: null }, 2.4, 2.4);
+    if (!o.plain) for (const qx of [x0, x1]) for (const qz of [z0, z1]) gb.box(qx === x0 ? x0 - 0.07 : x1 - 0.9, pl, qz === z0 ? z0 - 0.07 : z1 - 0.9, qx === x0 ? x0 + 0.9 : x1 + 0.07, h - 0.6, qz === z0 ? z0 + 0.9 : z1 + 0.07, 'ashlar', 2, 2, { skip: 'tb' }); // quoins
+    for (const y of o.strings || []) gb.box(x0 - 0.12, y - 0.16, z0 - 0.12, x1 + 0.12, y + 0.16, z1 + 0.12, 'ashlar', 3, 3, { skip: 'b' });
+    gb.box(x0 - 0.55, h - 0.7, z0 - 0.55, x1 + 0.55, h + 0.05, z1 + 0.55, SL, 3, 3);
+    const rh = o.rh ?? Math.min(x1 - x0 + 1.4, z1 - z0 + 1.4) / 2 * (o.pitch ?? 0.72);
+    hallRoof(gb, o.roofKey || 'roofSlate', x0 - 0.7, z0 - 0.7, x1 + 0.7, z1 + 0.7, h, rh);
+    col(x0, z0, x1, z1, -2, h + rh * 0.6);
+    return rh;
+  };
+  const chimney = (x, z, y0, y1) => { gb.box(x - 1.1, y0, z - 0.7, x + 1.1, y1, z + 0.7, { side: 'brick', top: null }, 2.4, 2.4); gb.box(x - 1.28, y1, z - 0.88, x + 1.28, y1 + 0.35, z + 0.88, SL, 2, 2); for (const px of [-0.55, 0.55]) gb.cyl('roofRed', x + px, z, 0.26, y1 + 0.35, y1 + 0.95, 6, 1, 1); };
+  // a brick wall with a stone coping
+  const wall = (x0, z0, x1, z1, h, y = 0, key = 'brick') => { gb.box(x0, y - 1.2, z0, x1, y + h, z1, { side: key, top: null }, 2.4, 2.4); gb.box(x0 - 0.1, y + h, z0 - 0.1, x1 + 0.1, y + h + 0.18, z1 + 0.1, SL, 2, 2); col(x0, z0, x1, z1, y - 1.5, y + h + 0.18); };
+  const pier = (x, z, w, h, y = 0, top = 'ball') => {
+    gb.box(x - w / 2, y - 1, z - w / 2, x + w / 2, y + h, z + w / 2, 'ashlar', 2, 2, { skip: 'tb' }); gb.box(x - w / 2 - 0.12, y + h, z - w / 2 - 0.12, x + w / 2 + 0.12, y + h + 0.22, z + w / 2 + 0.12, SL, 2, 2);
+    if (top === 'ball') { gb.cyl('ashlar', x, z, w * 0.34, y + h + 0.22, y + h + 0.22 + w * 0.55, 6, 2, 2); gb.cone('ashlar', x, z, w * 0.34, y + h + 0.22 + w * 0.55, w * 0.3, 6, 2); }
+    else if (top === 'urn') urn(x, z, y + h + 0.22, 0.8);
+    col(x - w / 2, z - w / 2, x + w / 2, z + w / 2, y - 1, y + h + 0.3);
+  };
+  const urn = (x, z, y, s = 1) => { gb.cyl('ashlar', x, z, 0.16 * s, y, y + 0.3 * s, 6, 2, 2); gb.cyl('ashlar', x, z, 0.42 * s, y + 0.3 * s, y + 0.85 * s, 8, 2, 2, { top: 'ashlar' }); gb.cyl('ashlar', x, z, 0.26 * s, y + 0.85 * s, y + 1.05 * s, 6, 2, 2); gb.cone('ashlar', x, z, 0.3 * s, y + 1.05 * s, 0.3 * s, 6, 2); };
+  // a figure on a pedestal, facing along +z of the current frame
+  const statue = (x, z, y) => {
+    gb.box(x - 0.55, y - 0.4, z - 0.55, x + 0.55, y + 0.18, z + 0.55, SL, 2, 2); gb.box(x - 0.42, y + 0.18, z - 0.42, x + 0.42, y + 1.0, z + 0.42, 'ashlar', 2, 2, { skip: 'tb' }); gb.box(x - 0.52, y + 1.0, z - 0.52, x + 0.52, y + 1.14, z + 0.52, SL, 2, 2);
+    gb.tint = [1.14, 1.12, 1.07]; const b = y + 1.14;
+    gb.cone('plaster', x, z, 0.34, b, 1.5, 7, 2); gb.cyl('plaster', x, z, 0.2, b + 0.85, b + 1.3, 6, 2, 2); gb.cyl('plaster', x, z, 0.27, b + 1.3, b + 1.62, 6, 2, 2, { top: 'plaster' });
+    gb.cyl('plaster', x, z, 0.085, b + 1.62, b + 1.74, 5, 2, 2); gb.cyl('plaster', x, z, 0.14, b + 1.74, b + 2.02, 6, 2, 2, { top: 'plaster' });
+    gb.box(x + 0.22, b + 1.45, z - 0.07, x + 0.36, b + 2.15, z + 0.07, 'plaster', 2, 2); gb.box(x - 0.36, b + 0.95, z - 0.07, x - 0.24, b + 1.58, z + 0.07, 'plaster', 2, 2);
+    gb.tint = null; col(x - 0.5, z - 0.5, x + 0.5, z + 0.5, y - 1, y + 3.1);
+  };
+  const hedge = (x0, z0, x1, z1, h, y = GL) => { gb.box(x0, y - 0.4, z0, x1, y + h, z1, 'hedge', 2, 2); col(x0, z0, x1, z1, y - 1, y + h); };
+  const yew = (x, z, r, h, y = GL) => { gb.cyl('hedge', x, z, r, y - 0.2, y + h * 0.22, 8, 2, 2); gb.cone('hedge', x, z, r, y + h * 0.22, h * 0.78, 8, 2); col(x - r * 0.7, z - r * 0.7, x + r * 0.7, z + r * 0.7, y - 1, y + h * 0.8); };
+  const patch = (key, x0, z0, x1, z1, lift, cell = 8) => drapePatch(gb, key, XF, x0, z0, x1, z1, { cell, lift, uvFrame: true });
+  const disc = (key, lx, lz, r, lift, segs = 20) => { const [x, z] = hallW(lx, lz); drapeDisc(gb, key, x, z, r, { segs, rings: 2, lift }); };
+
+  /* ---------------- the ground: lawns, gravel, paving ---------------- */
+  patch('hGravel', -2.6, 70, 2.6, HALL.gate + 7, 0.07, 6);        // the drive
+  patch('hGravel', -39, 9, 39, 72, 0.06);                                        // the forecourt
+  disc('hLawn2', 0, 42, 10, 0.09);                                               // its round of grass
+  for (const s of [-1, 1]) patch('hLawn2', s > 0 ? 13.5 : -37, 20, s > 0 ? 37 : -13.5, 66, 0.09, 6); // and a plat either side
+  gb.tint = [1.28, 1.22, 1.06]; patch('sqFlag', -40, -25, 40, -8, 0.06); gb.tint = null;                                       // the terrace
+  patch('hGravel', -46, -120, 46, -31.5, 0.07);                                    // the parterre's walks
+  for (const s of [-1, 1]) patch('hGravel', s * 16 - 3, -346, s * 16 + 3, -120, 0.07); // walks along the long water
+  patch('hGravel', -19, -346, 19, -340, 0.07);                                    // and round its head
+  disc('hGravel', 0, -347, 10, 0.07);                                            // the round at its head, where the rides part
+  HALL_RIDES.forEach(([a, b, c, d]) => drapeStrip(gb, 'hGravel', resampleEven([hallW(a, b), hallW(c, d)], 6), 3.2, { lift: 0.08 }));                                  // the middle ride's path to the obelisk
+  HALL_RIDES.forEach(([a, b, c, d]) => drapeStrip(gb, 'hLawn', resampleEven([hallW(a, b), hallW(c, d)], 6), 10, { lift: 0.05 }));
+  patch('hGravel', 39, 30, 50, 36, 0.07, 4); patch('hGravel', -50, 30, -39, 36, 0.07, 4); // ways through to the courts
+
+  /* ---------------- the house ---------------- */
+  frame();
+  // a raised basement, a ground floor, a taller principal floor and an attic storey under a steep roof with dormers
+  const PL = 1.6, S1 = 6.2, S2 = 11.2, E3 = 15.4, E2 = S2;
+  const R3 = [[PL + 1.0, 1.7, 3.1, 'sash'], [S1 + 0.9, 1.7, 3.5, 'sash'], [S2 + 0.9, 1.7, 2.4, 'sashS']], R2 = R3.slice(0, 2), HO = { plinth: PL, pitch: 0.95 };
+  const MAIN = { x0: -19, z0: -8, x1: 19, z1: 8 };
+  const mrh = range(MAIN.x0, MAIN.z0, MAIN.x1, MAIN.z1, E3, { ...HO, strings: [S1, S2] });
+  for (const f of ['s', 'n']) { wins(MAIN, f, 0.8, 11.8, R3, null, 3.6); wins(MAIN, f, 26.2, 37.2, R3, null, 3.6); }
+  // the centrepieces, front and garden: three bays standing forward under a pediment, the door in the middle up a flight of steps
+  for (const sg of [1, -1]) {
+    const z0 = sg > 0 ? 8 : -10, z1 = sg > 0 ? 10 : -8, zf = sg > 0 ? 10 : -10, CP = { x0: -7, z0, x1: 7, z1 }, f = sg > 0 ? 's' : 'n';
+    const E4 = E3 + 3.7, zb = sg * 8.7 * (1 - 3.7 / mrh) - sg * 0.6; // (the attic runs back to where it meets the main roof)
+    gb.box(-7.15, -1.8, z0 - 0.15, 7.15, PL, z1 + 0.15, SL, 3, 3); gb.box(-7, PL, z0, 7, E4, z1, { side: 'brick', top: null }, 2.4, 2.4); gb.box(-7, E3 - 0.2, Math.min(zb, z0), 7, E4, Math.max(zb, z0), { side: 'brick', top: null }, 2.4, 2.4);
+    for (const qx of [-7.07, 6.1]) gb.box(qx, PL, sg > 0 ? zf - 0.9 : zf - 0.07, qx + 0.97, E4 - 0.6, sg > 0 ? zf + 0.07 : zf + 0.9, 'ashlar', 2, 2, { skip: 'tb' });
+    for (const y of [S1, S2, E3 - 0.2]) gb.box(-7.12, y - 0.16, z0 - 0.12, 7.12, y + 0.16, z1 + 0.12, 'ashlar', 3, 3, { skip: 'b' });
+    gb.box(-7.55, E4 - 0.7, Math.min(zb, z0) - 0.55, 7.55, E4 + 0.05, Math.max(zb, z1) + 0.55, SL, 3, 3);
+    wins(CP, f, 0, 14, [...R3, [E3 + 0.75, 1.7, 2.0, 'sashS']], (k, ri) => k === 1 && ri === 0, 4.6);
+    // the pediment and the little roof behind it, running back into the main roof
+    const zp = zf + sg * 0.6, ph = 4.3, zc = sg * 8.7 * Math.max(0.02, 1 - (3.7 + ph) / mrh), ze = zb - sg * 0.6;
+    gb.tri('ashlar', [-7.9, E4, zp - sg * 0.3], [7.9, E4, zp - sg * 0.3], [0, E4 + ph, zp - sg * 0.3], [-2.5, 0], [2.5, 0], [0, 1.4], [0, 0, sg]);
+    gb.quad('sashS', [sg > 0 ? -0.75 : 0.75, E4 + 0.7, zp - sg * 0.26], [sg, 0, 0], [0, 1, 0], 1.5, 1.7, 1, 1, { fixedUV: true });
+    gb.quad4('roofSlate', [-8.1, E4 - 0.1, zp], [0, E4 + ph + 0.1, zp], [0, E4 + ph + 0.1, zc], [-8.1, E4 - 0.1, ze], [0, 0], [2.8, 0], [2.8, 2], [0, 0.4], [-1, 1.5, 0]);
+    gb.quad4('roofSlate', [8.1, E4 - 0.1, zp], [0, E4 + ph + 0.1, zp], [0, E4 + ph + 0.1, zc], [8.1, E4 - 0.1, ze], [0, 0], [2.8, 0], [2.8, 2], [0, 0.4], [1, 1.5, 0]);
+    // the door in its stone frame
+    const zd = zf + sg * 0.06;
+    gb.box(-2.9, PL, Math.min(zf, zf + sg * 0.12), 2.9, S1 - 0.16, Math.max(zf, zf + sg * 0.12), 'ashlar', 2, 2, { skip: 'tb' }); // the middle bay faced in stone
+    gb.tint = [1.9, 1.85, 1.7]; gb.quad('doorB', [sg > 0 ? -1.25 : 1.25, PL, zf + sg * 0.16], [sg, 0, 0], [0, 1, 0], 2.5, 3.6, 1, 1, { fixedUV: true }); gb.tint = null;
+    for (const px of [-2.6, 1.7]) { gb.box(px, PL, Math.min(zf, zf + sg * 0.7), px + 0.9, PL + 0.5, Math.max(zf, zf + sg * 0.7), SL, 2, 2); gb.cyl('ashlar', px + 0.45, zf + sg * 0.42, 0.3, PL + 0.5, PL + 3.9, 7, 1, 2); }
+    gb.box(-2.8, PL + 3.9, Math.min(zf, zf + sg * 0.8), 2.8, PL + 4.4, Math.max(zf, zf + sg * 0.8), SL, 2, 2);
+    gb.tri('ashlar', [-2.8, PL + 4.4, zf + sg * 0.75], [2.8, PL + 4.4, zf + sg * 0.75], [0, PL + 5.6, zf + sg * 0.75], [-0.8, 0], [0.8, 0], [0, 0.4], [0, 0, sg]);
+    // the steps: eight slabs, each a step lower and wider than the last
+    for (let k = 0; k < 8; k++) { const a = zf + sg * (0.8 + 0.45 * k), b = zf + sg * (0.8 + 0.45 * (k + 1)), hw = 4.2 + 0.35 * k, top = PL - 0.2 * k;
+      gb.box(-hw, -1, Math.min(a, b), hw, top, Math.max(a, b), SL, 2, 2, { skip: 'b' }); col(-hw, Math.min(a, b), hw, Math.max(a, b), -1, top); }
+    gb.box(-4.2, -1, Math.min(zf, zf + sg * 0.8), 4.2, PL, Math.max(zf, zf + sg * 0.8), SL, 2, 2, { skip: 'b' }); col(-4.2, Math.min(zf, zf + sg * 0.8), 4.2, Math.max(zf, zf + sg * 0.8), -1, PL); // the landing before the door
+    col(-7, z0, 7, z1, -2, E4 + 2);
+    if (sg > 0) for (const lx of [-2.6, 2.6]) Sites.glows.push([...((p) => [p[0], Y0 + 4.8, p[1]])(hallW(lx, 10.7)), 3]);
+    // dormers in the roof, two either side of the pediment
+    for (const dx of [-16.4, -13, -9.6, 9.6, 13, 16.4]) { const zs = 8.7 * (1 - 0.7 / mrh), a = sg * (zs - 2.8), b = sg * (zs + 0.05), zlo = Math.min(a, b), zhi = Math.max(a, b);
+      gb.box(dx - 0.95, E3 + 0.6, zlo, dx + 0.95, E3 + 2.8, zhi, { side: 'roofSlate', top: null }, 3, 3); gb.quad('sashS', [dx - sg * 0.75, E3 + 0.85, b + sg * 0.04], [sg, 0, 0], [0, 1, 0], 1.5, 1.8, 1, 1, { fixedUV: true });
+      hallRoof(gb, 'roofSlate', dx - 1.2, zlo - 0.25, dx + 1.2, zhi + 0.25, E3 + 2.8, 0.95); }
+  }
+  // the lantern on the roof
+  { const y = E3 + mrh - 0.6; gb.box(-3.1, y - 1.2, -3.1, 3.1, y + 1.8, 3.1, SL, 2, 2);
+    gb.tint = [1.12, 1.1, 1.04]; gb.cyl('plaster', 0, 0, 2.3, y + 1.8, y + 6.2, 8, 2, 2); gb.tint = null;
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 8, ux = Math.sin(a), uz = -Math.cos(a); gb.quad('winB', [Math.cos(a) * 2.17 - ux * 0.55, y + 2.7, Math.sin(a) * 2.17 - uz * 0.55], [ux, 0, uz], [0, 1, 0], 1.1, 2.6, 1, 1, { fixedUV: true }); }
+    gb.cyl('ashlar', 0, 0, 2.7, y + 6.2, y + 6.6, 8, 2, 2, { top: 'ashlar' }); gb.cone('roofCopper', 0, 0, 2.65, y + 6.6, 4.4, 8, 2);
+    gb.box(-0.07, y + 10.8, -0.07, 0.07, y + 13, 0.07, 'iron', 1, 1); gb.cyl('roofCopper', 0, 0, 0.32, y + 11.6, y + 12.1, 6, 1, 1, { top: 'roofCopper' }); }
+  for (const x of [-10, -4.2, 4.2, 10]) chimney(x, 0, E3 + mrh * 0.55, E3 + mrh + 2.8);
+  // the wings, and the pavilions that close them and come forward to hold the forecourt
+  for (const s of [-1, 1]) {
+    const W = s > 0 ? { x0: 19, z0: -6.5, x1: 29, z1: 6.5 } : { x0: -29, z0: -6.5, x1: -19, z1: 6.5 };
+    const wrh = range(W.x0, W.z0, W.x1, W.z1, E2, { ...HO, strings: [S1], plain: true, pitch: 0.75 });
+    wins(W, 's', 0.4, 9.6, R2, null, 3.2); wins(W, 'n', 0.4, 9.6, R2, null, 3.2); chimney(s * 24, 0, E2 + wrh * 0.5, E2 + wrh + 2.2);
+    const P = s > 0 ? { x0: 29, z0: -8, x1: 38, z1: 18 } : { x0: -38, z0: -8, x1: -29, z1: 18 };
+    const prh = range(P.x0, P.z0, P.x1, P.z1, E2, { ...HO, strings: [S1], pitch: 0.8 });
+    wins(P, 's', 0.9, 8.1, R2, null, 3.6); wins(P, 'n', 0.9, 8.1, R2, null, 3.6); wins(P, s > 0 ? 'e' : 'w', 1, 25, R2, null, 3.5);
+    if (s > 0) wins(P, 'w', 15.2, 25.2, R2, null, 3.4); else wins(P, 'e', 0.8, 10.8, R2, null, 3.4);
+    chimney(s * 33.5, 12, E2 + prh * 0.5, E2 + prh + 2.2); chimney(s * 33.5, -2, E2 + prh * 0.5, E2 + prh + 2.2);
+  }
+
+  /* ---------------- the forecourt: a railed screen with gate piers, walls to either side, a figure on the round of grass ---------------- */
+  statue(0, 42, 0);
+  for (const s of [-1, 1]) { const a = s > 0 ? 13.5 : -37, b = s > 0 ? 37 : -13.5; for (const [p, q, r, u] of [[a - 0.3, 19.7, b + 0.3, 20], [a - 0.3, 66, b + 0.3, 66.3], [a - 0.3, 20, a, 66], [b, 20, b + 0.3, 66]]) gb.box(p, -0.3, q, r, 0.22, u, SL, 2, 2);
+    for (const x of [a + 1.6, b - 1.6]) for (const z of [21.6, 64.4]) yew(x, z, 0.9, 2.8, 0); yew((a + b) / 2, 42, 1.4, 4.0, 0); }
+  for (const s of [-1, 1]) {
+    const a = s > 0 ? 4.6 : -40, b = s > 0 ? 40 : -4.6;
+    gb.box(a, -1, 71.7, b, 0.6, 72.3, SL, 2, 2); col(a, 71.6, b, 72.4, -1, 2.4);
+    for (let x = a; x < b - 0.5; x += 5.06) gb.quad('portcullis', [x, 0.6, 72], [1, 0, 0], [0, 1, 0], Math.min(5.06, b - x), 1.75, 1, 1, { fixedUV: true, double: true });
+    for (let k = 1; k < 7; k++) pier(s * (4.6 + k * 5.06), 72, 0.8, 2.6);
+    pier(s * 4.6, 72, 1.3, 4.2, 0, 'urn');
+    wall(s > 0 ? 39.7 : -40.3, 18, s > 0 ? 40.3 : -39.7, 30, 2.6); wall(s > 0 ? 39.7 : -40.3, 36, s > 0 ? 40.3 : -39.7, 72, 2.6);
+    pier(s * 40, 30, 0.9, 3.0); pier(s * 40, 36, 0.9, 3.0);
+  }
+
+  /* ---------------- the stable court (north side): ranges round a cobbled yard, a clock turret over the long one ---------------- */
+  { patch('rCobble', 50, -1, 84, 41, 0.06);
+    const L = { x0: 84, z0: -8, x1: 93, z1: 48 }, RS = [[1.7, 1.2, 1.6, 'sashS'], [4.4, 1.2, 1.2, 'sashS']], E = 6.3;
+    const lrh = range(L.x0, L.z0, L.x1, L.z1, E, { strings: [3.9], pitch: 0.6 });
+    wins(L, 'w', 9, 47, RS, (k, ri) => ri === 0 && k % 2 === 1, 4.2); wins(L, 'e', 2, 54, RS, null, 4.4);
+    { const fi = faceInfo(L, 'w'), n = 9, sp = 38 / n; for (let k = 1; k < n; k += 2) { const t = 9 + (k + 0.5) * sp; gb.quad('doorF', [fi.o[0] - 0.05, 1.0, fi.o[2] + t - 1.3], fi.U, [0, 1, 0], 2.6, 2.9, 1, 1, { fixedUV: true }); } }
+    { const y = E + lrh - 0.7; gb.box(87, y, 18.5, 90, y + 2.6, 21.5, { side: 'plaster', top: null }, 2, 2); gb.quad('winB', [86.95, y + 0.9, 19.4], [0, 0, 1], [0, 1, 0], 1.2, 1.2, 1, 1, { fixedUV: true }); gb.box(86.8, y + 2.6, 18.3, 90.2, y + 2.85, 21.7, SL, 2, 2); gb.cone('roofCopper', 88.5, 20, 2.0, y + 2.85, 2.6, 8, 2); }
+    for (const [z0, z1, f] of [[-8, -1, 's'], [41, 48, 'n']]) { const Rg = { x0: 50, z0, x1: 84, z1 }; range(Rg.x0, Rg.z0, Rg.x1, Rg.z1, 4.4, { plain: true, plinth: 0.6, pitch: 0.6 }); wins(Rg, f, 1, 33, [RS[0]], null, 4.2); wins(Rg, f === 's' ? 'n' : 's', 1, 33, [RS[0]], null, 4.2); }
+    wall(49.7, -1, 50.3, 30, 2.6); wall(49.7, 36, 50.3, 41, 2.6); pier(50, 30, 0.9, 3.0); pier(50, 36, 0.9, 3.0);
+    gb.box(60.8, -0.3, 19.5, 62.8, 0.5, 20.5, { side: 'stone', top: 'hWater' }, 2, 2); col(60.8, 19.5, 62.8, 20.5, -1, 0.5); // a trough
+  }
+  /* ---------------- the kitchen garden (south side): beds within a high wall, a gardener's cottage in the corner ---------------- */
+  { wall(-93, -8.3, -50, -7.7, 3.0); wall(-93, 47.7, -50, 48.3, 3.0); wall(-93.3, -8, -92.7, 48, 3.0); wall(-50.3, -8, -49.7, 30, 3.0); wall(-50.3, 36, -49.7, 48, 3.0);
+    pier(-50, 30, 0.9, 3.3); pier(-50, 36, 0.9, 3.3);
+    patch('hGravel', -91, 31.5, -51, 34.5, 0.07, 4); patch('hGravel', -73, -6, -70, 46, 0.07, 4);
+    const beds = [[-90, 36.5, -74.5, 45.5, 'fGreens'], [-68.5, 36.5, -52, 45.5, 'fPlowed'], [-90, 12, -74.5, 29.5, 'hBed'], [-68.5, 12, -52, 29.5, 'fGreens']];
+    for (const [a, b, c, d, k] of beds) { patch(k, a, b, c, d, 0.06, 4); for (const [p, q, r, t] of [[a - 0.3, b - 0.3, c + 0.3, b], [a - 0.3, d, c + 0.3, d + 0.3], [a - 0.3, b, a, d], [c, b, c + 0.3, d]]) gb.box(p, -0.2, q, r, 0.32, t, 'hedge', 2, 2); }
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) plant('oak' + (i + j) % 3, -66 + i * 4.3, -3.2 + j * 3.6, 0.36); // a quarter of fruit trees
+    for (let x = -90; x < -52; x += 4.4) { gb.box(x, -0.2, 47.1, x + 3.2, 2.3, 47.6, 'hedge', 2, 2); gb.box(x, -0.2, -7.6, x + 3.2, 2.3, -7.1, 'hedge', 2, 2); } // fruit trained on the walls
+    for (let k = 0; k < 4; k++) { const x = -89 + k * 3.6; gb.box(x, -0.2, 2, x + 3, 0.5, 4.4, { side: 'wood', top: 'winB' }, 1.5, 1.5); col(x, 2, x + 3, 4.4, -1, 0.5); } // glazed frames
+    gb.cyl('ashlar', -71.5, 33, 1.9, -0.4, 0.45, 12, 2, 2, { top: 'hWater' }); col(-73.2, 31.3, -69.8, 34.7, -1, 0.45); // a dipping pond where the paths cross
+    for (const [a, b, c, d] of [[-90, 36.5, -74.5, 45.5], [-68.5, 12, -52, 29.5]]) for (let x = a + 1.2; x < c - 0.6; x += 2.1) for (let z = b + 1.2; z < d - 0.6; z += 2.2) plant('bush', x, z, 0.32); // cabbages in rows
+    gb.setXf(...hallW(-82, 1.5), HALL.ang + Math.PI / 2, Y0); makeBuilding(area, gb, new RNG(7611), { fp: { x0: -4.5, z0: -3.4, x1: 4.5, z1: 3.4 }, stories: 1, style: 'brick', roof: 'gable', roofKey: 'roofSlate', doorT: 0.5, found: 0.6, chimney: 1 }); frame();
+  }
+
+  /* ---------------- the gate: two lodges, piers and railings on the road ---------------- */
+  { const gz = HALL.gate, yg = gy(0, gz) - Y0; frame(0, gz, 0, Y0 + yg);
+    for (const s of [-1, 1]) {
+      const Lg = s > 0 ? { x0: 8, z0: -3.2, x1: 14.4, z1: 3.2 } : { x0: -14.4, z0: -3.2, x1: -8, z1: 3.2 };
+      range(Lg.x0, Lg.z0, Lg.x1, Lg.z1, 4.6, { plinth: 0.6, pitch: 0.9 }); wins(Lg, 's', 0.8, 5.6, [[1.5, 1.2, 2.0, 'sashS']], null, 5); wins(Lg, 'n', 0.8, 5.6, [[1.5, 1.2, 2.0, 'sashS']], null, 5);
+      gb.quad('doorC', [s > 0 ? 7.95 : -7.95, 0.6, s > 0 ? -0.7 : 0.7], [0, 0, s], [0, 1, 0], 1.4, 2.4, 1, 1, { fixedUV: true }); // its door to the drive
+      chimney(s * 11.2, 0, 6.5, 9.4);
+      pier(s * 3.9, 3.2, 1.3, 4.4, 0, 'urn'); pier(s * 8, 3.2, 0.9, 3.0);
+      gb.box(s > 0 ? 4.5 : -7.6, -1, 2.95, s > 0 ? 7.6 : -4.5, 0.6, 3.45, SL, 2, 2); col(s > 0 ? 4.5 : -7.6, 2.9, s > 0 ? 7.6 : -4.5, 3.5, -1, 2.4);
+      gb.quad('portcullis', [s > 0 ? 4.5 : -7.6, 0.6, 3.2], [1, 0, 0], [0, 1, 0], 3.1, 1.75, 1, 1, { fixedUV: true, double: true });
+      wall(s > 0 ? 14.4 : -34, 2.9, s > 0 ? 34 : -14.4, 3.5, 1.5); pier(s * 34, 3.2, 0.9, 2.2);
+      Sites.glows.push([...((p) => [p[0], Y0 + yg + 5.4, p[1]])(hallW(s * 3.9, gz + 3.2)), 3.4]);
+    }
+    frame(); }
+
+  /* ---------------- the avenue: a double row of trees either side of the drive; old oaks standing about the park; sheep ---------------- */
+  for (let lz = 84; lz <= HALL.gate - 8; lz += 10) for (const lx of [-17.5, -8, 8, 17.5]) plant('oak1', lx, lz, 1.08);
+  { const cl = []; for (let q = 0; q < 300 && cl.length < 9; q++) { const lx = rng.range(60, 250) * (cl.length % 2 ? 1 : -1), lz = rng.range(110, 440); if (cl.some(([a, b]) => Math.hypot(a - lx, b - lz) < 75)) continue; cl.push([lx, lz]);
+      const n = rng.int(4, 7); for (let k = 0; k < n; k++) { const a = rng.range(0, 6.283), r = rng.range(3, 17); plant('oak' + rng.int(0, 2), lx + Math.cos(a) * r, lz + Math.sin(a) * r, rng.range(1.0, 1.4)); }
+      if (cl.length % 2) for (let k = 0; k < 5; k++) plant('sheep', lx + rng.range(-26, 26), lz + rng.range(18, 34), rng.range(0.9, 1.1)); }
+    for (let q = 0; q < 14; q++) { const lx = rng.range(40, 260) * (q % 2 ? 1 : -1), lz = rng.range(95, 465); if (!cl.some(([a, b]) => Math.hypot(a - lx, b - lz) < 30)) plant('oak' + rng.int(0, 2), lx, lz, rng.range(1.15, 1.45)); } }
+
+  for (const s of [-1, 1]) { for (let z = -20; z <= 60; z += 10) { plant('oak2', s * 104, z, 1.1); plant('oak0', s * 114, z + 5, 1.15); } for (let x = 60; x <= 95; x += 11) plant('oak2', s * x, 60, 1.1); } // rows of trees behind the courts, to frame the house
+
+  /* ---------------- the terrace: a balustrade above the bank, steps down to the gardens ---------------- */
+  for (const s of [-1, 1]) {
+    const a = s > 0 ? 5.5 : -40, b = s > 0 ? 40 : -5.5;
+    gb.box(a, -1.6, -25.5, b, 0.14, -25, SL, 2, 2); gb.quad('balus', [a, 0.14, -25.25], [1, 0, 0], [0, 1, 0], b - a, 0.72, 0.42, 0.72, { double: true, v0: 0 }); gb.box(a - 0.05, 0.86, -25.5, b + 0.05, 1.0, -25, SL, 2, 2); col(a, -25.5, b, -25, -2, 0.95);
+    for (const x of [12, 26]) { gb.box(s * x - 0.55, 0, -23.6, s * x + 0.55, 0.7, -22.5, { side: 'wood', top: 'dirt' }, 1, 1); gb.cone('hedge', s * x, -23.05, 0.6, 0.7, 1.9, 7, 2); col(s * x - 0.55, -23.6, s * x + 0.55, -22.5, -1, 2); }
+    for (let k = 0; k <= 5; k++) { const x = s * (5.5 + k * 6.9); gb.box(x - 0.35, -1.6, -25.6, x + 0.35, 1.1, -24.9, SL, 2, 2); if (k === 0 || k === 5) urn(x, -25.25, 1.1, 0.9); }
+  }
+  for (let k = 0; k < 7; k++) { const z1 = -25 - k * 0.86, z0 = z1 - 0.86, top = -0.2 * k; gb.box(-5.5, top - 2.2, z0, 5.5, top, z1, SL, 2, 2, { skip: 'b' }); col(-5.5, z0, 5.5, z1, top - 2.2, top); }
+  for (const s of [-1, 1]) { gb.box(s > 0 ? 5.5 : -6.4, -3, -31.4, s > 0 ? 6.4 : -5.5, 0.3, -25, SL, 2, 2, { skip: 'b' }); col(s > 0 ? 5.5 : -6.4, -31.4, s > 0 ? 6.4 : -5.5, -25, -3, 0.3); urn(s * 5.95, -30.9, 0.3, 0.9); }
+
+  /* ---------------- the parterre: four quarters of embroidery in clipped box and coloured earth round a fountain ---------------- */
+  const PW = 42; // its half-width: about that of the house and its terrace
+  for (const sx of [-1, 1]) for (const [za, zb] of [[-64, -40], [-114, -90]]) {
+    const x0 = sx > 0 ? 5 : -PW, x1 = sx > 0 ? PW : -5, t = 0.8, cx = (x0 + x1) / 2, cz = (za + zb) / 2, hx = (x1 - x0) / 2 - t, hz = (zb - za) / 2 - t;
+    hedge(x0, za, x1, za + t, 0.6); hedge(x0, zb - t, x1, zb, 0.6); hedge(x0, za + t, x0 + t, zb - t, 0.6); hedge(x1 - t, za + t, x1, zb - t, 0.6);
+    // the pattern itself, laid on the ground: scrolls of box on sand and brick dust, mirrored about both walks
+    gb.quad('hBrod', [x0 + t, GL + 0.1, zb - t], [1, 0, 0], [0, 0, -1], 2 * hx, 2 * hz, 1, 1, { fixedUV: true, flipU: sx < 0, v0: 0 });
+    // and standing up from it: the lozenge and the inner border in low clipped box, a yew in the middle bed and at each point
+    const lz2 = hz * 0.57, lx2 = hx * 0.49;
+    for (const [ax, az, bx, bz] of [[cx - lx2, cz, cx, cz - lz2], [cx, cz - lz2, cx + lx2, cz], [cx + lx2, cz, cx, cz + lz2], [cx, cz + lz2, cx - lx2, cz]]) { const L = Math.hypot(bx - ax, bz - az), rot = Math.atan2(bx - ax, bz - az); frame((ax + bx) / 2, (az + bz) / 2, rot); gb.box(-0.3, GL - 0.2, -L / 2, 0.3, GL + 0.42, L / 2, 'hedge', 2, 2); }
+    frame();
+    const bi = 2.3; for (const [p, q, r, u] of [[x0 + t + bi, za + t + bi, x1 - t - bi, za + t + bi + 0.5], [x0 + t + bi, zb - t - bi - 0.5, x1 - t - bi, zb - t - bi], [x0 + t + bi, za + t + bi, x0 + t + bi + 0.5, zb - t - bi], [x1 - t - bi - 0.5, za + t + bi, x1 - t - bi, zb - t - bi]]) gb.box(p, GL - 0.2, q, r, GL + 0.42, u, 'hedge', 2, 2);
+    gb.cyl('hedge', cx, cz, 2.6, GL - 0.2, GL + 0.42, 12, 2, 2, { top: 'hBedTop' });
+    yew(cx, cz, 1.0, 2.8); for (const px of [cx - lx2, cx + lx2]) yew(px, cz, 0.55, 1.6);
+    for (const [px, pz] of [[x0, za], [x1, za], [x0, zb], [x1, zb]]) yew(px + (px === x0 ? 0.4 : -0.4), pz + (pz === za ? 0.4 : -0.4), 0.8, 2.1);
+    for (let x = x0 + 7.4; x < x1 - 4; x += 7.4) for (const z of [za + 0.4, zb - 0.4]) yew(x, z, 0.5, 1.5);
+    // flowers in the border between the two lines of box
+    const fr = new RNG(7700 + (sx > 0 ? 0 : 1) + (za > -80 ? 0 : 2));
+    for (let q = 0; q < 70; q++) { const side = q % 4, u = fr.next(), w = t + 0.5 + fr.next() * (bi - 0.9); const lx = side < 2 ? lerp(x0 + 2, x1 - 2, u) : side === 2 ? x0 + w : x1 - w, lz = side === 0 ? za + w : side === 1 ? zb - w : lerp(za + 2, zb - 2, u); plant('flowers' + fr.int(0, 3), lx, lz, fr.range(1.0, 1.5)); }
+  }
+  // grass plats in the cross walk, edged with stone, a figure on each and an urn at its inner end
+  for (const s of [-1, 1]) { const a = s > 0 ? 16 : -PW, b = s > 0 ? PW : -16;
+    patch('hLawn2', a, -83, b, -71, 0.08, 6);
+    for (const [p, q, r, u] of [[a - 0.3, -83.3, b + 0.3, -83], [a - 0.3, -71, b + 0.3, -70.7], [a - 0.3, -83, a, -71], [b, -83, b + 0.3, -71]]) gb.box(p, GL - 0.3, q, r, GL + 0.22, u, SL, 2, 2);
+    frame(s * 29, -77, s > 0 ? -Math.PI / 2 : Math.PI / 2, Y0 + GL); statue(0, 0, 0); frame();
+    for (const x of [18.5, 39.5]) { frame(s * x, -77, 0, Y0 + GL); gb.box(-0.45, -0.4, -0.45, 0.45, 0.9, 0.45, SL, 2, 2); urn(0, 0, 0.9, 1.1); col(-0.45, -0.45, 0.45, 0.45, -1, 2.2); frame(); } }
+  for (const [px, pz] of [[-45, -37], [45, -37], [-45, -117], [45, -117]]) { frame(px, pz, px > 0 ? -Math.PI / 2 : Math.PI / 2, Y0 + GL); statue(0, 0, 0); }
+  frame();
+  // the fountain: a broad basin, two bowls and a jet
+  { const fz = -77; gb.cyl('ashlar', 0, fz, 7.6, GL - 0.5, GL + 0.6, 20, 2, 2, { top: 'ashlar' }); gb.disc('hWater', 0, GL + 0.66, fz, 6.9, 20, 5);
+    gb.cyl('ashlar', 0, fz, 1.2, GL, GL + 1.5, 8, 2, 2); gb.cone('ashlar', 0, fz, 1.2, GL + 1.5, 0.9, 8, 2); gb.cyl('ashlar', 0, fz, 0.5, GL + 1.5, GL + 2.5, 6, 2, 2);
+    gb.cyl('ashlar', 0, fz, 3.0, GL + 2.5, GL + 2.85, 14, 2, 2, { top: 'hWater' }); gb.cyl('ashlar', 0, fz, 0.42, GL + 2.85, GL + 4.3, 6, 2, 2); gb.cyl('ashlar', 0, fz, 1.5, GL + 4.3, GL + 4.6, 10, 2, 2, { top: 'hWater' });
+    gb.tint = [1.5, 1.56, 1.6]; gb.cone('plaster', 0, fz, 0.6, GL + 4.6, 1.9, 6, 1); gb.tint = null;
+    col(-6.6, fz - 6.6, 6.6, fz + 6.6, GL - 1, GL + 0.6); col(-1.6, fz - 1.6, 1.6, fz + 1.6, GL - 1, GL + 5); }
+  // tall clipped hedges close the gardens on either side, in lengths with gaps to the park
+  for (const s of [-1, 1]) for (let z = -36; z > -330; z -= 50) hedge(s > 0 ? 49.2 : -50.8, Math.max(z - 45, -338), s > 0 ? 50.8 : -49.2, z, 2.7);
+
+  /* ---------------- the long water: a stone-edged basin, walks and rows of trees beside it, yews at measured intervals ---------------- */
+  { const z0 = -338, z1 = -130, hw = 10;
+    gb.quad('hWater', [-hw + 0.3, GL + 0.22, z1 - 0.3], [1, 0, 0], [0, 0, -1], 2 * hw - 0.6, z1 - z0 - 0.6, 6, 6);
+    for (const [a, b, c, d] of [[-hw - 0.5, z0 - 0.5, -hw + 0.5, z1 + 0.5], [hw - 0.5, z0 - 0.5, hw + 0.5, z1 + 0.5], [-hw + 0.5, z0 - 0.5, hw - 0.5, z0 + 0.5], [-hw + 0.5, z1 - 0.5, hw - 0.5, z1 + 0.5]]) { gb.box(a, GL - 1, b, c, GL + 0.4, d, SL, 2, 2, { skip: 'b' }); col(a, b, c, d, GL - 1, GL + 0.4); }
+    for (const s of [-1, 1]) { for (const z of [z0 - 0.2, z1 + 0.2]) { frame(s * (hw + 0.2), z, 0, Y0 + GL); urn(0, 0, 0.4, 1.0); frame(); }
+      for (let z = -140; z >= -334; z -= 10.8) { plant('oak1', s * 29, z, 1.0); plant('oak1', s * 39, z, 1.0); }
+      for (let z = -150; z >= -330; z -= 27) yew(s * 21.5, z, 1.0, 3.0);
+      for (let z = -136; z >= -332; z -= 27) { frame(s * 12.6, z, s > 0 ? -Math.PI / 2 : Math.PI / 2, Y0 + GL); gb.box(-0.9, -0.3, -0.3, 0.9, 0.45, 0.3, SL, 2, 2); col(-0.9, -0.3, 0.9, 0.3, -1, 0.45); frame(); } } // stone seats
+  }
+
+  /* ---------------- the rides and the obelisk ---------------- */
+  HALL_RIDES.forEach(([a, b, c, d], ri) => { const L = Math.hypot(c - a, d - b), ux = (c - a) / L, uz = (d - b) / L;
+    for (let t = 22; t < L - 4; t += 10) for (const s of [-1, 1]) { const lx = a + ux * t - uz * 7.6 * s, lz = b + uz * t + ux * 7.6 * s; if (HALL_RIDES.some((R, k) => k !== ri && segDist(lx, lz, R[0], R[1], R[2], R[3]).d < 8)) continue; plant('oak0', lx, lz, 0.9); }
+    // each side ride ends at a little round temple: six columns under a copper dome
+    if (ri) { const y = gy(c, d) - Y0, K = 1.5; frame(c, d, 0, Y0 + y); gb.cyl('ashlar', 0, 0, 4.4 * K, -1.2, 0.35, 14, 2, 2, { top: 'ashlar' }); gb.cyl('ashlar', 0, 0, 3.8 * K, 0.35, 0.7, 14, 2, 2, { top: 'ashlar' });
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4 + Math.PI / 8, px = Math.cos(an) * 3.1 * K, pz = Math.sin(an) * 3.1 * K; gb.cyl('ashlar', px, pz, 0.42, 0.7, 6.6, 6, 1, 2); col(px - 0.45, pz - 0.45, px + 0.45, pz + 0.45, 0, 6.6); }
+      gb.cyl('ashlar', 0, 0, 3.7 * K, 6.6, 7.5, 14, 2, 2); gb.disc('ashlar', 0, 6.6, 0, 3.7 * K, 14, 2); gb.cone('roofCopper', 0, 0, 3.9 * K, 7.5, 4.4, 14, 2); statue(0, 0, 0.7);
+      col(-4.4 * K, -4.4 * K, 4.4 * K, 4.4 * K, -1.2, 0.35); col(-3.8 * K, -3.8 * K, 3.8 * K, 3.8 * K, -1.2, 0.7); frame(); } });
+  { const oz = HALL.ob, y = gy(0, oz) - Y0 - 0.2; frame(0, oz, 0, Y0 + y); gb.tint = [1.08, 1.06, 1.0];
+    gb.box(-4.6, -1.5, -4.6, 4.6, 0.6, 4.6, SL, 2, 2); gb.box(-3.5, 0.6, -3.5, 3.5, 1.2, 3.5, SL, 2, 2); gb.box(-2.4, 1.2, -2.4, 2.4, 5.0, 2.4, SL, 2, 2); gb.box(-2.75, 5.0, -2.75, 2.75, 5.45, 2.75, SL, 2, 2);
+    const b = 1.95, t = 1.1, y0 = 5.45, y1 = 30, ya = 33, C = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    for (let k = 0; k < 4; k++) { const [ax, az] = C[k], [bx, bz] = C[(k + 1) % 4], hint = [(ax + bx) / 2, 0.05, (az + bz) / 2];
+      gb.quad4('ashlar', [ax * b, y0, az * b], [bx * b, y0, bz * b], [bx * t, y1, bz * t], [ax * t, y1, az * t], [0, 0], [1.6, 0], [1.25, 10], [0.35, 10], hint);
+      gb.tri('ashlar', [ax * t, y1, az * t], [bx * t, y1, bz * t], [0, ya, 0], [0, 0], [0.9, 0], [0.45, 1.2], [hint[0], 0.6, hint[2]]); }
+    gb.tint = null; col(-4.6, -4.6, 4.6, 4.6, -2, 0.6); col(-3.5, -3.5, 3.5, 3.5, -2, 1.2); col(-2.4, -2.4, 2.4, 2.4, -2, 30); frame(); }
+
+  gb.xf = null; gb.light = savedLight;
+  // the household, about their work by day
+  const P = (lx, lz) => hallW(lx, lz);
+  S.folk = [
+    { at: P(5.5, HALL.gate - 6), r: 3, trade: 'Gatekeeper of Halewood', look: { hat: '#2a2a2e', shirt: '#3a3a44', pants: '#2a2a2e' }, lines: ['"The family is in town for the season. You may walk the avenue, so long as you keep off the lawns."', '"Four hundred paces from this gate to the door. I have counted them more often than I care to say."', '"Carriages for Corrinvale leave by this road. On foot it is the better part of an hour."'] },
+    { at: P(30, -78), r: 9, trade: 'Gardener at Halewood', look: { apron: '#5a6a3a', hat: '#a08a52' }, lines: ['"Every yew is clipped twice a year, and each must match its twin across the walk."', '"Mind the box hedges. They are older than I am, and better thought of."', '"The fountain plays on feast days. The rest of the year it sulks."'] },
+    { at: P(-16, -230), r: 8, trade: 'Gardener at Halewood', look: { apron: '#5a6a3a', hat: '#6a5a3a' }, lines: ['"The long water was dug in a single summer. I carried my share of it in a barrow."', '"Stand at the far end and the house sits on the water like a picture. That is what it was dug for."', '"The obelisk? It marks nothing at all. It is there to be looked at."'] },
+    { at: P(66, 22), r: 7, trade: 'Groom at Halewood', look: { shirt: '#7a6a50', pants: '#3a2e24' }, lines: ['"Twelve stalls, and the best of them stand empty while the family is away."', '"The grey kicks. The bay bites. The rest are merely unfriendly."'] },
+    { at: P(-72, 20), r: 6, trade: 'Kitchen gardener at Halewood', look: { apron: '#c8c0a8' }, lines: ['"Leeks, cabbages, and more beans than any household could eat. They ask for flowers."', '"The wall keeps the wind off and the rabbits out. Mostly the wind."'] },
+  ];
 };
 
 /* =====================================================================
@@ -2760,7 +3169,7 @@ const Wild = {
     const rh = new Map(); this.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const k = Math.floor(R.P[q][0] / 32) * 8192 + Math.floor(R.P[q][1] / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
     this.bridges = [];
     this.tracks.forEach((T, ti) => { for (let q = 1; q < T.length; q++) {
-      const [ax, az] = T[q - 1], [bx, bz] = T[q], l = rh.get(Math.floor(bx / 32) * 8192 + Math.floor(bz / 32)); if (!l) continue;
+      const [ax, az] = T[q - 1], [bx, bz] = T[q], l = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const c = rh.get((Math.floor(bx / 32) + i) * 8192 + Math.floor(bz / 32) + j); if (c) l.push(...c); } if (!l.length) continue; // (the river's point can lie in the next cell over from the crossing)
       for (let m = 0; m < l.length; m += 2) { const R = this.rivers[l[m]], p = l[m + 1], [cx, cz] = R.P[p - 1], [dx, dz] = R.P[p]; if (!segCross(ax, az, bx, bz, cx, cz, dx, dz)) continue;
         if (this.bridges.some(b => b.ti === ti && Math.abs(b.q - q) < 8)) continue;
         const w = R.w[p], wl = R.wl[p], ang = Math.atan2(bx - ax, bz - az);
@@ -3221,6 +3630,7 @@ const Wild = {
     // plants: one chance on a jittered 5.5 m grid, as dense as the woods round the city
     const SP = 5.5, DENS = (SP / 5) * (SP / 5);
     const tree = (kind, x, z, h, s) => { const def = WILD_KINDS[kind]; fl[kind].push([x, h - 0.15, z, s]); if (def[4]) c.cols.push({ x0: x - 0.35, z0: z - 0.35, x1: x + 0.35, z1: z + 0.35, y0: h - 1, y1: h + def[4] * s }); };
+    for (const S of SITES) if (S.plants) for (const [kind, px, pz, sc] of S.plants) if (px >= x0 && px < x0 + WC && pz >= z0 && pz < z0 + WC) tree(kind, px, pz, this.heightAt(px, pz), sc); // a site's planted trees: its avenues and rows
     const siteHere = SITES.some(S => Math.abs(x0 + WC / 2 - S.x) < S.rb + 400 && Math.abs(z0 + WC / 2 - S.z) < S.rb + 400), townHere = TOWNS.some(T => Math.abs(x0 + WC / 2 - T.x) < T.cfg.A + T.cfg.B + 500 && Math.abs(z0 + WC / 2 - T.z) < T.cfg.A + T.cfg.B + 500);
     for (let b = 0; b < WC / SP; b++) {
       for (let a = 0; a < WC / SP; a++) {
@@ -3611,7 +4021,7 @@ function makeFlag(area, tex, x, y, z, ang, w = 2.6, h = 1.5) {
 }
 
 /* =====================================================================
-   The city of Daggerfall: an irregular walled port with seven quarters,
+   The city of Aldhaven: an irregular walled port with seven quarters,
    a hierarchical street network that grows from the market outwards,
    buildings that face their street, landmarks, carriage stops, harbour
    and the countryside beyond the walls
@@ -3640,13 +4050,13 @@ const CASTLE_Z = -58; // the castle's frame: its north wall is part of the city 
 const RAMP = { x0: 40, xw: -24, xe: 10, z1: -72, z2: -79, w: 6 };
 const LOOK_AT = [-12, 26]; // what the lookout on Pilgrim's Rise faces
 
-const FIRST_M = ['Aldric', 'Bertrand', 'Cedric', 'Gaston', 'Pierre', 'Remy', 'Theodore', 'Lucien', 'Guillaume', 'Mathieu', 'Roland', 'Edouard', 'Gilles', 'Anton', 'Basile', 'Corvin', 'Darien', 'Emeric', 'Florian', 'Hugo', 'Jourdain', 'Lothaire', 'Marius', 'Olivier', 'Rainier', 'Tristan', 'Valentin', 'Kharjo', 'Sigurd', 'Azzan', 'Tavi', 'Hazadir', 'Brond', 'Ferrin'];
-const FIRST_F = ['Jehanne', 'Marguerite', 'Odile', 'Sabine', 'Yvette', 'Aurore', 'Isolde', 'Nadine', 'Celestine', 'Fiona', 'Helene', 'Adele', 'Blanche', 'Clemence', 'Elodie', 'Genevieve', 'Liliane', 'Mirabelle', 'Oriane', 'Perrine', 'Rosalind', 'Solene', 'Viviane', 'Iszara', 'Saadia', 'Freyja', 'Nirasha'];
-const SURNAMES = ['Belmont', 'Carrard', 'Dufresne', 'Fontaine', 'Gautier', 'Lamoreaux', 'Marchand', 'Montclair', 'Rochefort', 'Sauveur', 'Thibault', 'Vautrin', 'Duvall', 'Leclerc', 'Moreau', 'Pelletier', 'Renaud', 'Arcand', 'Beaumont', 'Chastel', 'Delacroix', 'Estienne', 'Fauconnier', 'Girard', 'Hennequin', 'Jardin', 'Lefort', 'Mercier', 'Noirel', 'Oriel', 'Pontbriand', 'Quintard', 'Rivard', 'Sorel', 'Tremblay', 'Valmont'];
+const FIRST_M = ['Pieter', 'Willem', 'Jan', 'Hendrik', 'Cornelis', 'Joost', 'Maarten', 'Thomas', 'Edmund', 'Nathaniel', 'Gideon', 'Josiah', 'Ralph', 'Walter', 'Hugh', 'Giacomo', 'Lorenzo', 'Matteo', 'Bartolomeo', 'Niccolò', 'Ambrose', 'Jasper', 'Tobias', 'Reinier', 'Claes', 'Dirk', 'Gerrit', 'Silas', 'Abel', 'Benedict', 'Crispin', 'Fabrizio', 'Lambert', 'Rufus'];
+const FIRST_F = ['Margriet', 'Neeltje', 'Grietje', 'Trijntje', 'Aaltje', 'Judith', 'Susanna', 'Prudence', 'Mercy', 'Agnes', 'Joan', 'Alice', 'Beatrix', 'Lucia', 'Caterina', 'Lucrezia', 'Ottavia', 'Isabella', 'Hester', 'Marijke', 'Rosalind', 'Cecily', 'Tabitha', 'Elspeth', 'Geertruid', 'Maddalena', 'Sophia'];
+const SURNAMES = ['de Vries', 'Bakker', 'Visser', 'Janssen', 'van Dijk', 'Hoekstra', 'Brouwer', 'Kuiper', 'Ashdown', 'Fairweather', 'Thornbury', 'Whitlock', 'Cole', 'Pennington', 'Hartley', 'Mercer', 'Rossi', 'Bellini', 'Moretti', 'Contarini', 'Vos', 'Smit', 'van der Meer', 'Oriel', 'Pruitt', 'Blackwood', 'Tanner', 'Fletcher', 'Ruysch', 'Graaf', 'Lombardi', 'Ferrante', 'Wyck', 'Haverkamp', 'Stoke', 'Verhoef'];
 const TAV_ADJ = ['Laughing', 'Drunken', 'Silver', 'Rusty', 'Howling', 'Dancing', 'Bloated', 'Crimson', 'Sleeping', 'Wandering', 'Salty', 'Screaming', 'Golden', 'Tipsy', 'Bearded', 'Merry'];
-const TAV_NOUN = ['Unicorn', 'Goat', 'Knight', 'Dragon', 'Mermaid', 'Flagon', 'Barrel', 'Wolf', 'Hound', 'Chicken', 'Rat', 'Kraken', 'Stag', 'Minotaur', 'Harpy', 'Mudcrab'];
+const TAV_NOUN = ['Unicorn', 'Goat', 'Knight', 'Dragon', 'Mermaid', 'Flagon', 'Barrel', 'Wolf', 'Hound', 'Chicken', 'Rat', 'Kraken', 'Stag', 'Minotaur', 'Harpy', 'Herring'];
 const OPEN_HOURS = { tavern: [0, 24], general: [6, 18], weaponsmith: [6, 18], armorer: [6, 18], alchemist: [6, 18], temple: [0, 24], mages: [6, 23], fighters: [6, 23], castle: [6, 20], house: [6, 20], mausoleum: [0, 24], hospice: [0, 24], warehouse: [6, 18] };
-const TYPE_LABEL = { tavern: 'Tavern', general: 'General Store', weaponsmith: 'Weaponsmith', armorer: 'Armorer', alchemist: 'Alchemist', temple: 'Temple', mages: 'Guild Hall', fighters: 'Guild Hall', castle: 'Palace', house: 'Residence', mausoleum: 'Mausoleum', hospice: 'Hospice', warehouse: 'Warehouse' };
+const TYPE_LABEL = { tavern: 'Tavern', general: 'General Store', weaponsmith: 'Weaponsmith', armorer: 'Armorer', alchemist: 'Alchemist', temple: 'Church', mages: 'Society Hall', fighters: 'Fencing School', castle: 'Palace', house: 'Residence', mausoleum: 'Mausoleum', hospice: 'Hospice', warehouse: 'Warehouse' };
 const LOCKABLE = { house: true, warehouse: true };
 function personName(rng, gender) { return rng.pick(gender === 'f' ? FIRST_F : FIRST_M) + ' ' + rng.pick(SURNAMES); }
 function isOpen(b, t = G.time) { const [a, z] = OPEN_HOURS[b.type] || [0, 24]; const h = hourOf(t); return h >= a && h < z; }
@@ -3656,8 +4066,8 @@ const capFirst = s => s.charAt(0).toUpperCase() + s.slice(1);
 const DISTRICTS = [
   { id: 'kingsward', name: 'Kingsward', kind: 'noble', blurb: 'where the nobility keep their manors in the shadow of the castle', seeds: [[-85, -105], [0, -135], [-40, -85], [30, -95]] },
   { id: 'market', name: 'the Market Ward', kind: 'market', blurb: 'crowded timber houses around the Grand Market', seeds: [[0, 12], [-35, -25], [35, -25], [0, 48]] },
-  { id: 'temple', name: 'the Temple Quarter', kind: 'temple', blurb: "quiet streets around the Temple of Arkay", seeds: [[-130, -10], [-122, -62], [-125, 40]] },
-  { id: 'forges', name: 'the Forges', kind: 'crafts', blurb: 'smithies, workshops and the Fighters Guild', seeds: [[125, -5], [118, -58], [88, 18], [100, -110]] },
+  { id: 'temple', name: 'the Church Quarter', kind: 'temple', blurb: "quiet streets around the Church of Saint Hallam", seeds: [[-130, -10], [-122, -62], [-125, 40]] },
+  { id: 'forges', name: 'the Forges', kind: 'crafts', blurb: 'smithies, workshops and the Fencing School', seeds: [[125, -5], [118, -58], [88, 18], [100, -110]] },
   { id: 'docks', name: 'the Docks', kind: 'harbor', blurb: 'warehouses, sailors and the smell of fish', seeds: [[-45, 135], [15, 130], [75, 132]] },
   { id: 'warrens', name: 'the Warrens', kind: 'slum', blurb: 'a maze of shacks where the guard seldom goes', seeds: [[-108, 108], [-150, 78], [-72, 98]] },
   { id: 'tanners', name: "Tanners' Row", kind: 'poor', blurb: 'tanneries, dye-works and the homes of the people who work them', seeds: [[132, 92], [95, 88], [152, 45]] },
@@ -3690,6 +4100,7 @@ const CITY_MATS = {
   door: { tex: 'door' }, doorDark: { tex: 'doorDark' }, doorA: { tex: 'doorA' }, doorB: { tex: 'doorB' }, doorC: { tex: 'doorC' }, doorD: { tex: 'doorD' }, doorE: { tex: 'doorE' }, doorF: { tex: 'doorF' }, doorG: { tex: 'doorG' }, portcullis: { tex: 'portcullis', alpha: true, double: true }, iron: { tex: 'iron' },
   cloth: { tex: 'cloth', double: true }, stallA: { tex: 'stallA', double: true }, stallB: { tex: 'stallB', double: true }, stallC: { tex: 'stallC', double: true },
   banner: { tex: 'banner', double: true }, bannerRed: { tex: 'bannerRed', double: true }, bannerGuild: { tex: 'bannerGuild', double: true }, sail: { tex: 'sail', double: true },
+  hBrod: { tex: 'broderie', po: 4 }, hBedTop: { tex: 'bed' }, ashlar: { tex: 'ashlar' }, balus: { tex: 'balus', alpha: true, double: true }, sash: { tex: 'sash' }, sashS: { tex: 'sashS' }, hLawn: { tex: 'lawn', po: 1 }, hGravel: { tex: 'gravelPale', po: 2 }, hBed: { tex: 'bed', po: 4 }, hLawn2: { tex: 'lawn', po: 3 }, hWater: { tex: 'water', po: 5 }, // the great house's windows, lawns, gravel and flower beds
   hedge: { tex: 'hedge' }, rock: { tex: 'rock' }, signLook: { tex: 'signLook', double: true },
   roofCopper: { tex: 'roofCopper', double: true }, roofBlue: { tex: 'roofBlue', double: true }, roofBrown: { tex: 'roofBrown', double: true },
   // the terrain itself
@@ -3964,7 +4375,7 @@ function buildingName(rng, type, owner, wealth = 1.5) {
   const sur = owner.name.split(' ')[1];
   switch (type) {
     case 'tavern': return `The ${rng.pick(TAV_ADJ)} ${rng.pick(TAV_NOUN)}`;
-    case 'general': return rng.pick([`${sur}'s General Store`, 'Iliac Bay Provisions', `The ${rng.pick(['Honest', 'Thrifty', 'Wandering'])} Merchant`]);
+    case 'general': return rng.pick([`${sur}'s General Store`, 'Merrow Bay Provisions', `The ${rng.pick(['Honest', 'Thrifty', 'Wandering'])} Merchant`]);
     case 'weaponsmith': return rng.pick([`${sur}'s Smithy`, 'The Iron Anvil', 'The Keen Edge', 'The Red Forge']);
     case 'armorer': return rng.pick([`${sur}'s Armory`, 'The Steel Bulwark', 'The Dented Shield', 'The Riveted Hauberk']);
     case 'alchemist': return rng.pick([`The ${rng.pick(['Bubbling', 'Green', 'Smoking'])} Cauldron`, `${sur}'s Apothecary`]);
@@ -4008,7 +4419,7 @@ function chainAt(ch, t) {
 
 function buildCity() {
   planLand(); // the rivers of the whole country, and the valleys they cut, before any ground is laid
-  const area = newArea('city'); G.city = area; area.floorY = 0; area.name = 'Daggerfall'; area.heightAt = terrainH;
+  const area = newArea('city'); G.city = area; area.floorY = 0; area.name = 'Aldhaven'; area.heightAt = terrainH;
   const rng = new RNG(40521);
   const gb = new GB();
   const mats = worldMats(area, CITY_MATS);
@@ -4450,12 +4861,12 @@ function buildCity() {
     addCol(area, x - 4.3, z - 4.3, x + 4.3, z + 4.3, g - 2, g + 15); caster(mkObb(x, z, 0, 4.4, 4.4), g + 19); addCol(area, x - 3, z - 3, x + 3, z + 3, g + 15, g + 18.5); addCol(area, x - 1.4, z - 1.4, x + 1.4, z + 1.4, g + 18.5, g + 21.5);
   }
 
-  /* ---------- Castle Daggerfall (north), on its knoll ---------- */
+  /* ---------- Aldhaven Castle (north), on its knoll ---------- */
   const CH = castlePad.h;
   gb.setXf(0, CASTLE_Z, 0, CH);
   gb.quad('sqCobble', [-30.5, 0.03, -41.5], [1, 0, 0], [0, 0, -1], 61, 59, 3, 3); // the ward is cobbled
   gb.quad('sqFlag', [-2.5, 0.06, -40], [1, 0, 0], [0, 0, -1], 5, 26, 3, 3);
-  // Castle Daggerfall: a tall curtain on a battered plinth; one great tower and a keep lead a clear hierarchy of towers,
+  // Aldhaven Castle: a tall curtain on a battered plinth; one great tower and a keep lead a clear hierarchy of towers,
   // a projecting twin-towered gatehouse, the royal palace with crow-stepped gables and a chapel whose spire tops its ridge
   const CW = 15; // wall-walk height above the ward: half as high again as the city wall
   const cmerX = (x0, x1, z, h) => { for (let x = x0 + 0.6; x < x1 - 1.2; x += 2.7) gb.box(x, h, z - 0.5, x + 1.5, h + 1.7, z + 0.5, 'castle', 4, 4); };
@@ -4572,7 +4983,7 @@ function buildCity() {
   const castleFlags = [];
   for (const [cx, cz, tt, red] of [[STX, STZ, STH + 9, true], [-31.2, -106, 49, true], [-8.2, -36.5, GT + 4.6, false], [8.2, -36.5, GT + 4.6, false]]) { gb.box(cx - 0.2, tt - 1.5, cz - 0.2, cx + 0.2, tt + 5.8, cz + 0.2, 'woodDark', 1, 1); gb.box(cx - 0.35, tt + 5.8, cz - 0.35, cx + 0.35, tt + 6.3, cz + 0.35, 'iron', 1, 1); const p = wp(cx, cz); castleFlags.push([p[0], CH + tt + 4.9, p[1], red ? TEX.bannerRed : TEX.banner]); }
   for (const [x, z] of [[-24, -48], [24, -48], [-24, -60], [24, -60]]) { const p = wp(x, z); tree('cypress', p[0], p[1], 1.1); }
-  registerBuilding(area, { id: 'castle', type: 'castle', name: 'Castle Daggerfall', district: 'kingsward', wealth: 3, door: { x: 0, z: PZ1 + 1.1 + CASTLE_Z, y: CH, nx: 0, nz: 1 }, poly: footprintPoly(gb.xf, { x0: PX0, z0: PZ0, x1: PX1, z1: PZ1 }), owner: { name: 'King Gothryd', gender: 'm' } });
+  registerBuilding(area, { id: 'castle', type: 'castle', name: 'Aldhaven Castle', district: 'kingsward', wealth: 3, door: { x: 0, z: PZ1 + 1.1 + CASTLE_Z, y: CH, nx: 0, nz: 1 }, poly: footprintPoly(gb.xf, { x0: PX0, z0: PZ0, x1: PX1, z1: PZ1 }), owner: { name: 'King Ottmar', gender: 'm' } });
   area.castleWalls = footprintPoly(gb.xf, { x0: -32, z0: -102, x1: 32, z1: -40 });
   area.castleTowers = [[-31.2, -106], [31.2, -106], [-31.2, -41], [31.2, -41], [-31.2, -73], [31.2, -73], [-8.2, -36.5], [8.2, -36.5], [STX, STZ]].map(([x, z]) => wp(x, z));
   gb.xf = null;
@@ -4674,7 +5085,7 @@ function buildCity() {
   const spray = makeBillboard(simpleSprite('spray', 2).tex[0], 1.3, 2.4, { transparent: true, opacity: 0.8 }); spray.position.set(MARKET[0], marketPad.h + 2.2, MARKET[1]); area.scene.add(spray); area.bbs.push(spray);
   area.anim.push((dt, t) => { spray.material.map = simpleSprite('spray', 2).tex[Math.floor(t * 6) % 2]; });
 
-  /* ---------- the Lysandus Memorial ---------- */
+  /* ---------- the Aldwin Memorial ---------- */
   gb.setXf(MEMORIAL[0], MEMORIAL[1], 0, memPad.h);
   gb.box(-1.8, -0.3, -1.8, 1.8, 0.5, 1.8, { side: 'stone', top: 'stone' }, 2, 2); gb.box(-1.2, 0.5, -1.2, 1.2, 2.0, 1.2, { side: 'stoneLight', top: 'stoneLight' }, 2, 2); col(-1.8, -1.8, 1.8, 1.8, -1, 0.5); col(-1.2, -1.2, 1.2, 1.2, 0.5, 6.4);
   for (const [x, z] of [[-2.6, 0], [2.6, 0], [0, 2.6], [0, -2.6]]) { const p = wp(x, z); flower(p[0], p[1]); }
@@ -4682,7 +5093,7 @@ function buildCity() {
   { const st = makeBillboard(simpleSprite('kingstatue').tex[0], 2.2, 4.4); st.position.set(MEMORIAL[0], memPad.h + 2.0, MEMORIAL[1]); area.scene.add(st); area.bbs.push(st); area.tintMats.push(st.material); }
   area.memorial = { x: MEMORIAL[0], z: MEMORIAL[1] };
 
-  /* ---------- Temple of Arkay with its spire, the graveyard on the slope and the old mausoleum ---------- */
+  /* ---------- Church of Saint Hallam with its spire, the graveyard on the slope and the old mausoleum ---------- */
   {
     gb.setXf(TEMPLE.x, TEMPLE.z, TEMPLE.ang, templePad.h);
     const fp = { x0: -10, z0: -13, x1: 10, z1: 13 };
@@ -4692,7 +5103,7 @@ function buildCity() {
     col(1, -15, 12, -4, -1.5, 48); col(3, -13, 10, -6, 48, 60); col(5.5, -10.5, 7.5, -8.5, 60, 82); casterL(1, -15, 12, -4, 70); casterL(-10, -13, 10, 13, 19);
     for (const y of [16, 24, 32, 40]) gb.quad('winA', [5.9, y, -3.97], [1, 0, 0], [0, 1, 0], 1.2, 2.4, 1, 1, { fixedUV: true });
     for (const x of [-4.5, 4.5]) { const p = wp(x, 15.5); tree('cypress', p[0], p[1], 1.1); }
-    registerBuilding(area, { id: 'temple', type: 'temple', name: 'The Temple of Arkay', district: 'temple', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'High Priest Odric Maleveil', gender: 'm', look: LOOKS.priest } });
+    registerBuilding(area, { id: 'temple', type: 'temple', name: 'The Church of Saint Hallam', district: 'temple', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Rector Thomas Ashdown', gender: 'm', look: LOOKS.priest } });
     gb.xf = null;
     const g = GRAVE;
     drapePatch(gb, 'gGrass', null, g.x0, g.z0, g.x1, g.z1, { cell: 4, lift: 0.05, tw: 4 });
@@ -4725,7 +5136,7 @@ function buildCity() {
     registerBuilding(area, { id: 'hospice', type: 'hospice', name: 'The House of Mercy', district: 'market', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Mother Ysolde Carrard', gender: 'f', look: hl } });
     gb.xf = null;
   }
-  /* ---------- Mages Guild and its blue-roofed tower ---------- */
+  /* ---------- the Philosophers’ Society and its blue-roofed observatory tower ---------- */
   {
     gb.setXf(MAGES.x, MAGES.z, MAGES.ang, magesPad.h);
     const fp = { x0: -12, z0: -7.5, x1: 12, z1: 7.5 };
@@ -4736,10 +5147,10 @@ function buildCity() {
     for (const [x, z] of [[-8, -9.5], [-4, -10]]) { const p = wp(x, z); trees.bush.push([p[0], H(p[0], p[1]), p[1], 1]); }
     { const p = wp(-10, 9.5); tree('cypress', p[0], p[1], 1); }
     { const p = wp(6, -12.5); glows.push([p[0], magesPad.h + 30.5, p[1], 1.6]); }
-    registerBuilding(area, { id: 'mages', type: 'mages', name: 'The Mages Guild', district: 'kingsward', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Magistrix Celestine Vautrin', gender: 'f', look: LOOKS.mage } });
+    registerBuilding(area, { id: 'mages', type: 'mages', name: 'The Philosophers’ Society', district: 'kingsward', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Doctor Margriet Vos', gender: 'f', look: LOOKS.mage } });
     gb.xf = null;
   }
-  /* ---------- Fighters Guild with its training yard ---------- */
+  /* ---------- the Fencing School with its training yard ---------- */
   {
     gb.setXf(FIGHTERS.x, FIGHTERS.z, FIGHTERS.ang, fightPad.h);
     const fp = { x0: -12, z0: -7.5, x1: 12, z1: 7.5 };
@@ -4750,7 +5161,7 @@ function buildCity() {
     gb.box(-12, -0.5, fz, 12, 1.0, fz + 0.15, { side: 'woodDark', top: 'woodDark' }, 2, 2); col(-12, fz, 12, fz + 0.15, -1, 1.0);
     for (const x of [-12, 11.85]) { gb.box(x, -0.5, fz, x + 0.15, 1.0, -7.5, { side: 'woodDark', top: 'woodDark' }, 2, 2); col(x, fz, x + 0.15, -7.5, -1, 1.0); }
     for (const x of [-8, -3, 2, 7]) { const p = wp(x, -16); dummies.push([p[0], fightPad.h, p[1], 1]); addCol(area, p[0] - 0.3, p[1] - 0.3, p[0] + 0.3, p[1] + 0.3, fightPad.h - 1, fightPad.h + 1.8); }
-    registerBuilding(area, { id: 'fighters', type: 'fighters', name: 'The Fighters Guild', district: 'forges', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Guildmaster Ulfgar Stone-Arm', gender: 'm', look: LOOKS.fighter } });
+    registerBuilding(area, { id: 'fighters', type: 'fighters', name: 'The Fencing School', district: 'forges', fp, poly: footprintPoly(gb.xf, fp), door, owner: { name: 'Master of Arms Jacob Ruysch', gender: 'm', look: LOOKS.fighter } });
     area.fightersYard = footprintPoly(gb.xf, { x0: -12, z0: fz, x1: 12, z1: -7.5 });
     gb.xf = null;
   }
@@ -4905,7 +5316,7 @@ function buildCity() {
     else if (l.K !== DK.market && l.K !== DK.harbor && hr.chance(0.05)) l.type = 'garden';
     else l.type = 'house';
   }
-  const FIXED_NAMES = { warrens: "The Rat's Nest", kingsward: 'The Gilded Griffon', docks: 'The Salty Mudcrab' };
+  const FIXED_NAMES = { warrens: "The Rat's Nest", kingsward: 'The Gilded Griffon', docks: 'The Salty Herring' };
   const usedNames = new Set();
   for (const l of lots) {
     const hr = new RNG(l.seed); const K = l.K; const type = l.type;
@@ -4997,8 +5408,8 @@ function buildCity() {
 
   /* ---------- carriage stops ---------- */
   const STOP_DEFS = [
-    ['market', 'the Grand Market', 22, 22], ['castle', 'Castle Daggerfall', 9, CASTLE_Z - 30], ['temple', 'the Temple of Arkay', -108, 4], ['hospice', 'the House of Mercy', -55, 64],
-    ['mages', 'the Mages Guild', 72, -84], ['fighters', 'the Fighters Guild', 128, 14], ['garden', "the Queen's Garden", -43, -100], ['bell', 'the Bell Tower', 50, 50],
+    ['market', 'the Grand Market', 22, 22], ['castle', 'Aldhaven Castle', 9, CASTLE_Z - 30], ['temple', 'the Church of Saint Hallam', -108, 4], ['hospice', 'the House of Mercy', -55, 64],
+    ['mages', 'the Philosophers’ Society', 72, -84], ['fighters', 'the Fencing School', 128, 14], ['garden', "the Queen's Garden", -43, -100], ['bell', 'the Bell Tower', 50, 50],
     ['docks', 'the Docks', -30, 143], ['lighthouse', 'Lighthouse Quay', 112, 143], ['warrens', "Beggar's Well", -100, 101], ['tanners', "Tanners' Row", 128, 90],
     ...GATES.map(g => [g.id, capFirst(g.name.replace('the ', '')), g.inner[0] + g.nx * 6, g.inner[1] + g.nz * 6]),
   ];
@@ -5247,10 +5658,10 @@ function buildCity() {
   area.guardPosts.push([-3, CASTLE_Z - 35], [3, CASTLE_Z - 35], [PIERS[1] - 3.2, SHORE - 1.5], [PIERS[1] + 3.2, SHORE - 1.5]);
   { const s = xfP(lookXf, 0, 2.55); area.start = { x: s[0], z: s[1], y: LOOKY, yaw: Math.atan2(-lookDir[0], -lookDir[1]), pitch: -0.25 }; }
   area.landmarks = [
-    { id: 'market', name: 'the Grand Market', x: MARKET[0], z: MARKET[1] }, { id: 'memorial', name: 'the Lysandus Memorial', x: MEMORIAL[0], z: MEMORIAL[1] },
+    { id: 'market', name: 'the Grand Market', x: MARKET[0], z: MARKET[1] }, { id: 'memorial', name: 'the Aldwin Memorial', x: MEMORIAL[0], z: MEMORIAL[1] },
     { id: 'garden', name: "the Queen's Garden", x: GARDEN[0], z: GARDEN[1] }, { id: 'bell', name: 'the Bell Tower', x: BELL[0], z: BELL[1] },
     { id: 'well', name: "Beggar's Well", x: WELL[0], z: WELL[1] }, { id: 'fish', name: 'the Fish Market', x: FISH[0], z: FISH[1] },
-    { id: 'lighthouse', name: 'the Lighthouse', x: BREAK, z: 210 }, { id: 'rise', name: "Pilgrim's Rise", x: RISE_LOOK[0], z: RISE_LOOK[1] }, { id: 'graveyard', name: "Arkay's Graveyard", x: -128, z: 76 },
+    { id: 'lighthouse', name: 'the Lighthouse', x: BREAK, z: 210 }, { id: 'rise', name: "Pilgrim's Rise", x: RISE_LOOK[0], z: RISE_LOOK[1] }, { id: 'graveyard', name: "Saint Hallam’s Churchyard", x: -128, z: 76 },
     ...GATES.map(g => ({ id: g.id, name: g.name, x: g.x, z: g.z })),
   ];
   // everything the automap needs
@@ -5280,7 +5691,7 @@ function buildCity() {
    and around it looser quarters, each cut into blocks along its own
    road at its own angle and scale, inside an irregular polygonal wall.
    The first is Corrinvale, a lowland canal town in the north.
-   See CITIES.md for what Daggerfall and this town taught about cities.
+   See CITIES.md for what Aldhaven and this town taught about cities.
    ===================================================================== */
 
 // One config per town. Lengths in metres; u runs along the town's long axis, v across it (+v is south when ang is 0)
@@ -5499,7 +5910,7 @@ class Town {
       const used = new Set();
       for (let i = -nI2; i < nI2; i++) for (let j = j0; j < nJp; j++) { if (used.has(i * 4096 + j)) continue;
         // now and then two cells make one block, so a lane ends at a T and the next one runs on offset
-        const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp ? 'v' : null;
+        const bc = c => bridgeCols.has(c) && (j === 0 || j === -1), mg = rng.chance(0.2) && !bc(i + 1) && !used.has((i + 1) * 4096 + j) ? 'u' : rng.chance(0.16) && j !== -1 && j + 1 < nJp && !used.has(i * 4096 + j + 1) ? 'v' : null; // (never into a cell the last column's block already took)
         const quad = mg === 'u' ? [P(i, j), P(i + 1, j), P(i + 2, j), P(i + 2, j + 1), P(i + 1, j + 1), P(i, j + 1)] : mg === 'v' ? [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i + 1, j + 2), P(i, j + 2), P(i, j + 1)] : [P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1)], cen = tCentroid(quad), side = j >= 0 ? 1 : -1;
         if (mg === 'u') used.add((i + 1) * 4096 + j); if (mg === 'v') used.add(i * 4096 + j + 1);
         if (this.wallOut(cen[0], cen[1]) > -R || coreOut(cen[0], cen[1]) < 0 || !inSector(sc, cen)) continue;
@@ -5540,6 +5951,23 @@ class Town {
           this.lots.push(l); mine.push(l); last = l; lastEnd = s + ok.w; s += ok.w; }
         if (last) last.corner = true; } };
     for (const b of this.blocks) if (b.use === 'lots') placeLots(b, this.kindAt(b.uc, b.vc));
+    { // a plot that reaches into a street is given up (where two roads close in on a block's corner): checked after all are placed, so the draw for every other plot stays the same
+      const od = (o, u, v) => { const du = u - o.x, dv = v - o.z, lx = du * o.c - dv * o.s, lz = du * o.s + dv * o.c; return Math.hypot(Math.max(0, Math.abs(lx) - o.hx), Math.max(0, Math.abs(lz) - o.hz)); }, drop = new Set();
+      for (const l of this.lots) { const r = Math.hypot(l.w, l.d) / 2 + 8; for (const st of this.streets) { if (Math.min(st.u0, st.u1) > l.u + r || Math.max(st.u0, st.u1) < l.u - r || Math.min(st.v0, st.v1) > l.v + r || Math.max(st.v0, st.v1) < l.v - r) continue;
+        const L = Math.hypot(st.u1 - st.u0, st.v1 - st.v0), n = Math.max(1, Math.ceil(L)); for (let k = 0; k <= n && !drop.has(l); k++) if (od(l.ob, lerp(st.u0, st.u1, k / n), lerp(st.v0, st.v1, k / n)) < st.w / 2 - 0.5) drop.add(l); if (drop.has(l)) break; } }
+      if (drop.size) { this.lots = this.lots.filter(l => !drop.has(l)); for (const b of this.blocks) if (b.lots) b.lots = b.lots.filter(l => !drop.has(l)); } }
+    // where a row of houses faces neither a street nor a square (a quarter's lattice meeting a road at a slant leaves a wedge of ground), the ground before it is paved out to the road
+    this.aprons = [];
+    { const near = (u, v, r) => this.streets.filter(st => Math.min(st.u0, st.u1) - r < u && Math.max(st.u0, st.u1) + r > u && Math.min(st.v0, st.v1) - r < v && Math.max(st.v0, st.v1) + r > v);
+      const onWay = (u, v, S) => S.some(st => segDist(u, v, st.u0, st.v0, st.u1, st.v1).d < st.w / 2 + 0.3);
+      const covered = (u, v) => this.blocks.some(b => b.poly && b.use !== 'lots' && pointInPoly(u, v, b.poly)) || this.gateSquares.some(P => pointInPoly(u, v, P));
+      for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots || !b.lots.length || !b.edgeD) continue;
+        for (const h of tEdgesIn(b.poly)) { if (!(h.i in b.edgeD) || h.L < 6) continue;
+          const mu = (h.a[0] + h.b[0]) / 2, mv = (h.a[1] + h.b[1]) / 2, S = near(mu, mv, h.L / 2 + 24);
+          if (onWay(mu - h.nu * 2, mv - h.nv * 2, S) || covered(mu - h.nu * 3, mv - h.nv * 3)) continue; // (a street or a square before it already)
+          const reach = p => { for (let t = 0; t <= 16; t += 0.5) if (onWay(p[0] - h.nu * t, p[1] - h.nv * t, S)) return t; return null; };
+          const n = Math.max(2, Math.ceil(h.L / 3)), P = [], D = []; for (let k = 0; k <= n; k++) { const p = [lerp(h.a[0], h.b[0], k / n), lerp(h.a[1], h.b[1], k / n)], r = reach(p); if (r === null) { P.length = 0; break; } P.push(p); D.push(r > 0 ? r + 1 : 0); } // (a metre over the road's own paving, so no seam of grass shows between them) // (measured all along the row: a wedge can bulge between two streets)
+          for (let k = 1; k < P.length; k++) if (D[k - 1] + D[k] > 0.4) this.aprons.push([P[k - 1], P[k], [P[k][0] - h.nu * D[k], P[k][1] - h.nv * D[k]], [P[k - 1][0] - h.nu * D[k - 1], P[k - 1][1] - h.nv * D[k - 1]]]); } } }
     // what each lot is: shops and inns where the trade is, warehouses on the canal, the rest homes
     const pick = types => { for (const [type, n, f] of types) for (let k = 0; k < n; k++) { const c = this.lots.filter(l => !l.type && l.w >= 7 && f(l)); if (!c.length) continue; const l = c[rng.int(0, c.length - 1)]; l.type = type; } };
     const nearGate = l => this.gates.some(g => Math.hypot(l.u - g.u, l.v - g.v) < 140);
@@ -5804,6 +6232,7 @@ Town.prototype.buildChunk = function (x0, z0, WC, gb, cols, fl, blocks) {
   for (const g of this.gates) { const o0 = C.moat.off + C.moat.w + 8, pts = []; for (let t = o0; t <= o0 + 190; t += 10) pts.push(this.w(g.u + g.nu * t, g.v + g.nv * t)); for (let k = 1; k < pts.length; k++) if (inC(...pts[k - 1])) drapeStrip(gb, 'rCobble', [pts[k - 1], pts[k]], 7, { lift: 0.07 }); }
   // the squares just inside the gates
   for (const P of this.gateSquares) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.052); }
+  for (const P of this.aprons) { const c = tCentroid(P), [mx, mz] = this.w(c[0], c[1]); if (inC(mx, mz)) drapePoly(gb, 'sqCobble', P.map(([u, v]) => this.w(u, v)), H0 + 0.051); } // the ground paved before rows that face no street
   // yards and gardens inside the blocks: the ground before the houses paved, the gardens behind them walled, with trees, sheds and bushes; orchards in the commons
   for (const b of this.blocks) { if (b.use !== 'lots' || !b.lots) continue; const [mx, mz] = this.w(b.uc, b.vc); if (!inC(mx, mz)) continue; const r2 = new RNG(Math.floor(b.uc * 7 + b.vc * 13) + 7000), E = tEdgesIn(b.poly), built = b.lots.reduce((s2, l) => s2 + l.w * l.d, 0), nT = Math.floor(Math.max(0, Math.abs(tArea(b.poly)) - built) / (b.kind === 'commons' ? 120 : 200));
     { for (const h of tEdgesIn(b.poly)) { const dk = (b.edgeD && b.edgeD[h.i] || 2.4) + 0.6; drapePoly(gb, 'rCobble', [h.a, h.b, [h.b[0] + h.nu * dk, h.b[1] + h.nv * dk], [h.a[0] + h.nu * dk, h.a[1] + h.nv * dk]].map(([u, v]) => this.w(u, v)), H0 + 0.05); } let Y = b.poly; // (the ground before the houses paved, each row's depth back) for (const h of tEdgesIn(b.poly)) { if (Y.length < 3) break; h.c += (b.edgeD && b.edgeD[h.i] || 2.4) + 0.5; Y = tClipPoly(Y, h); }
@@ -5887,7 +6316,7 @@ Town.prototype.buildLasting = function (area, mats) {
     sg.tint = null; this.far = sg.build(fm); this.far.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); o.frustumCulled = false; }); area.scene.add(this.far); }
   if (this.hall) { const b = this.hall, [hx, hz] = this.w(b.uc, this.fv > 0 ? b.v1 - 9 : b.v0 + 9), [fx, fz] = xfP(makeXf(hx, hz, C.ang + (this.fv > 0 ? 0 : Math.PI)), 0.2, 6); makeFlag(area, TEX.bannerRed, fx, H0 + 79.6, fz, C.ang, 2.6, 1.5); }
   if (this.citadel) { const b = this.citadel, S2 = Math.min(b.u1 - b.u0, b.v1 - b.v0) / 2 - 4, [kx, kz] = this.w(b.uc, b.vc - S2 * 0.25); makeFlag(area, TEX.bannerRed, kx + 0.1, H0 + 41, kz, C.ang, 2.6, 1.5); }
-  // the doors: every house, shop and inn can be entered, as in Daggerfall
+  // the doors: every house, shop and inn can be entered, as in Aldhaven
   const used = new Set();
   for (const l of this.lots) {
     const r = new RNG(l.seed + 11), K = TK[l.kind], wealth = { old: 2, grand: 3, close: 2.2, citadel: 1.5, canal: 2.2, commons: 0.7, weavers: 1.3, tanners: 0.9, suburb: 0.8 }[l.kind], owner = makeOwner(r, l.type, wealth);
@@ -5935,10 +6364,10 @@ const MATERIALS = {
   iron: { name: 'Iron', dmg: -1, mult: 0.7, rank: 0, col: '#8a8a8a' },
   steel: { name: 'Steel', dmg: 0, mult: 1, rank: 1, col: '#c4c8d0' },
   silver: { name: 'Silver', dmg: 1, mult: 2.2, rank: 2, col: '#eef2fa' },
-  elven: { name: 'Elven', dmg: 2, mult: 4, rank: 3, col: '#a8d8e8' },
-  dwarven: { name: 'Dwarven', dmg: 3, mult: 6, rank: 4, col: '#d8b058' },
-  ebony: { name: 'Ebony', dmg: 5, mult: 12, rank: 5, col: '#4a4460' },
-  daedric: { name: 'Daedric', dmg: 7, mult: 25, rank: 6, col: '#b02828' },
+  blued: { name: 'Blued', dmg: 2, mult: 4, rank: 3, col: '#7a98c8' },
+  damascus: { name: 'Damascus', dmg: 3, mult: 6, rank: 4, col: '#b8b0a0' },
+  blackened: { name: 'Blackened', dmg: 5, mult: 12, rank: 5, col: '#4a4460' },
+  meteoric: { name: 'Meteoric', dmg: 7, mult: 25, rank: 6, col: '#8a3a2a' },
 };
 const WEAPONS = {
   dagger: { name: 'Dagger', min: 2, max: 5, speed: 1.45, reach: 2.1, price: 20, kind: 'blade' },
@@ -5964,7 +6393,7 @@ const ARMOR = {
 };
 const POTIONS = {
   heal: { name: 'Potion of Healing', price: 30, desc: 'Restores 35 health.' },
-  magicka: { name: 'Potion of Magicka', price: 35, desc: 'Restores 35 magicka.' },
+  spirit: { name: 'Potion of Spirit', price: 35, desc: 'Restores 35 spirit.' },
   stamina: { name: 'Potion of Stamina', price: 15, desc: 'Restores 60 fatigue.' },
 };
 const GEMS = { ruby: ['Ruby', 120], emerald: ['Emerald', 100], sapphire: ['Sapphire', 90], amethyst: ['Amethyst', 40], ring: ['Silver Ring', 60], necklace: ['Gold Necklace', 150], candlestick: ['Silver Candlestick', 35], goblet: ['Pewter Goblet', 12] };
@@ -5999,7 +6428,7 @@ function itemDesc(it) {
 }
 function randMaterial(level, bias = 0) {
   const r = rnd.next() + level * 0.025 + bias;
-  if (r > 1.32) return 'daedric'; if (r > 1.2) return 'ebony'; if (r > 1.08) return 'dwarven'; if (r > 0.96) return 'elven';
+  if (r > 1.32) return 'meteoric'; if (r > 1.2) return 'blackened'; if (r > 1.08) return 'damascus'; if (r > 0.96) return 'blued';
   if (r > 0.8) return 'silver'; if (r > 0.42) return 'steel'; return 'iron';
 }
 
@@ -6007,26 +6436,26 @@ function randMaterial(level, bias = 0) {
 const ATTRS = ['STR', 'INT', 'WIL', 'AGI', 'END', 'PER', 'SPD', 'LUC'];
 const ATTR_NAMES = { STR: 'Strength', INT: 'Intelligence', WIL: 'Willpower', AGI: 'Agility', END: 'Endurance', PER: 'Personality', SPD: 'Speed', LUC: 'Luck' };
 const RACES = {
-  Breton: { desc: 'Natives of High Rock, at home in Daggerfall. Gifted in the arcane.', mods: { INT: 10, WIL: 10, STR: -5, AGI: -5 } },
-  Redguard: { desc: 'Warrior folk of Hammerfell, peerless with a blade.', mods: { STR: 10, END: 10, SPD: 5, INT: -10, WIL: -5 } },
-  Nord: { desc: 'Hardy northerners from Skyrim who laugh at the cold.', mods: { STR: 10, END: 15, AGI: -5, INT: -10, PER: -5 } },
-  'Dark Elf': { desc: 'Dunmer of Morrowind: quick of hand and of temper.', mods: { AGI: 10, SPD: 10, INT: 5, WIL: -10, PER: -10 } },
-  'High Elf': { desc: 'Altmer of the Summerset Isles, born to magic.', mods: { INT: 15, WIL: 5, END: -10, STR: -5 } },
-  'Wood Elf': { desc: 'Bosmer of Valenwood, nimble scouts and archers.', mods: { AGI: 15, SPD: 10, STR: -10, END: -10 } },
-  Khajiit: { desc: 'Feline wanderers of Elsweyr. Lucky, agile, and hard to pin down.', mods: { AGI: 10, SPD: 5, LUC: 10, WIL: -10, END: -5 } },
-  Argonian: { desc: 'Reptilian natives of Black Marsh, tough and swift.', mods: { SPD: 10, END: 10, AGI: 5, PER: -15, INT: -5 } },
+  Townborn: { desc: 'Raised among printers, guild halls and counting-houses. Quick with letters and with figures.', mods: { INT: 10, WIL: 10, STR: -5, AGI: -5 } },
+  Marcher: { desc: 'From the border hills, where every farm kept a pike by the door.', mods: { STR: 10, END: 10, SPD: 5, INT: -10, WIL: -5 } },
+  Highlander: { desc: 'Hardy folk of the high pastures, who laugh at the cold.', mods: { STR: 10, END: 15, AGI: -5, INT: -10, PER: -5 } },
+  Portborn: { desc: 'Grown up on the quays: quick of hand and of temper.', mods: { AGI: 10, SPD: 10, INT: 5, WIL: -10, PER: -10 } },
+  Courtborn: { desc: 'Brought up at a noble court among tutors and fencing masters.', mods: { INT: 15, WIL: 5, END: -10, STR: -5 } },
+  Forester: { desc: 'From the deep woods: nimble, watchful, a fair shot.', mods: { AGI: 15, SPD: 10, STR: -10, END: -10 } },
+  Wanderer: { desc: 'Born on the road among tinkers and players. Lucky, agile, and hard to pin down.', mods: { AGI: 10, SPD: 5, LUC: 10, WIL: -10, END: -5 } },
+  Fenlander: { desc: 'From the polders and the reed marshes, tough and swift.', mods: { SPD: 10, END: 10, AGI: 5, PER: -15, INT: -5 } },
 };
 const CLASSES = {
   Warrior: { desc: 'A master of arms who trusts steel over sorcery.', mods: { STR: 10, END: 10, INT: -10 }, hp: 12, mp: 0.5, gold: 90 },
-  Spellsword: { desc: 'A blade in one hand and lightning in the other.', mods: { STR: 5, INT: 5, WIL: 5 }, hp: 6, mp: 1.1, gold: 100 },
-  Mage: { desc: 'A scholar of the arcane who burns what cannot be reasoned with.', mods: { INT: 15, WIL: 10, STR: -10, END: -5 }, hp: 0, mp: 2, gold: 120 },
+  Adept: { desc: 'A blade in one hand and lightning in the other.', mods: { STR: 5, INT: 5, WIL: 5 }, hp: 6, mp: 1.1, gold: 100 },
+  Scholar: { desc: 'A natural philosopher who burns what cannot be reasoned with.', mods: { INT: 15, WIL: 10, STR: -10, END: -5 }, hp: 0, mp: 2, gold: 120 },
   Thief: { desc: 'Quick hands, soft steps and a knack for locks.', mods: { AGI: 10, SPD: 10, LUC: 10, STR: -5 }, hp: 4, mp: 0.5, gold: 220 },
 };
 function startingKit(cls) {
   switch (cls) {
     case 'Warrior': return { items: [makeWeapon('longsword', 'steel'), makeArmor('chain'), makeArmor('buckler'), makePotion('heal', 3)], spells: [] };
-    case 'Spellsword': return { items: [makeWeapon('shortsword', 'steel'), makeArmor('leather'), makePotion('heal', 2), makePotion('magicka', 1)], spells: ['shock'] };
-    case 'Mage': return { items: [makeWeapon('staff', 'iron'), makePotion('heal', 2), makePotion('magicka', 2)], spells: ['fireball', 'heal'] };
+    case 'Adept': return { items: [makeWeapon('shortsword', 'steel'), makeArmor('leather'), makePotion('heal', 2), makePotion('spirit', 1)], spells: ['shock'] };
+    case 'Scholar': return { items: [makeWeapon('staff', 'iron'), makePotion('heal', 2), makePotion('spirit', 2)], spells: ['fireball', 'heal'] };
     default: return { items: [makeWeapon('dagger', 'steel'), makeArmor('leather'), makeArmor('cap'), makePotion('heal', 2), makePotion('stamina', 2)], spells: [] };
   }
 }
@@ -6036,11 +6465,11 @@ const ENEMIES = {
   rat: { name: 'Giant Rat', hp: 9, dmg: [1, 3], speed: 3.6, reach: 1.4, cd: 1.0, xp: 6, w: 1.1, h: 0.55, radius: 0.3, ac: 2, sight: 14, sprite: 'rat', sound: 'squeak', loot: 'none', corpse: [0.9, 0.3] },
   bat: { name: 'Giant Bat', hp: 10, dmg: [1, 4], speed: 4.8, reach: 1.6, cd: 0.9, xp: 8, w: 1.3, h: 0.65, radius: 0.3, ac: 5, sight: 16, sprite: 'bat', fly: 1.3, sound: 'flap', loot: 'none', noCorpse: true },
   thief: { name: 'Thief', hp: 26, dmg: [2, 7], speed: 3.3, reach: 1.9, cd: 1.2, xp: 22, w: 0.9, h: 1.85, ac: 3, sight: 18, sprite: 'thief', loot: 'thief', bark: ['Your purse or your life!', 'Nobody will miss you, stranger.', 'Empty your pockets!'] },
-  bandit: { name: 'Bandit', hp: 55, dmg: [4, 10], speed: 3.4, reach: 2.0, cd: 1.2, xp: 60, w: 0.95, h: 1.9, ac: 5, sight: 20, sprite: 'bandit', loot: 'thief', bark: ['So the Guild sent a hero. How sweet.'] },
+  bandit: { name: 'Bandit', hp: 55, dmg: [4, 10], speed: 3.4, reach: 2.0, cd: 1.2, xp: 60, w: 0.95, h: 1.9, ac: 5, sight: 20, sprite: 'bandit', loot: 'thief', bark: ['So they sent a hero. How sweet.'] },
   skeleton: { name: 'Skeletal Warrior', hp: 34, dmg: [3, 9], speed: 2.7, reach: 2.0, cd: 1.4, xp: 28, w: 0.9, h: 1.85, ac: 5, sight: 16, sprite: 'skeleton', undead: true, loot: 'skeleton', sound: 'growl' },
   zombie: { name: 'Zombie', hp: 52, dmg: [4, 10], speed: 1.6, reach: 1.9, cd: 1.8, xp: 30, w: 0.95, h: 1.85, ac: 1, sight: 12, sprite: 'zombie', undead: true, loot: 'zombie', sound: 'moan' },
   wraith: { name: 'Wraith', hp: 44, dmg: [5, 12], speed: 3.1, reach: 2.0, cd: 1.5, xp: 60, w: 1.0, h: 2.0, ac: 6, sight: 18, sprite: 'wraith', undead: true, silver: true, transparent: true, opacity: 0.78, fly: 0.25, loot: 'wraith', noCorpse: true, sound: 'ghost' },
-  necro: { name: 'Vharzal the Necromancer', hp: 150, dmg: [6, 14], speed: 2.5, reach: 2.0, cd: 1.6, xp: 320, w: 0.95, h: 1.95, ac: 6, sight: 22, sprite: 'necro', caster: true, boss: true, loot: 'necro', bark: ['You dare intrude upon my work?', "The old king's soul is MINE!"] },
+  necro: { name: 'Corvin Ash the Necromancer', hp: 150, dmg: [6, 14], speed: 2.5, reach: 2.0, cd: 1.6, xp: 320, w: 0.95, h: 1.95, ac: 6, sight: 22, sprite: 'necro', caster: true, boss: true, loot: 'necro', bark: ['You dare intrude upon my work?', "The old king's soul is MINE!"] },
   guard: { name: 'City Guard', hp: 65, dmg: [5, 12], speed: 4.1, reach: 2.2, cd: 1.3, xp: 30, w: 0.95, h: 1.9, ac: 7, sight: 26, sprite: 'guard', loot: 'guard' },
 };
 
@@ -6053,8 +6482,8 @@ function rollLoot(kind, level) {
     case 'wraith': gold = rnd.int(10, 40); if (rnd.chance(0.5)) items.push(makeGem(rnd.pick(['ruby', 'emerald', 'sapphire']))); break;
     case 'guard': gold = rnd.int(10, 40); if (rnd.chance(0.3)) items.push(makeWeapon('longsword', 'steel')); break;
     case 'citizen': gold = rnd.int(1, 18); break;
-    case 'necro': gold = 250; items.push(makeWeapon('dagger', 'ebony'), makePotion('magicka', 2), makeGem('ruby')); break;
-    case 'chest': gold = rnd.int(15, 80) + L * 5; if (rnd.chance(0.5)) items.push(makePotion(rnd.pick(['heal', 'heal', 'magicka', 'stamina']))); if (rnd.chance(0.3)) items.push(makeWeapon(rnd.pick(Object.keys(WEAPONS)), randMaterial(L, 0.1)));
+    case 'necro': gold = 250; items.push(makeWeapon('dagger', 'blackened'), makePotion('spirit', 2), makeGem('ruby')); break;
+    case 'chest': gold = rnd.int(15, 80) + L * 5; if (rnd.chance(0.5)) items.push(makePotion(rnd.pick(['heal', 'heal', 'spirit', 'stamina']))); if (rnd.chance(0.3)) items.push(makeWeapon(rnd.pick(Object.keys(WEAPONS)), randMaterial(L, 0.1)));
       if (rnd.chance(0.2)) items.push(makeArmor(rnd.pick(Object.keys(ARMOR)), randMaterial(L))); if (rnd.chance(0.4)) items.push(makeGem(rnd.pick(Object.keys(GEMS)))); break;
     case 'house': gold = rnd.int(5, 45); if (rnd.chance(0.45)) items.push(makeGem(rnd.pick(['amethyst', 'ring', 'candlestick', 'necklace', 'goblet']))); if (rnd.chance(0.3)) items.push(makePotion('heal')); break;
   }
@@ -6069,12 +6498,12 @@ function shopStock(b) {
   const st = G.bState[b.id] || (G.bState[b.id] = {}); const day = dayOf(G.time);
   if (st.stockDay === day && st.stock) return st.stock;
   const rng = new RNG(hashStr(b.id) + day * 7919); const stock = []; const L = G.player ? G.player.level : 1;
-  const mat = (bias = 0) => { const r = rng.next() + L * 0.02 + bias; return r > 1.25 ? 'ebony' : r > 1.12 ? 'dwarven' : r > 1.0 ? 'elven' : r > 0.78 ? 'silver' : r > 0.4 ? 'steel' : 'iron'; };
+  const mat = (bias = 0) => { const r = rng.next() + L * 0.02 + bias; return r > 1.25 ? 'blackened' : r > 1.12 ? 'damascus' : r > 1.0 ? 'blued' : r > 0.78 ? 'silver' : r > 0.4 ? 'steel' : 'iron'; };
   const P_ = (k) => { const p = makePotion(k, 1); p.infinite = true; return p; };
   switch (b.type) {
     case 'weaponsmith': for (let i = 0; i < 11; i++) stock.push(makeWeapon(rng.pick(Object.keys(WEAPONS)), mat(0.05))); stock.push(makeWeapon('longsword', 'silver')); break;
     case 'armorer': for (let i = 0; i < 9; i++) stock.push(makeArmor(rng.pick(Object.keys(ARMOR)), mat())); break;
-    case 'alchemist': stock.push(P_('heal'), P_('magicka'), P_('stamina')); break;
+    case 'alchemist': stock.push(P_('heal'), P_('spirit'), P_('stamina')); break;
     case 'vendor': stock.push(P_('heal'), P_('stamina')); for (let i = 0; i < 2; i++) stock.push(makeGem(rng.pick(['amethyst', 'ring', 'goblet']))); break;
     default: stock.push(P_('heal'), P_('stamina')); for (let i = 0; i < 3; i++) stock.push(makeWeapon(rng.pick(['dagger', 'shortsword', 'mace', 'staff']), rng.chance(0.6) ? 'iron' : 'steel'));
       stock.push(makeArmor('leather'), makeArmor('cap'), makeArmor('buckler'));
@@ -6281,7 +6710,7 @@ function updateNPC(e, dt) {
       wanderStep(e, dt, 0.5);
       const P = G.player; const d = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
       e.barkT -= dt;
-      if (d < 26 && e.barkT <= 0) { e.barkT = rnd.range(12, 20); SFX.play('ghost', e.pos); msg(rnd.pick(['A spectral voice howls: "VENGEANCE!"', 'The ghost of King Lysandus moans: "Vengeance... vengeance..."', 'A chill wind whispers: "Who... betrayed... me..."']), 'ghost'); }
+      if (d < 26 && e.barkT <= 0) { e.barkT = rnd.range(12, 20); SFX.play('ghost', e.pos); msg(rnd.pick(['A spectral voice howls: "VENGEANCE!"', 'The ghost of King Aldwin moans: "Vengeance... vengeance..."', 'A chill wind whispers: "Who... betrayed... me..."']), 'ghost'); }
       break;
     }
     case 'wander': wanderStep(e, dt, 0.5); break;
@@ -6442,7 +6871,7 @@ const TRAVELLER_KINDS = [
   { trade: 'A travelling merchant', w: 3, speed: 1.15, look: r => ({ ...lookByWealth(r, 'm', 2), cape: '#5a3a1e', hat: '#3a2a1a' }), g: 'm' },
   { trade: 'A pilgrim on the road to the shrines', w: 2, speed: 1.0, look: (r, g) => ({ ...lookByWealth(r, g, 0.8), robe: '#6a5a46', hat: null }) },
   { trade: 'A farmer on the way to market', w: 3, speed: 1.1, look: (r, g) => lookByWealth(r, g, 0.7) },
-  { trade: 'A courier of the Daggerfall court', w: 1, speed: 1.55, look: r => ({ ...lookByWealth(r, 'm', 2.2), cape: '#2a4a8a' }), g: 'm' },
+  { trade: 'A courier of the Aldhaven court', w: 1, speed: 1.55, look: r => ({ ...lookByWealth(r, 'm', 2.2), cape: '#2a4a8a' }), g: 'm' },
   { trade: 'A soldier of the road patrol', w: 1.5, speed: 1.2, look: () => LOOKS.guard, g: 'm', pair: true },
   { trade: 'A wandering knight', w: 0.6, speed: 1.2, look: r => ({ ...lookByWealth(r, 'm', 3), cape: '#7a1e1e' }), g: 'm' },
   { trade: 'A peddler of pots and ribbons', w: 1.5, speed: 1.0, look: (r, g) => ({ ...lookByWealth(r, g, 1.2), apron: '#8a7a5a' }) },
@@ -6682,10 +7111,10 @@ function furnish(P, b, R, rng) {
       FURN.wallBanner(P, -4.5, 3.5, z0, 1, 'banner'); FURN.wallBanner(P, 4.5, 3.5, z0, 1, 'banner');
       FURN.brazier(P, -5, z0 + 6); FURN.brazier(P, 5, z0 + 6); FURN.brazier(P, -4, z1 - 5); FURN.brazier(P, 4, z1 - 5);
       P.op(gb => { for (let z = z0 + 8; z < z1 - 3; z += 6) { gb.quad('winLit', [x0 + 0.02, 6, z + 0.5], [0, 0, -1], [0, 1, 0], 1, 2.4, 1, 1, { fixedUV: true }); gb.quad('winLit', [x1 - 0.02, 6, z - 0.5], [0, 0, 1], [0, 1, 0], 1, 2.4, 1, 1, { fixedUV: true }); } });
-      P.person({ name: 'King Gothryd', look: LOOKS.king, spriteKey: 'king', x: -1.6, z: z0 + 2.3, role: 'static', dialog: 'king', data: { fixed: true } });
-      P.person({ name: 'Queen Aubk-i', look: LOOKS.queen, spriteKey: 'queen', x: 1.6, z: z0 + 2.3, role: 'static', dialog: 'queen', gender: 'f', data: { fixed: true } });
+      P.person({ name: 'King Ottmar', look: LOOKS.king, spriteKey: 'king', x: -1.6, z: z0 + 2.3, role: 'static', dialog: 'king', data: { fixed: true } });
+      P.person({ name: 'Queen Isabeau', look: LOOKS.queen, spriteKey: 'queen', x: 1.6, z: z0 + 2.3, role: 'static', dialog: 'queen', gender: 'f', data: { fixed: true } });
       for (const [gx, gz] of [[-3, z0 + 9], [3, z0 + 9], [-3, z1 - 6], [3, z1 - 6]]) P.person({ name: 'Palace Guard', look: LOOKS.guard, spriteKey: 'guard', x: gx, z: gz, role: 'static', dialog: 'palaceguard', data: { fixed: true } });
-      P.person({ name: 'Court Mage Mynaste', look: { ...LOOKS.mage, robe: '#3a1a1a', hair: '#c8c8c8', beard: true, hairStyle: 1 }, spriteKey: 'courtmage', x: 5, z: z0 + 4, role: 'static', dialog: 'courtmage', data: { fixed: true } });
+      P.person({ name: 'Court Philosopher Anselm Brandt', look: { ...LOOKS.mage, robe: '#3a1a1a', hair: '#c8c8c8', beard: true, hairStyle: 1 }, spriteKey: 'courtmage', x: 5, z: z0 + 4, role: 'static', dialog: 'courtmage', data: { fixed: true } });
       break;
     }
     case 'hospice': {
@@ -6797,7 +7226,7 @@ function buildInterior(b) {
 }
 
 /* =====================================================================
-   The Catacombs beneath Arkay's graveyard — a grid dungeon
+   The Catacombs beneath Saint Hallam’s churchyard — a grid dungeon
    ===================================================================== */
 
 const DG_MATS = { dwall: { tex: 'dungeonWall' }, dfloor: { tex: 'dungeonFloor' }, dceil: { tex: 'flag' }, door: { tex: 'doorDark' }, woodDark: { tex: 'woodDark' }, stone: { tex: 'stone' }, iron: { tex: 'iron' } };
@@ -6915,7 +7344,7 @@ function buildDungeon() {
       if (!G.flags.necroDead) {
         const [x, z] = [(r.cx + 0.5) * cs, (r.cy + 0.5) * cs];
         const e = spawnEnemy(area, 'necro', x, z, { wanderR: 2 }); e.level = Math.max(3, L_); e.hp = e.maxHp = Math.round(ENEMIES.necro.hp * (1 + (e.level - 1) * 0.1));
-        e.bossLoot = [makeQuestItem('soulgem', 'Soul Gem of King Lysandus'), makeQuestItem('letter', "The Emperor's Letter")];
+        e.bossLoot = [makeQuestItem('soulgem', 'Black Stone of King Aldwin'), makeQuestItem('letter', "The Stadtholder’s Letter")];
       }
       for (let k = 0; k < 2; k++) { const [x, z] = freeSpot(r); spawnEnemy(area, 'skeleton', x, z); }
       continue;
@@ -6970,6 +7399,7 @@ function wildFooting(p, ox, oz) {
   const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
   const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
     if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
+    if (hallWet(x, z) && !hallWet(ox, oz)) return true; // the long water and the fountain at Halewood
     for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40) && groundAt(G.area, x, z, 0.3, p.pos.y) < T.wl() + 0.3) return true; // a town's moat and canal: not to be waded into (but a bridge over it is walked on)
     return g > g0 + 0.01 && p.pos.y <= g + 0.3 && terrainSlope(x, z) > 1.2; };
   if (!bad(p.pos.x, p.pos.z)) return;
@@ -7011,12 +7441,12 @@ function useItem(it) {
   const p = G.player;
   if (it.kind === 'potion') {
     if (it.base === 'heal') { const h = Math.min(p.maxHp - p.hp, 35); p.hp += h; msg(`You drink the potion and recover ${h} health.`, 'good'); }
-    if (it.base === 'magicka') { const h = Math.min(p.maxMp - p.mp, 35); p.mp += h; msg(`Magicka surges through you (+${h}).`, 'good'); }
+    if (it.base === 'spirit') { const h = Math.min(p.maxMp - p.mp, 35); p.mp += h; msg(`Your spirit rallies (+${h}).`, 'good'); }
     if (it.base === 'stamina') { p.fat = Math.min(p.maxFat, p.fat + 60); msg('Your weariness fades.', 'good'); }
     removeItem(p, it); SFX.play('drink'); return true;
   }
   if (it.kind === 'weapon' || it.kind === 'armor') { equipItem(it); return true; }
-  if (it.kind === 'quest' || it.kind === 'key') { msg(it.base === 'letter' ? 'The seal is unbroken. It is addressed to the Queen of Daggerfall.' : it.base === 'soulgem' ? 'Inside the black gem a tiny crowned figure pounds silently against the facets.' : `It is ${it.name}.`); return false; }
+  if (it.kind === 'quest' || it.kind === 'key') { msg(it.base === 'letter' ? 'The seal is unbroken. It is addressed to the Queen of Aldhaven.' : it.base === 'soulgem' ? 'Deep inside the black stone a tiny crowned figure pounds silently against its walls.' : `It is ${it.name}.`); return false; }
   return false;
 }
 function quickPotion() {
@@ -7161,9 +7591,9 @@ function resolveMelee() {
 }
 function startCast() {
   const p = G.player; if (p.dead || p.castT >= 0 || p.swingT >= 0 || !rpgUI()) return;
-  if (!p.spells.length) { msg('You know no spells. The Mages Guild teaches them for a price.'); return; }
+  if (!p.spells.length) { msg('You know no arts. The Philosophers’ Society teaches them for a price.'); return; }
   const sp = SPELLS[p.spells[p.spell % p.spells.length]];
-  if (p.mp < sp.cost) { msg(`Not enough magicka to cast ${sp.name} (${sp.cost} needed).`, 'bad'); SFX.play('locked'); return; }
+  if (p.mp < sp.cost) { msg(`Not enough spirit to cast ${sp.name} (${sp.cost} needed).`, 'bad'); SFX.play('locked'); return; }
   p.mp -= sp.cost; p.castT = 0; p.castDone = false; p.castSpell = p.spells[p.spell % p.spells.length];
 }
 function resolveSpell() {
@@ -7233,13 +7663,13 @@ function markDiscovered(b) { const st = G.bState[b.id] || (G.bState[b.id] = {});
    ===================================================================== */
 
 const RUMORS = [
-  'They say old King Lysandus walks the streets after dark, howling for vengeance. I bar my door at sunset.',
-  "Strange lights flicker in Arkay's graveyard at night. The priests won't speak of it.",
-  'The city guard never forgets. Cross them once and they will chase you from here to Wayrest.',
-  'Sentinel and Wayrest are circling each other like hungry dogs. War is coming to the Iliac Bay, mark my words.',
-  'The Mages Guild sells spells to anyone with coin. Fireballs! In a city built of timber!',
+  'They say old King Aldwin walks the streets after dark, howling for vengeance. I bar my door at sunset.',
+  "Strange lights flicker in Saint Hallam’s churchyard at night. The priests won't speak of it.",
+  'The city guard never forgets. Cross them once and they will chase you from here to Brakkenburg.',
+  'Vellaro and Brakkenburg are circling each other like hungry dogs. War is coming to Merrow Bay, mark my words.',
+  'The Philosophers’ Society teaches its fire arts to anyone with coin. Fireballs! In a city built of timber!',
   'Only silver or finer steel will bite a wraith. My uncle learned that the hard way.',
-  'The Fighters Guild pays good coin to anyone brave or foolish enough to go into the Catacombs.',
+  'The Fencing School pays good coin to anyone brave or foolish enough to go into the Catacombs.',
   'Merchants shut their doors at six in the evening. The taverns never close, thank the Divines.',
   'Someone saw a hooded man slip into the old mausoleum. Nobody has seen him come out.',
   'The Underking? A tale to frighten children. ...Is it not?',
@@ -7249,19 +7679,19 @@ const RUMORS = [
   'The House of Mercy takes in anyone, even Warrens folk. Mother Ysolde is a saint, or mad.',
   'In Kingsward they have hedges trimmed into the shape of griffons. In the Warrens we have rats shaped like rats.',
   "The bell in the Bell Tower cracked during the old king's funeral. Nobody has had the heart to recast it.",
-  "They built the memorial to Lysandus on the castle road. Now his ghost walks right past his own statue every night.",
+  "They built the memorial to Aldwin on the castle road. Now his ghost walks right past his own statue every night.",
   'Half the cargo in the dockside warehouses never saw a customs clerk. The other half never saw daylight.',
-  "Tanners' Row stinks worse than a troll's armpit, but the leather is the best on the Iliac Bay.",
-  'Queen Aubk-i hails from Sentinel, you know. Some of the old nobles still grumble about it.',
-  "They say Daggerfall is the only city worth seeing on the whole Iliac Bay. Lucky, since it's the only one you'll ever see.",
-  'The Emperor sends his agents here and there. Most of them leave in a box.',
-  'My cousin swears he found a Daedric dagger in a crypt once. He is a liar, but an entertaining one.',
+  "Tanners' Row stinks worse than a troll's armpit, but the leather is the best on Merrow Bay.",
+  'Queen Isabeau hails from Vellaro, you know. Some of the old nobles still grumble about it.',
+  "They say Aldhaven is the only city worth seeing on the whole of Merrow Bay. Lucky, since it's the only one you'll ever see.",
+  'The Stadtholder sends his agents here and there. Most of them leave in a box.',
+  'My cousin swears he found a dagger of star-iron in a crypt once. He is a liar, but an entertaining one.',
   'The court mage says the dead king is bound to this world by something. Or someone.',
   'Rats the size of dogs in the Catacombs, I hear. Bats too. And worse.',
   'If the guards come for you, pay your fine at the castle. Or lie low for a day and pray.',
 ];
 const GREET = {
-  day: ['Good day to you.', 'Aye? What is it?', 'Make it quick, stranger.', 'Well met, traveler.', "Blessings of Arkay upon you.", 'You are not from around here, are you?', 'Lovely weather for the Iliac Bay.'],
+  day: ['Good day to you.', 'Aye? What is it?', 'Make it quick, stranger.', 'Well met, traveler.', "God keep you.", 'You are not from around here, are you?', 'Lovely weather for Merrow Bay.'],
   night: ["It's late. You should be indoors.", 'The dead walk this city at night. Did you know that?', 'Keep your voice down.', 'What do you want at this hour?'],
 };
 
@@ -7277,10 +7707,10 @@ const Quests = {
     const L = G.player.level; const types = giver === 'fighters' ? ['undead', 'bounty'] : giver === 'mages' ? ['deliver', 'fetch'] : ['undead', 'deliver'];
     const type = rnd.pick(types); const id = 'q' + Date.now().toString(36);
     const q = { id, giver, type, status: 'active', day: dayOf(G.time) };
-    const giverName = { fighters: 'the Fighters Guild', mages: 'the Mages Guild', temple: 'the Temple of Arkay' }[giver];
+    const giverName = { fighters: 'the Fencing School', mages: 'the Philosophers’ Society', temple: 'the Church of Saint Hallam' }[giver];
     if (type === 'undead') {
       q.need = rnd.int(3, 5); q.count = 0; q.title = giver === 'temple' ? 'Lay the Dead to Rest' : 'Cleanse the Catacombs';
-      q.desc = `Destroy ${q.need} undead in the Catacombs beneath the mausoleum in Arkay's graveyard, then report to ${giverName}.`;
+      q.desc = `Destroy ${q.need} undead in the Catacombs beneath the mausoleum in Saint Hallam’s churchyard, then report to ${giverName}.`;
       q.reward = { gold: 80 + q.need * 25 + L * 10, xp: 50 + q.need * 12 };
     } else if (type === 'bounty') {
       const g = rnd.chance(0.5) ? 'm' : 'f'; q.target = `${rnd.pick(g === 'm' ? FIRST_M : FIRST_F)} ${rnd.pick(['the Knife', 'Blackhand', 'the Weasel', 'Redcloak', 'the Butcher', 'Quickfingers'])}`;
@@ -7298,7 +7728,7 @@ const Quests = {
       markDiscovered(b);
       addItem(G.player, makeQuestItem(q.itemBase, q.item), true);
     } else {
-      const names = giver === 'mages' ? ['the Codex of Vharzal', 'a Welkynd Stone', 'the Tome of Hollow Stars'] : ['the Reliquary of Arkay'];
+      const names = giver === 'mages' ? ['the Codex of Corvin Ash', 'the Great Burning-Glass', 'the Tome of Hollow Stars'] : ['the Reliquary of Saint Hallam'];
       q.itemName = rnd.pick(names); q.itemBase = 'relic_' + id; q.title = `Retrieve ${q.itemName}`;
       q.desc = `Recover ${q.itemName} from the Catacombs beneath the mausoleum and bring it to ${giverName}.`;
       q.reward = { gold: 150 + L * 20, xp: 70 };
@@ -7312,7 +7742,7 @@ const Quests = {
     msg(`Quest complete: ${q.title}. You receive ${q.reward.gold} gold.`, 'quest');
   },
   onKill(e) {
-    if (e.etype === 'necro') { G.flags.necroDead = true; msg('Vharzal the Necromancer crumples to the floor. The air in the Catacombs grows lighter.', 'quest'); }
+    if (e.etype === 'necro') { G.flags.necroDead = true; msg('Corvin Ash the Necromancer crumples to the floor. The air in the Catacombs grows lighter.', 'quest'); }
     for (const q of this.active()) {
       if (q.status !== 'active') continue;
       if (q.type === 'undead' && e.def && e.def.undead && G.area.kind === 'dungeon') {
@@ -7324,9 +7754,9 @@ const Quests = {
   },
   onPickup(it) {
     if ((it.base === 'soulgem' || it.base === 'letter') && this.mq() < 2 && hasItem('soulgem') && hasItem('letter')) {
-      this.setMQ(2, 'You have recovered the Soul Gem of King Lysandus and the Emperor\'s Letter. Lysandus\'s ghost walks the streets at night — confront him with the gem.');
+      this.setMQ(2, 'You have recovered the Black Stone of King Aldwin and the Stadtholder’s Letter. Aldwin\'s ghost walks the streets at night — confront him with the gem.');
     }
-    for (const q of this.active()) if (q.type === 'fetch' && q.status === 'active' && it.base === q.itemBase) { q.status = 'done'; msg(`You found ${q.itemName}. Return it to ${q.giver === 'mages' ? 'the Mages Guild' : 'the Temple'}.`, 'quest'); SFX.play('quest'); }
+    for (const q of this.active()) if (q.type === 'fetch' && q.status === 'active' && it.base === q.itemBase) { q.status = 'done'; msg(`You found ${q.itemName}. Return it to ${q.giver === 'mages' ? 'the Philosophers’ Society' : 'the Temple'}.`, 'quest'); SFX.play('quest'); }
   },
   populateDungeon(area, rooms, cs, freeSpot) {
     for (const q of this.active()) {
@@ -7354,11 +7784,11 @@ const Quests = {
   },
   mainJournal() {
     switch (this.mq()) {
-      case 0: return 'The Emperor has sent me to Daggerfall. I should present myself to King Gothryd at Castle Daggerfall, at the north end of the city, and learn why the ghost of his father haunts the streets.';
-      case 1: return "King Gothryd believes a necromancer has bound his father's spirit and stolen the Emperor's letter. The Catacombs lie beneath the old mausoleum in Arkay's Graveyard, behind the Temple of Arkay in the west of the city. The King gave me the key. A carriage from the Grand Market would save my legs.";
-      case 2: return 'I carry the Soul Gem of King Lysandus and the Emperor\'s Letter. The ghost walks between 8 in the evening and dawn around the Lysandus Memorial, on the road from the Grand Market to the castle. I must confront him with the gem.';
-      case 3: return "King Lysandus is at peace. I should bring the Emperor's Letter to King Gothryd.";
-      default: return 'The ghost of Lysandus is at rest and the letter is delivered. Daggerfall is in my debt.';
+      case 0: return 'The Stadtholder has sent me to Aldhaven. I should present myself to King Ottmar at Aldhaven Castle, at the north end of the city, and learn why the ghost of his father haunts the streets.';
+      case 1: return "King Ottmar believes a necromancer has bound his father's spirit and stolen the Stadtholder’s letter. The Catacombs lie beneath the old mausoleum in Saint Hallam’s Churchyard, behind the Church of Saint Hallam in the west of the city. The King gave me the key. A carriage from the Grand Market would save my legs.";
+      case 2: return 'I carry the Black Stone of King Aldwin and the Stadtholder’s Letter. The ghost walks between 8 in the evening and dawn around the Aldwin Memorial, on the road from the Grand Market to the castle. I must confront him with the gem.';
+      case 3: return "King Aldwin is at peace. I should bring the Stadtholder’s Letter to King Ottmar.";
+      default: return 'The ghost of Aldwin is at rest and the letter is delivered. Aldhaven is in my debt.';
     }
   },
 };
@@ -7375,8 +7805,8 @@ function describeDir(fx, fz, tx, tz, from = 'here') {
 function nearestStop(x, z) { let best = null, bd = 1e9; for (const s of G.city.stops || []) { const d = Math.hypot(s.x - x, s.z - z); if (d < bd) { bd = d; best = s; } } return best; }
 const WHERE_TOPICS = [
   ['tavern', 'a tavern'], ['general', 'a general store'], ['weaponsmith', 'a weaponsmith'], ['armorer', 'an armorer'], ['alchemist', 'an alchemist'],
-  ['temple', 'the Temple of Arkay'], ['hospice', 'the House of Mercy'], ['mages', 'the Mages Guild'], ['fighters', 'the Fighters Guild'], ['castle', 'Castle Daggerfall'], ['mausoleum', 'the Catacombs'],
-  ['coach', 'a carriage stop'], ['lm:market', 'the Grand Market'], ['lm:memorial', 'the Lysandus Memorial'], ['lm:garden', "the Queen's Garden"], ['lm:bell', 'the Bell Tower'], ['lm:lighthouse', 'the lighthouse'],
+  ['temple', 'the Church of Saint Hallam'], ['hospice', 'the House of Mercy'], ['mages', 'the Philosophers’ Society'], ['fighters', 'the Fencing School'], ['castle', 'Aldhaven Castle'], ['mausoleum', 'the Catacombs'],
+  ['coach', 'a carriage stop'], ['lm:market', 'the Grand Market'], ['lm:memorial', 'the Aldwin Memorial'], ['lm:garden', "the Queen's Garden"], ['lm:bell', 'the Bell Tower'], ['lm:lighthouse', 'the lighthouse'],
 ];
 function whereIs(npc, type) {
   const origin = G.area.kind === 'city' ? npc.pos : (G.area.building ? { x: G.area.building.door.x, z: G.area.building.door.z } : { x: 0, z: 0 });
@@ -7424,36 +7854,36 @@ function dialogFor(npc) {
   }
   const guildQuest = (giver) => {
     const q = Quests.byGiver(giver);
-    if (q && q.status === 'done') opts.push({ label: 'Report success', fn: () => { if (q.type === 'fetch') { const it = hasItem(q.itemBase); if (it) removeItem(P, it); } Quests.complete(q); return `"Well done. The ${giver === 'temple' ? 'temple' : 'guild'} remembers those who deliver." You receive ${q.reward.gold} gold.`; } });
+    if (q && q.status === 'done') opts.push({ label: 'Report success', fn: () => { if (q.type === 'fetch') { const it = hasItem(q.itemBase); if (it) removeItem(P, it); } Quests.complete(q); return `"Well done. The ${giver === 'temple' ? 'church' : giver === 'mages' ? 'Society' : 'School'} remembers those who deliver." You receive ${q.reward.gold} gold.`; } });
     else opts.push({ label: 'Ask for work', fn: () => { const cur = Quests.byGiver(giver); if (cur) return `"You already have a task from us: ${cur.title}. Finish it first."`; const nq = Quests.generate(giver); return `"${nq.desc}" (Added to your journal.)${nq.gaveKey ? ' You are given a key to the Catacombs.' : ''}`; } });
   };
   switch (npc.dialog) {
     case 'king': {
-      sub = 'King of Daggerfall'; const mq = Quests.mq();
+      sub = 'King of Aldhaven'; const mq = Quests.mq();
       if (mq === 0) {
-        text = '"So, the Emperor\'s agent arrives at last. Welcome to Daggerfall. I would that you had come in happier times."';
-        opts.push({ label: 'Ask about the ghost', fn: () => { Quests.setMQ(1, 'Journal updated. The King has given you the Catacombs Key.'); if (!hasItem('catakey')) addItem(P, { id: iid(), kind: 'key', base: 'catakey', name: 'Catacombs Key', value: 0 }, true); return '"My father, King Lysandus, fell at Cryngaine Field. Every night since, his shade stalks these streets crying for vengeance, and my people cower behind their doors. Mynaste — my court mage — believes something holds his spirit here. Something unnatural.\n\nWorse: a letter the Emperor sent to my mother vanished from these very halls. My spies trace both troubles to the Catacombs beneath the mausoleum in Arkay\'s graveyard. A necromancer lurks there, they say.\n\nTake this key. Find the villain. Free my father, and bring me that letter."'; } });
-      } else if (mq === 1) text = '"The Catacombs lie beneath the old mausoleum in the graveyard beside the Temple of Arkay, in the south-west of the city. Go with Arkay\'s blessing — and a good blade."';
+        text = '"So, the Stadtholder’s agent arrives at last. Welcome to Aldhaven. I would that you had come in happier times."';
+        opts.push({ label: 'Ask about the ghost', fn: () => { Quests.setMQ(1, 'Journal updated. The King has given you the Catacombs Key.'); if (!hasItem('catakey')) addItem(P, { id: iid(), kind: 'key', base: 'catakey', name: 'Catacombs Key', value: 0 }, true); return '"My father, King Aldwin, fell on Harrow Moor. Every night since, his shade stalks these streets crying for vengeance, and my people cower behind their doors. Anselm Brandt — my court mage — believes something holds his spirit here. Something unnatural.\n\nWorse: a letter the Stadtholder sent to my mother vanished from these very halls. My spies trace both troubles to the Catacombs beneath the mausoleum in Saint Hallam\'s graveyard. A necromancer lurks there, they say.\n\nTake this key. Find the villain. Free my father, and bring me that letter."'; } });
+      } else if (mq === 1) text = '"The Catacombs lie beneath the old mausoleum in the graveyard beside the Church of Saint Hallam, in the south-west of the city. Go with God’s blessing — and a good blade."';
       else if (mq === 2) text = '"You have the gem? I can almost hear him through it. Go to my father — he walks the streets at night, near the plaza and the castle road. Release him, I beg you."';
       else if (mq === 3) {
         text = '"His voice... it no longer echoes through my halls. My father is at peace?"';
-        opts.push({ label: "Hand over the Emperor's Letter", fn: () => { const it = hasItem('letter'); if (it) removeItem(P, it); P.gold += 1500; addItem(P, makeWeapon('longsword', 'daedric'), true); giveXP(400); Quests.setMQ(4); setTimeout(() => UI.openVictory(), 50); return '"The seal is unbroken. You have done what no priest or mage in this city could. Take this gold — and this blade, forged in fires not of this world. Daggerfall will not forget you."'; } });
-      } else text = '"Daggerfall owes you a debt, friend. Stay as long as you like. The city is yours."';
+        opts.push({ label: "Hand over the Stadtholder’s Letter", fn: () => { const it = hasItem('letter'); if (it) removeItem(P, it); P.gold += 1500; addItem(P, makeWeapon('longsword', 'meteoric'), true); giveXP(400); Quests.setMQ(4); setTimeout(() => UI.openVictory(), 50); return '"The seal is unbroken. You have done what no priest or mage in this city could. Take this gold — and this blade, forged in fires not of this world. Aldhaven will not forget you."'; } });
+      } else text = '"Aldhaven owes you a debt, friend. Stay as long as you like. The city is yours."';
       break;
     }
-    case 'queen': sub = 'Queen of Daggerfall';
-      text = Quests.mq() >= 4 ? '"My husband speaks of little else but your deeds. The court is grateful."' : '"The Emperor\'s letter was meant for my husband\'s mother. What it says is a matter of state — which is to say, a matter of war. Find it."';
+    case 'queen': sub = 'Queen of Aldhaven';
+      text = Quests.mq() >= 4 ? '"My husband speaks of little else but your deeds. The court is grateful."' : '"The Stadtholder’s letter was meant for my husband\'s mother. What it says is a matter of state — which is to say, a matter of war. Find it."';
       opts.push(rumor); break;
-    case 'courtmage': sub = 'Court Mage';
-      text = '"The dead king is anchored to our world by a soul gem — a black one. Whoever holds it holds him. Shatter it in his presence and he will finally rest. Mind the wraiths: only silver, finer metals or magic will touch them."';
+    case 'courtmage': sub = 'Court Philosopher';
+      text = '"The dead king is anchored to our world by a stone — a black one, cut and bound by a necromancer. Whoever holds it holds him. Shatter it in his presence and he will finally rest. Mind the wraiths: only silver, finer metals or magic will touch them."';
       opts.push(where); break;
     case 'palaceguard': sub = 'Palace Guard'; text = rnd.pick(['"Keep your hands where I can see them."', '"The King receives petitioners until eight in the evening."', '"Move along."']); opts.push(where); break;
     case 'ghost': {
       sub = 'A restless spirit'; const mq = Quests.mq();
-      if (mq < 2) text = '"VENGEANCE! ...The gem... the dark one binds me... beneath Arkay\'s garden... VENGEANCE!"';
+      if (mq < 2) text = '"VENGEANCE! ...The gem... the dark one binds me... beneath the saint’s garden... VENGEANCE!"';
       else if (mq === 2 && hasItem('soulgem')) {
-        text = 'The ghost of King Lysandus turns towards the gem in your hand. Its hollow eyes burn.';
-        opts.push({ label: 'Shatter the soul gem', fn: () => { const it = hasItem('soulgem'); if (it) removeItem(P, it); Quests.setMQ(3, "King Lysandus is at peace. Bring the Emperor's Letter to King Gothryd."); npc.data.fading = 1; giveXP(150); SFX.play('ghost'); return 'The gem cracks with a sound like breaking ice. The ghost sighs, and for a moment you see a tired old man instead of a monster.\n\n"At last... the chains are broken. Tell my son... I am proud. Tell the Emperor... the letter holds the truth..."\n\nHe fades into the night air.'; } });
+        text = 'The ghost of King Aldwin turns towards the gem in your hand. Its hollow eyes burn.';
+        opts.push({ label: 'Shatter the black stone', fn: () => { const it = hasItem('soulgem'); if (it) removeItem(P, it); Quests.setMQ(3, "King Aldwin is at peace. Bring the Stadtholder’s Letter to King Ottmar."); npc.data.fading = 1; giveXP(150); SFX.play('ghost'); return 'The gem cracks with a sound like breaking ice. The ghost sighs, and for a moment you see a tired old man instead of a monster.\n\n"At last... the chains are broken. Tell my son... I am proud. Tell the Stadtholder... the letter holds the truth..."\n\nHe fades into the night air.'; } });
       } else text = 'The ghost stares through you.';
       break;
     }
@@ -7465,16 +7895,16 @@ function dialogFor(npc) {
     case 'shop': case 'vendor': sub = b ? `${TYPE_LABEL[b.type]} — ${b.name}` : 'Market vendor';
       text = rnd.pick(['"Take a look. Everything is of the finest quality."', '"Buying or selling?"', '"No haggling. Well — a little haggling."']);
       opts.push({ label: 'Buy', fn: () => { UI.openShop(npc, 'buy'); return null; } }, { label: 'Sell', fn: () => { UI.openShop(npc, 'sell'); return null; } }, where); break;
-    case 'priest': sub = 'High Priest of Arkay';
-      text = '"Arkay watches over the living and the dead alike. How may the temple serve you?"';
+    case 'priest': sub = 'Rector of Saint Hallam’s';
+      text = '"Saint Hallam keeps the dying and the dead alike. How may the church serve you?"';
       opts.push({ label: 'Heal my wounds', fn: () => { const miss = P.maxHp - P.hp; if (miss <= 0) return '"You are hale, child. Go in peace."'; const cost = Math.ceil(miss * 0.5 + 5); if (P.gold < cost) return `"The temple asks a donation of ${cost} gold for healing."`; P.gold -= cost; P.hp = P.maxHp; SFX.play('heal'); return `The priest lays hands upon you. You are fully healed. (-${cost} gold)`; } });
       opts.push({ label: 'Buy potions', fn: () => { UI.openShop(npc, 'buy', 'alchemist'); return null; } });
       guildQuest('temple'); opts.push(where); break;
-    case 'magister': sub = 'Guild Magister';
-      text = '"The Mages Guild welcomes seekers of knowledge — and their gold."';
+    case 'magister': sub = 'Secretary of the Philosophers’ Society';
+      text = '"The Society welcomes seekers of knowledge — and their gold."';
       opts.push({ label: 'Learn spells', fn: () => { UI.openSpells(npc); return null; } }, { label: 'Buy potions', fn: () => { UI.openShop(npc, 'buy', 'alchemist'); return null; } });
       guildQuest('mages'); opts.push(rumor); break;
-    case 'guildmaster': sub = 'Master of the Fighters Guild';
+    case 'guildmaster': sub = 'Master of the Fencing School';
       text = '"Another sword arm looking for coin? Good. We have more trouble than blades."';
       guildQuest('fighters');
       opts.push({ label: `Train (${60 * P.level} gold)`, fn: () => { const st = G.bState.fighters || (G.bState.fighters = {}); if (st.trainDay === dayOf(G.time)) return '"Enough for today. Your arms need rest. Come back tomorrow."'; const cost = 60 * P.level; if (P.gold < cost) return `"Training costs ${cost} gold."`; P.gold -= cost; st.trainDay = dayOf(G.time); const gain = Math.round(xpToNext(P.level) * 0.3); giveXP(gain); P.fat = 0; return `You spar for hours until your arms burn. (+${gain} experience)`; } });
@@ -7488,17 +7918,18 @@ function dialogFor(npc) {
       text = rnd.pick(['"Mind the bucket. Please."', '"Fell off a roof in the Warrens. The roof fell with me."', '"The Mother says I will walk again. Soon. Probably."', '"Do not drink from Beggar\'s Well. Trust me."', '"Got stabbed on the docks. Over a fish. A fish!"']); opts.push(rumor); break;
     case 'clerk': sub = b ? `Clerk of ${b.name}` : 'Clerk';
       text = rnd.pick(['"Deliveries round the back. Everything here is counted twice."', '"If you are from customs, I have never seen you before in my life."']); opts.push(rumor, where); break;
-    case 'servant': sub = 'Household servant'; text = rnd.pick(['"The master is not receiving visitors."', '"Mind the carpet, it came all the way from Sentinel."']); opts.push(rumor, where); break;
+    case 'servant': sub = 'Household servant'; text = rnd.pick(['"The master is not receiving visitors."', '"Mind the carpet, it came all the way from Vellaro."']); opts.push(rumor, where); break;
     case 'coach': {
-      sub = 'Coachman of the Daggerfall Carriage Company'; const stop = G.city.stops.find(s => s.id === npc.data.stop);
+      sub = 'Coachman of the Aldhaven Carriage Company'; const stop = G.city.stops.find(s => s.id === npc.data.stop);
       text = rnd.pick(['"Where to? Anywhere inside the walls, if you have the coin."', '"Climb aboard. Mind the horse, he bites."', '"Kingsward, the Docks, the Warrens if you are brave. Name it."']);
       opts.push({ label: 'Travel by carriage', fn: () => { UI.openTravel(stop); return null; } }, rumor, where); break;
     }
     case 'villager': sub = `A villager of ${npc.data.hamlet || 'Mirrormere'}`;
-      text = npc.data.hamlet ? rnd.pick(['"Not many come through here. Fewer stop."', '"The harvest was thin this year. The one before, thinner."', '"Follow the track and you will reach Daggerfall, in the end. Everything ends up in Daggerfall."', '"Mind the dog. He is friendlier than he looks. No, wait, the other way round."', `"${npc.data.hamlet}? Five families and a well. Been that way since my grandmother's day."`]) : rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Daggerfall, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
+      text = npc.data.hamlet ? rnd.pick(['"Not many come through here. Fewer stop."', '"The harvest was thin this year. The one before, thinner."', '"Follow the track and you will reach Aldhaven, in the end. Everything ends up in Aldhaven."', '"Mind the dog. He is friendlier than he looks. No, wait, the other way round."', `"${npc.data.hamlet}? Five families and a well. Been that way since my grandmother's day."`]) : rnd.pick(['"Mind the jetty, the planks are older than I am."', '"The mere is deep in the middle. Deeper than anyone has swum, my father said."', '"We get pike the length of your arm out of that water. Not many visitors, though."', '"The road down the valley joins the track to Aldhaven, if you keep walking long enough."', '"Chapel bell rings for weddings and funerals. Mostly funerals, lately."']);
       opts.push(siteRumor(npc), rumor); break;
+    case 'household': sub = npc.data.trade; text = rnd.pick(npc.data.lines); opts.push(siteRumor(npc), rumor); break;
     case 'traveler': sub = npc.data.trade || 'A traveller on the road';
-      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Daggerfall, the gates shut at no hour, but the guards ask questions after dark."']);
+      text = rnd.pick(['"Fair weather for the road, at least."', '"Keep your purse close out here. Not everyone on the road is as honest as me."', '"Long way yet. Always a long way yet."', '"Good day to you, stranger."', '"If you are heading to Aldhaven, the gates shut at no hour, but the guards ask questions after dark."']);
       opts.push(siteRumor(npc), rumor); break;
     case 'bard': sub = 'Traveling bard'; text = '"Care for a song? No? A rumor, then — bards hear everything."'; opts.push(rumor); break;
     case 'resident':
@@ -7508,7 +7939,7 @@ function dialogFor(npc) {
       opts.push(where, rumor); break;
     default: opts.push(where, rumor);
   }
-  if (!['king', 'ghost', 'villager', 'traveler'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
+  if (!['king', 'ghost', 'villager', 'traveler', 'household'].includes(npc.dialog) && npc.dialog !== 'guard' && !opts.includes(where) && npc.dialog !== 'bard') opts.push(where);
   return { title: npc.name, sub, text, opts };
 }
 
@@ -7686,6 +8117,7 @@ const Travel = {
     for (const pts of M.outside || []) line(pts);
     if (M.hillPath) line(M.hillPath);
     for (const T of Wild.tracks) line(T, 4);
+    for (const S of SITES) if (S.lane) line(S.lane);
     for (const S of SITES) if (S.id === 'mirrormere') line([[S.x + 126, S.z + 2], [S.x + 200, S.z - 2], [S.x + 280, S.z]]);
     for (const Tn of TOWNS) { const b0 = X.length; for (const n of Tn.nodes) add(n.x, n.z); Tn.nodes.forEach((n, i) => { for (const j of n.n) link(b0 + i, b0 + j); }); // a town's streets, and its gates out to the roads that leave them
       const own = new Set(Tn.nodes.map((_, i) => b0 + i)); for (const g of Tn.gates) { const j = near(g.ox, g.oz, 90, own); if (j >= 0) link(b0 + g.node, j); } }
@@ -7777,7 +8209,7 @@ const Travel = {
     if (c.detourT > 0) { c.detourT -= h; const a = c.detour, cs = Math.cos(a), sn = Math.sin(a); [dx, dz] = [dx * cs - dz * sn, dx * sn + dz * cs]; }
     // the water's edge, the sea or the mere, ends a cross-country walk
     const ax = P.pos.x + dx * 3, az = P.pos.z + dz * 3, ah = terrainH(ax, az), M = SITES[2];
-    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3))) { this.stop('The water bars your way.', undefined, false); return; }
+    if (!c.road && (ah < SEA + 0.15 || (Math.hypot(ax - M.x, az - M.z) < 260 && ah < MERE.wl - 0.3) || hallWet(ax, az))) { this.stop('The water bars your way.', undefined, false); return; }
     const ox = P.pos.x, oz = P.pos.z, st = spd * h;
     P.pos.x += dx * st; P.pos.z += dz * st;
     collide(G.area, P.pos, 0.38, P.pos.y + 1.5, 0.3); keepAshore(G.area, P.pos, ox, oz, 0.38, P.pos.y); // a traveller climbs the stiles: hedges, field walls and fences under two metres do not stop the journey
@@ -7833,7 +8265,7 @@ const Travel = {
   // the places you can name as a goal: the city, and the landmarks you have found or heard of
   goals() {
     const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
-    if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Daggerfall', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
+    if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Aldhaven', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
     for (const S of SITES) if (found[S.id] || heard[S.id] || S.kind === 'town') out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
     for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
     return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);
@@ -7949,8 +8381,8 @@ const UI = {
   },
   openSpells(npc) {
     const P = G.player;
-    const render = () => `<h2>Spells of the Mages Guild</h2><div class="list scroll">${Object.entries(SPELLS).map(([k, s]) => `<div class="row"><div class="nm">${esc(s.name)} <small>${esc(s.desc)} Costs ${s.cost} magicka.</small></div><div class="pr">${s.price} g</div>${P.spells.includes(k) ? '<span class="dim">Known</span>' : `<button class="db sm" data-a="${k}" ${P.gold < s.price ? 'disabled' : ''}>Learn</button>`}</div>`).join('')}</div>
-      <p class="note">Cast your selected spell with Q or the right mouse button. Choose it with 1–3.${P.maxMp < 20 ? ' Your magicka reserves are meager — consider Potions of Magicka.' : ''}</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Done</button></div>`;
+    const render = () => `<h2>Arts of the Philosophers’ Society</h2><div class="list scroll">${Object.entries(SPELLS).map(([k, s]) => `<div class="row"><div class="nm">${esc(s.name)} <small>${esc(s.desc)} Costs ${s.cost} spirit.</small></div><div class="pr">${s.price} g</div>${P.spells.includes(k) ? '<span class="dim">Known</span>' : `<button class="db sm" data-a="${k}" ${P.gold < s.price ? 'disabled' : ''}>Learn</button>`}</div>`).join('')}</div>
+      <p class="note">Cast your selected spell with Q or the right mouse button. Choose it with 1–3.${P.maxMp < 20 ? ' Your spirit runs thin — consider Potions of Spirit.' : ''}</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="close">Done</button></div>`;
     this.open('spells', render, { cls: 'mid', onAct: (a) => { const s = SPELLS[a]; if (!s || P.gold < s.price || P.spells.includes(a)) return; P.gold -= s.price; P.spells.push(a); SFX.play('levelup'); msg(`You have learned ${s.name}.`, 'good'); this.render(); } });
   },
 
@@ -7987,7 +8419,7 @@ const UI = {
         ${it.kind === 'potion' ? `<button class="db sm" data-a="u${i}">Drink</button>` : ''}${it.kind === 'weapon' || it.kind === 'armor' ? `<button class="db sm" data-a="u${i}">${isEquipped(it) ? 'Remove' : 'Equip'}</button>` : ''}${it.kind === 'quest' || it.kind === 'key' ? `<button class="db sm" data-a="u${i}">Examine</button>` : `<button class="db sm ghost" data-a="d${i}">Drop</button>`}</div>`).join('') || '<p class="dim">Your pack is empty.</p>';
       return `<div class="sheet"><div class="col"><h2>${esc(P.name)}</h2><div class="sub">Level ${P.level} ${esc(P.race)} ${esc(P.cls)}</div>
         <div class="xpbar"><i style="width:${Math.round(P.xp / next * 100)}%"></i></div><div class="sub">${P.xp} / ${next} experience</div>
-        <div class="vitals"><span class="hp">Health ${Math.ceil(P.hp)}/${P.maxHp}</span><span class="mp">Magicka ${Math.floor(P.mp)}/${P.maxMp}</span><span class="ft">Fatigue ${Math.floor(P.fat)}/${P.maxFat}</span></div>
+        <div class="vitals"><span class="hp">Health ${Math.ceil(P.hp)}/${P.maxHp}</span><span class="mp">Spirit ${Math.floor(P.mp)}/${P.maxMp}</span><span class="ft">Fatigue ${Math.floor(P.fat)}/${P.maxFat}</span></div>
         <div class="attrs">${attrs}</div>${P.points ? `<p class="note good">${P.points} attribute points to spend.</p>` : ''}
         <div class="attr"><span>Armor rating</span><b>${playerAC()}</b></div><div class="attr"><span>Damage</span><b>${w.min + (w.dmgBonus || 0)}–${w.max + (w.dmgBonus || 0)}</b></div><div class="attr"><span>Gold</span><b>${P.gold}</b></div></div>
         <div class="col"><h3>Equipment</h3>${eq}<h3>Spells</h3><div class="spells">${spells}</div><h3>Pack</h3><div class="list scroll">${inv}</div></div></div>
@@ -8008,8 +8440,8 @@ const UI = {
     const render = () => {
       const act = Quests.active().map(q => `<div class="quest ${q.status}"><h3>${esc(q.title)}${q.status === 'done' ? ' — report back' : ''}</h3><p>${esc(q.desc)}${q.type === 'undead' ? ` (${q.count}/${q.need})` : ''}</p><small>Reward: ${q.reward.gold} gold</small></div>`).join('');
       const old = G.quests.filter(q => q.status === 'complete' || q.status === 'failed').map(q => `<li>${esc(q.title)} — ${q.status}</li>`).join('');
-      return `<h2>Journal</h2><div class="scroll journal"><div class="quest main"><h3>The Emperor's Business</h3><p>${esc(Quests.mainJournal())}</p></div>${act}
-        ${G.wanted ? `<div class="quest bad"><h3>Wanted</h3><p>The city guard hunts you. Pay your fine of ${G.wanted.fine} gold at Castle Daggerfall, or keep out of sight until ${clockString(G.wanted.until)} on ${dateString(G.wanted.until)}.</p></div>` : ''}
+      return `<h2>Journal</h2><div class="scroll journal"><div class="quest main"><h3>The Stadtholder’s Business</h3><p>${esc(Quests.mainJournal())}</p></div>${act}
+        ${G.wanted ? `<div class="quest bad"><h3>Wanted</h3><p>The city guard hunts you. Pay your fine of ${G.wanted.fine} gold at Aldhaven Castle, or keep out of sight until ${clockString(G.wanted.until)} on ${dateString(G.wanted.until)}.</p></div>` : ''}
         ${old ? `<h3>Past deeds</h3><ul>${old}</ul>` : ''}</div><div class="btns"><button class="db" data-a="close">Close (J)</button></div>`;
     };
     this.open('journal', render, { cls: 'mid' });
@@ -8066,8 +8498,8 @@ const UI = {
   },
   openDeath() {
     const hasSave = !!readSave();
-    this.open('death', () => `<h2 class="bad">You have died</h2><p class="story">Your vision darkens. The cold stones of Daggerfall are the last thing you feel.</p>
-      <div class="btns col">${hasSave ? '<button class="db" data-a="load">Load last save</button>' : ''}<button class="db" data-a="revive">Wake in the Temple of Arkay (lose half your gold)</button><button class="db" data-a="quit">Quit to title</button></div>`,
+    this.open('death', () => `<h2 class="bad">You have died</h2><p class="story">Your vision darkens. The cold stones of Aldhaven are the last thing you feel.</p>
+      <div class="btns col">${hasSave ? '<button class="db" data-a="load">Load last save</button>' : ''}<button class="db" data-a="revive">Wake in the Church of Saint Hallam (lose half your gold)</button><button class="db" data-a="quit">Quit to title</button></div>`,
       { cls: 'small', closable: false, onAct: (a) => { if (a === 'load') loadGame(); if (a === 'revive') { this.close(true); reviveAtTemple(); } if (a === 'quit') { this.close(true); toTitle(); } } });
   },
   openStory(title, text, btn, cb, cls = 'mid') {
@@ -8075,7 +8507,7 @@ const UI = {
       { cls, closable: false, leave: () => { this.close(true); cb && cb(); }, onAct: (a) => { if (a === 'go') { this.close(true); cb && cb(); } } });
   },
   openVictory() {
-    this.openStory('The Ghost Is at Rest', `<p>King Lysandus no longer walks the streets of Daggerfall. The Emperor's letter is in royal hands, and whatever it says will set the Iliac Bay on a new course — but that is a story for another city.</p><p>For now, Daggerfall sleeps soundly for the first time in months. Its taverns, guilds and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Daggerfall: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
+    this.openStory('The Ghost Is at Rest', `<p>King Aldwin no longer walks the streets of Aldhaven. The Stadtholder’s letter is in royal hands, and whatever it says will set Merrow Bay on a new course — but that is a story for another city.</p><p>For now, Aldhaven sleeps soundly for the first time in months. Its taverns, halls and Catacombs remain open to you.</p><p class="dim">Thank you for playing <b>Aldhaven: One City</b>, an unofficial tribute.</p>`, 'Keep exploring', null);
   },
   // fast travel on foot: straight on, along the road underfoot, or to a place you know of (by road or across country)
   openFoot() {
@@ -8110,7 +8542,7 @@ const UI = {
     if (nearbyHostiles(18)) { msg('The horses shy away. You cannot board with enemies nearby.', 'bad'); return; }
     const h = hourOf(G.time); const night = h < 5 || h >= 23;
     const routes = carriageRoutes(stop);
-    const render = () => `<h2>Daggerfall Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
+    const render = () => `<h2>Aldhaven Carriage Company</h2><p class="dim">${esc(capFirst(stop.name))} · ${esc(capFirst(districtAt(stop.x, stop.z).name))}${night ? ' · night coach, double fare' : ''}</p>
       <div class="list scroll">${routes.map((r, i) => `<div class="row"><div class="nm">${esc(capFirst(r.stop.name))}<small>${esc(capFirst(districtAt(r.stop.x, r.stop.z).name))} · about ${r.mins} minutes${r.via.length ? ' · via ' + esc(r.via.join(', ')) : ''}</small></div><div class="pr">${r.fare * (night ? 2 : 1)} g</div><button class="db sm" data-a="t${i}" ${P.gold < r.fare * (night ? 2 : 1) ? 'disabled' : ''}>Travel</button></div>`).join('')}</div>
       <p class="note">Fares follow the distance by road. Time passes on the way.</p><div class="btns"><span class="gold">${P.gold} gold</span><button class="db" data-a="foot">Travel on foot</button><button class="db" data-a="close">Stay here</button></div>`;
     this.open('travel', render, { cls: 'mid', onAct: (a) => { if (a === 'foot') { this.openFoot(); return; } const r = routes[+a.slice(1)]; if (!r) return; const fare = r.fare * (night ? 2 : 1); if (P.gold < fare) return; this.close(true); travelBy(stop, r, fare); } });
@@ -8229,7 +8661,7 @@ const MapView = {
     const markers = [];
     const mq = Quests.mq();
     const bld = id => G.buildings.find(b => b.id === id);
-    if (mq === 0 || mq === 3) markers.push([bld('castle').door, 'King Gothryd']);
+    if (mq === 0 || mq === 3) markers.push([bld('castle').door, 'King Ottmar']);
     if (mq === 1 && !G.flags.necroDead) markers.push([bld('mausoleum').door, 'The Catacombs']);
     if (mq === 2) markers.push([G.city.memorial, 'The ghost (at night)']);
     for (const q of Quests.active()) {
@@ -8240,7 +8672,7 @@ const MapView = {
     }
     const t = performance.now() / 300;
     if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
-    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Daggerfall', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
+    if (this.zoom < 0.45) { labels.length = 0; labels.push(['Aldhaven', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
     // the towns: moat, walls, canal, streets and squares, their great buildings named once the town is found
     for (const T of TOWNS) { const C = T.cfg, f = (G.flags.found || {})[T.id], P2 = (u, v) => { const [wx, wz] = T.w(u, v); return [X(wx), Z(wz)]; };
       const poly = (pts, close) => { x.beginPath(); pts.forEach(([u, v], i) => { const [a, b] = P2(u, v); i ? x.lineTo(a, b) : x.moveTo(a, b); }); if (close) x.closePath(); };
@@ -8264,8 +8696,8 @@ const MapView = {
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
     this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Daggerfall — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
-      : 'Daggerfall — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
+    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+      : 'Aldhaven — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
   },
   drawDungeon(x, W, H) {
     const D = G.area.dg; const cell = Math.floor(Math.min(W, H) * 0.9 / D.N); const ox = (W - cell * D.N) / 2, oz = (H - cell * D.N) / 2; const P = G.player;
@@ -8362,7 +8794,7 @@ function drawHUD() {
 
 /* ---------------- title & character creation ---------------- */
 const Create = {
-  race: 'Breton', cls: 'Spellsword', name: '', attr: null,
+  race: 'Townborn', cls: 'Adept', name: '', attr: null,
   quick() { if (!this.attr) this.roll(); return { name: this.name || 'Traveller', race: this.race, cls: this.cls, attr: { ...this.attr } }; },
   roll() { this.attr = {}; for (const a of ATTRS) this.attr[a] = clamp(40 + rnd.int(0, 15) + (RACES[this.race].mods[a] || 0) + (CLASSES[this.cls].mods[a] || 0), 20, 95); },
   open() {
@@ -8371,10 +8803,10 @@ const Create = {
       const R = RACES[this.race], C = CLASSES[this.cls]; const hp = 25 + Math.floor(this.attr.END / 4) + C.hp, mp = Math.round(this.attr.INT * C.mp);
       return `<h2>Create Your Character</h2><div class="create scroll">
         <div class="field"><label for="c_name">Name</label><input id="c_name" type="text" maxlength="24" value="${esc(this.name)}" placeholder="Nameless" autocomplete="off"></div>
-        <h3>Race</h3><div class="grid">${Object.keys(RACES).map(r => `<button class="db sm ${r === this.race ? 'on' : ''}" data-a="r:${r}">${r}</button>`).join('')}</div><p class="dim">${esc(R.desc)}</p>
+        <h3>Origin</h3><div class="grid">${Object.keys(RACES).map(r => `<button class="db sm ${r === this.race ? 'on' : ''}" data-a="r:${r}">${r}</button>`).join('')}</div><p class="dim">${esc(R.desc)}</p>
         <h3>Class</h3><div class="grid">${Object.keys(CLASSES).map(c => `<button class="db sm ${c === this.cls ? 'on' : ''}" data-a="c:${c}">${c}</button>`).join('')}</div><p class="dim">${esc(C.desc)}${rpgUI() ? ` Starts with: ${esc(startingKit(this.cls).items.map(i => i.name).join(', '))}${startingKit(this.cls).spells.length ? '; spells: ' + startingKit(this.cls).spells.map(s => SPELLS[s].name).join(', ') : ''}.` : ''}</p>
         ${rpgUI() ? `<h3>Attributes <button class="db xs" data-a="reroll">Reroll</button></h3><div class="attrs two">${ATTRS.map(a => `<div class="attr"><span>${ATTR_NAMES[a]}</span><b>${this.attr[a]}</b></div>`).join('')}</div>
-        <p>Health ${hp} · Magicka ${mp} · Fatigue ${this.attr.END + this.attr.STR} · Gold ${C.gold}</p>` : ''}</div>
+        <p>Health ${hp} · Spirit ${mp} · Fatigue ${this.attr.END + this.attr.STR} · Gold ${C.gold}</p>` : ''}</div>
         <div class="btns"><button class="db" data-a="back">Back</button><button class="db primary" data-a="start">Begin</button></div>`;
     };
     UI.open('create', render, {
@@ -8415,7 +8847,7 @@ function addSky(area) {
   const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, depthWrite: false });
   const stars = new THREE.Points(sg, starMat); stars.renderOrder = -9; stars.frustumCulled = false; sc.add(stars);
   const mk = (tex, s) => { const m = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, fog: false, depthWrite: false, transparent: true })); m.scale.set(s, s, 1); m.renderOrder = -8; sc.add(m); return m; };
-  const sun = mk(TEX.sun, 110), masser = mk(TEX.masser, 70), secunda = mk(TEX.secunda, 30);
+  const sun = mk(TEX.sun, 110), moon = mk(TEX.moon, 62);
   const cg = new THREE.CircleGeometry(1400, 48); const cc = new Float32Array(cg.attributes.position.count * 4);
   for (let i = 0; i < cg.attributes.position.count; i++) { cc[i * 4] = cc[i * 4 + 1] = cc[i * 4 + 2] = 1; cc[i * 4 + 3] = i === 0 ? 1 : 0; }
   cg.setAttribute('color', new THREE.BufferAttribute(cc, 4)); TEX.clouds.repeat.set(7, 7);
@@ -8427,7 +8859,7 @@ function addSky(area) {
   const rp = new Float32Array(900 * 6); const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.BufferAttribute(rp, 3));
   const rain = new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x9aa8b8, transparent: true, opacity: 0.45, fog: false })); rain.frustumCulled = false; rain.visible = false; sc.add(rain);
   for (let i = 0; i < 900; i++) { rp[i * 6] = rnd.range(-30, 30); rp[i * 6 + 1] = rnd.range(0, 25); rp[i * 6 + 2] = rnd.range(-30, 30); }
-  area.sky = { sky, geo, stars, starMat, sun, masser, secunda, clouds, cloudMat, mountains, mountMat, rain, rp };
+  area.sky = { sky, geo, stars, starMat, sun, moon, clouds, cloudMat, mountains, mountMat, rain, rp };
   sc.fog = new THREE.Fog(0x9ab0c8, 60, 200);
 }
 const _c1 = new THREE.Color(), _c2 = new THREE.Color(), _c3 = new THREE.Color(), _c4 = new THREE.Color();
@@ -8462,9 +8894,7 @@ function updateSky(area, dt) {
   const a = (h - 6) / 12.5 * Math.PI; const sd = new THREE.Vector3(Math.cos(a), Math.sin(a) * 0.9, 0.4).normalize();
   S.sun.position.copy(cp).addScaledVector(sd, 800); S.sun.visible = sd.y > -0.05 && wx === 'clear';
   const ma = (h - 18.5) / 12 * Math.PI; const md = new THREE.Vector3(Math.cos(ma) * 0.9, Math.sin(ma) * 0.8, -0.3).normalize();
-  S.masser.position.copy(cp).addScaledVector(md, 800); S.masser.visible = md.y > 0 && L < 0.8;
-  const md2 = new THREE.Vector3(Math.cos(ma + 0.5), Math.sin(ma + 0.5) * 0.9, -0.1).normalize();
-  S.secunda.position.copy(cp).addScaledVector(md2, 800); S.secunda.visible = md2.y > 0 && L < 0.8;
+  S.moon.position.copy(cp).addScaledVector(md, 800); S.moon.visible = md.y > 0 && L < 0.8;
   S.cloudMat.opacity = wx === 'clear' ? 0.55 : wx === 'overcast' ? 0.92 : 1; S.cloudMat.color.copy(G.tint).lerp(hor, 0.3);
   TEX.clouds.offset.x = (G.clock * 0.0025) % 1; TEX.clouds.offset.y = (G.clock * 0.0012) % 1;
   S.mountMat.color.copy(hor).lerp(_c3.setRGB(0.5, 0.55, 0.66).multiplyScalar(Math.max(L, 0.35)), 0.3);
@@ -8503,7 +8933,7 @@ function populateCity(area) {
   area.stalls.forEach(([x, z], i) => { const g = i % 2 ? 'f' : 'm'; const look = randomLook(new RNG(90 + i), g); look.apron = '#c8c0a8'; spawnNPC(area, { name: personName(new RNG(80 + i), g), look, gender: g, x, z, role: 'static', dialog: 'vendor', spriteKey: 'vendor' + i, building: { id: 'stall' + i, type: 'vendor', name: i === 2 ? 'Fish market stall' : 'Market stall' }, data: { fixed: true, vendor: true } }); });
   area.stops.forEach((st, i) => { const r = new RNG(300 + i); const look = { ...randomLook(r, 'm'), hat: '#2a2a2a', cape: '#3a2a1a', robe: null }; spawnNPC(area, { name: personName(r, 'm'), look, gender: 'm', x: st.coachman[0], z: st.coachman[1], role: 'static', dialog: 'coach', spriteKey: 'coach' + i, data: { fixed: true, stop: st.id, coachman: true } }); });
   const M = area.memorial;
-  const ghost = spawnNPC(area, { name: 'Ghost of King Lysandus', frames: enemySprite('lysandus').tex, x: M.x, z: M.z + 11, role: 'ghost', dialog: 'ghost', transparent: true, opacity: 0.6, fly: 0.25, speed: 1.0, hp: 9999 });
+  const ghost = spawnNPC(area, { name: 'Ghost of King Aldwin', frames: enemySprite('ghostking').tex, x: M.x, z: M.z + 11, role: 'ghost', dialog: 'ghost', transparent: true, opacity: 0.6, fly: 0.25, speed: 1.0, hp: 9999 });
   ghost.wanderR = 12; ghost.data.fixedHome = true;
   area.spawnT = 20;
 }
@@ -8599,7 +9029,7 @@ function leaveCurrentArea() { if (G.area && G.area !== G.city) { disposeArea(G.a
 function tryEnter(b) {
   const P = G.player;
   if (b.type === 'mausoleum') {
-    if (!hasItem('catakey')) { SFX.play('locked'); msg('The mausoleum gate is sealed with a heavy iron lock. Someone at Castle Daggerfall must hold the key.'); return; }
+    if (!hasItem('catakey')) { SFX.play('locked'); msg('The mausoleum gate is sealed with a heavy iron lock. Someone at Aldhaven Castle must hold the key.'); return; }
     SFX.play('unlock'); transition(() => { const a = buildDungeon(); setArea(a, a.spawn.x, a.spawn.z, a.spawn.yaw); msg('You descend into the Catacombs. The air is cold and smells of old bones.'); });
     return;
   }
@@ -8639,7 +9069,7 @@ function leaveDungeon() {
 function reviveAtTemple() {
   const P = G.player; P.dead = false; P.hp = P.maxHp; P.fat = P.maxFat; P.gold = Math.floor(P.gold / 2); G.time += 8 * 60; camera.rotation.z = 0;
   leaveCurrentArea(); const t = G.buildings.find(b => b.id === 'temple'); const a = buildInterior(t); setArea(a, 0, -2, Math.PI);
-  msg('You wake on a cold altar. The priests of Arkay dragged you back from the brink — and took half your purse for the trouble.');
+  msg('You wake on a cold altar. The priests of Saint Hallam dragged you back from the brink — and took half your purse for the trouble.');
 }
 let _musicT = 0;
 function pickMusic(force) {
@@ -8688,7 +9118,11 @@ function serialize() {
     area: G.area.kind === 'interior' ? { kind: 'interior', id: G.area.building.id } : { kind: G.area.kind },
   };
 }
-function readSave() { try { const s = localStorage.getItem(SAVE_KEY); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+// a game saved before the names were changed (2026-11-12) is read with the new ones
+const RENAMED = [[/Daggerfall/g, 'Aldhaven'], [/the Iliac Bay|Iliac Bay/g, 'Merrow Bay'], [/Arkay/g, 'Saint Hallam'], [/Mages Guild/g, 'Philosophers’ Society'], [/Fighters Guild/g, 'Fencing School'], [/Lysandus/g, 'Aldwin'], [/Gothryd/g, 'Ottmar'], [/Vharzal/g, 'Corvin Ash'],
+  [/Soul Gem/g, 'Black Stone'], [/Emperor/g, 'Stadtholder'], [/a Welkynd Stone/g, 'the Great Burning-Glass'], [/\bDaedric\b/g, 'Meteoric'], [/\bEbony\b/g, 'Blackened'], [/\bDwarven\b/g, 'Damascus'], [/\bElven\b/g, 'Blued'], [/"daedric"/g, '"meteoric"'], [/"ebony"/g, '"blackened"'], [/"dwarven"/g, '"damascus"'], [/"elven"/g, '"blued"'],
+  [/"magicka"/g, '"spirit"'], [/Magicka/g, 'Spirit'], [/"Breton"/g, '"Townborn"'], [/"Redguard"/g, '"Marcher"'], [/"Nord"/g, '"Highlander"'], [/"Dark Elf"/g, '"Portborn"'], [/"High Elf"/g, '"Courtborn"'], [/"Wood Elf"/g, '"Forester"'], [/"Khajiit"/g, '"Wanderer"'], [/"Argonian"/g, '"Fenlander"'], [/"Spellsword"/g, '"Adept"'], [/"Mage"/g, '"Scholar"']];
+function readSave() { try { let s = localStorage.getItem(SAVE_KEY) || localStorage.getItem(OLD_SAVE_KEY); if (!s) return null; for (const [a, b] of RENAMED) s = s.replace(a, b); return JSON.parse(s); } catch (e) { return null; } }
 function saveGame() {
   if (!G.player || G.player.dead) { msg('You cannot save now.'); return false; }
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); return true; } catch (e) { msg('Saving is unavailable in this browser.', 'bad'); return false; }
@@ -8709,7 +9143,7 @@ function loadGame(data) {
   if ((data.v || 1) < 3) { // the city was rebuilt since this save: start again at the Grand Market
     area = G.city; const s = G.city.stops.find(q => q.id === 'market'); P.pos.set(s.arrive[0], 0, s.arrive[1]); P.yaw = s.arrive[2];
     for (const q of G.quests) if (q.type === 'deliver' && q.status === 'active') q.status = 'failed';
-    setTimeout(() => msg('Daggerfall has grown since this journey was recorded. You find yourself at the Grand Market.'), 400);
+    setTimeout(() => msg('Aldhaven has grown since this journey was recorded. You find yourself at the Grand Market.'), 400);
   }
   setArea(area, P.pos.x, P.pos.z, P.yaw); if ((data.v || 1) >= 3) P.pos.y = Math.max(P.pos.y, sp.pos[1]);
   G.lastDistrict = G.area.kind === 'city' ? districtAt(P.pos.x, P.pos.z).id : null;
@@ -8717,9 +9151,9 @@ function loadGame(data) {
 }
 
 /* ---------------- game flow ---------------- */
-const INTRO = `<p>The year is 3E 405. In the Imperial City, Emperor Uriel Septim VII summons you and speaks of a matter too delicate for his legions.</p>
-<p>In the High Rock kingdom of Daggerfall, the ghost of the late King Lysandus has risen. Each night it stalks the streets of his capital, crying out for vengeance. And a letter the Emperor sent to the court of Daggerfall has vanished before anyone could read it.</p>
-<p>A storm wrecked your ship in the Iliac Bay. Fishermen pulled you from the surf of a village up the coast, and three days on foot have brought you, with your wits, your sheathed sword and a light purse, to the crag travellers call Pilgrim's Rise. The morning mist is lifting. Below you lies Daggerfall.</p>
+const INTRO = `<p>The year is 1652. In his cabinet at the court, the Stadtholder sends for you and speaks of a matter too delicate for his regiments.</p>
+<p>In the port of Aldhaven, the ghost of the late King Aldwin has risen. Each night it stalks the streets of his city, crying out for vengeance. And a letter the Stadtholder sent to the court of Aldhaven has vanished before anyone could read it.</p>
+<p>A storm wrecked your ship on Merrow Bay. Fishermen pulled you from the surf of a village up the coast, and three days on foot have brought you, with your wits, your sheathed sword and a light purse, to the crag travellers call Pilgrim's Rise. The morning mist is lifting. Below you lies Aldhaven.</p>
 <p>Find out what binds the dead king to this world. Recover the letter. And whatever you do, <em>do not anger the city guard</em>.</p>`;
 function beginNewGame(cfg) {
   SFX.init();
@@ -8731,10 +9165,10 @@ function beginNewGame(cfg) {
   // the story introduction (INTRO) is set aside while the project concentrates on the world itself; the hints wait so the first look is clear
   setTimeout(() => { if (G.state !== 'play') return;
     if (Input.touch) {
-      msg('Welcome to Daggerfall. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
+      msg('Welcome to Aldhaven. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
       msg('Carriages wait at signposts marked with a wheel. Tap Use at one, or Travel near one, to ride across the city.');
     } else {
-      msg(`Welcome to Daggerfall. J opens your journal, M the map${rpgUI() ? ', I your character' : ''}. Click the view to capture the mouse.`);
+      msg(`Welcome to Aldhaven. J opens your journal, M the map${rpgUI() ? ', I your character' : ''}. Click the view to capture the mouse.`);
       msg('Carriages wait at signposts marked with a wheel. Press E at one, or T near one, to ride across the city.');
     }
   }, 6000);
@@ -8773,7 +9207,7 @@ function updateTextHUD(dt) {
   if (G.state === 'play' && P && G.area.kind === 'city') {
     const d = districtAt(P.pos.x, P.pos.z); const inside = insideCity(P.pos.x, P.pos.z, -2);
     const T = TOWNS.find(t => t.inside(P.pos.x, P.pos.z, -1)), td = T && T.districtAt(P.pos.x, P.pos.z);
-    const id = inside ? d.id : T ? T.id + ':' + td.id : 'outside'; where = inside ? `Daggerfall · ${capFirst(d.name)}` : T ? `${T.name} · ${capFirst(td.name)}` : Math.hypot(P.pos.x, P.pos.z) < 1200 ? 'Outside the walls of Daggerfall' : 'The open country';
+    const id = inside ? d.id : T ? T.id + ':' + td.id : 'outside'; where = inside ? `Aldhaven · ${capFirst(d.name)}` : T ? `${T.name} · ${capFirst(td.name)}` : Math.hypot(P.pos.x, P.pos.z) < 1200 ? 'Outside the walls of Aldhaven' : 'The open country';
     if (G.lastDistrict && G.lastDistrict !== id && !P.dead) msg(inside ? `You enter ${d.name} — ${d.blurb}.` : T ? `You enter ${td.name} of ${T.name} — ${td.blurb}.` : (G.lastDistrict.includes(':') ? `You leave the walls of ${capFirst(G.lastDistrict.split(':')[0])} behind.` : G.lastDistrict === 'outside' ? '' : 'You leave the city walls behind.'), 'district');
     G.lastDistrict = id;
   }
@@ -8950,7 +9384,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { HALL, hallW, hallL, hallWet, siteWild, TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

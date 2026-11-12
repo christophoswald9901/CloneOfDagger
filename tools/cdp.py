@@ -26,6 +26,7 @@ class CDP:
     def __init__(self, port=None): self.port = port or int(os.environ.get('CDP_PORT', '9333')); self.id = 0; self.logs = []  # CDP_PORT: run several tools side by side
     async def start(self, url, w=1280, h=720):
         if not CHROME: raise SystemExit('no Chrome/Chromium found: install one or set $CHROME')
+        url = url.replace(':8765/', f":{os.environ.get('HTTP_PORT', '8765')}/")  # HTTP_PORT: another worktree's server may hold 8765
         prof = f'{PROFILE}{self.port}'; os.makedirs(prof, exist_ok=True)
         self.proc = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
                                       '--enable-unsafe-swiftshader', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',
@@ -81,8 +82,8 @@ class CDP:
             if await self.ev("!!(window.__game && __game.G.city)"): return True
         return False
     async def new_game(self):
-        await self.ev("localStorage.removeItem('onecity_daggerfall_settings'); Object.assign(__game.settings,{dbgFly:false,dbgStamina:false})")
-        await self.ev("__game.beginNewGame({name:'T',race:'Breton',cls:'Warrior',attr:{STR:50,INT:50,WIL:50,AGI:50,END:50,PER:50,SPD:50,LUC:50}})")
+        await self.ev("localStorage.removeItem('onecity_aldhaven_settings'); localStorage.removeItem('onecity_daggerfall_settings'); Object.assign(__game.settings,{dbgFly:false,dbgStamina:false})")
+        await self.ev("__game.beginNewGame({name:'T',race:'Townborn',cls:'Warrior',attr:{STR:50,INT:50,WIL:50,AGI:50,END:50,PER:50,SPD:50,LUC:50}})")
         await self.ev("__game.UI.close(true); __game.Input.fallback=true")
     def errors(self): return [l for l in self.logs if 'favicon' not in l]
     def stop(self): self.proc.kill()

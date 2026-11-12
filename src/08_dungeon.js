@@ -1,5 +1,5 @@
 /* =====================================================================
-   The Catacombs beneath Arkay's graveyard — a grid dungeon
+   The Catacombs beneath Saint Hallam’s churchyard — a grid dungeon
    ===================================================================== */
 
 const DG_MATS = { dwall: { tex: 'dungeonWall' }, dfloor: { tex: 'dungeonFloor' }, dceil: { tex: 'flag' }, door: { tex: 'doorDark' }, woodDark: { tex: 'woodDark' }, stone: { tex: 'stone' }, iron: { tex: 'iron' } };
@@ -117,7 +117,7 @@ function buildDungeon() {
       if (!G.flags.necroDead) {
         const [x, z] = [(r.cx + 0.5) * cs, (r.cy + 0.5) * cs];
         const e = spawnEnemy(area, 'necro', x, z, { wanderR: 2 }); e.level = Math.max(3, L_); e.hp = e.maxHp = Math.round(ENEMIES.necro.hp * (1 + (e.level - 1) * 0.1));
-        e.bossLoot = [makeQuestItem('soulgem', 'Soul Gem of King Lysandus'), makeQuestItem('letter', "The Emperor's Letter")];
+        e.bossLoot = [makeQuestItem('soulgem', 'Black Stone of King Aldwin'), makeQuestItem('letter', "The Stadtholder’s Letter")];
       }
       for (let k = 0; k < 2; k++) { const [x, z] = freeSpot(r); spawnEnemy(area, 'skeleton', x, z); }
       continue;

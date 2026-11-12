@@ -195,7 +195,7 @@ function updateNPC(e, dt) {
       wanderStep(e, dt, 0.5);
       const P = G.player; const d = Math.hypot(P.pos.x - e.pos.x, P.pos.z - e.pos.z);
       e.barkT -= dt;
-      if (d < 26 && e.barkT <= 0) { e.barkT = rnd.range(12, 20); SFX.play('ghost', e.pos); msg(rnd.pick(['A spectral voice howls: "VENGEANCE!"', 'The ghost of King Lysandus moans: "Vengeance... vengeance..."', 'A chill wind whispers: "Who... betrayed... me..."']), 'ghost'); }
+      if (d < 26 && e.barkT <= 0) { e.barkT = rnd.range(12, 20); SFX.play('ghost', e.pos); msg(rnd.pick(['A spectral voice howls: "VENGEANCE!"', 'The ghost of King Aldwin moans: "Vengeance... vengeance..."', 'A chill wind whispers: "Who... betrayed... me..."']), 'ghost'); }
       break;
     }
     case 'wander': wanderStep(e, dt, 0.5); break;

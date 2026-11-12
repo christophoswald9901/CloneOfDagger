@@ -320,6 +320,44 @@ function genWindow(lit) {
   x.fillStyle = '#4a3220'; x.fillRect(0, 29, 32, 3);
   return c;
 }
+// a quarter of a parterre de broderie: scrolls of clipped box on sand, with fields of brick dust and coloured earth
+function genBroderie() {
+  const W = 192, Hh = 96, [c, x] = cnv(W, Hh), G = '#2c4a20', G2 = '#3e6228';
+  const line = (w, col) => { x.lineWidth = w; x.strokeStyle = col; x.stroke(); };
+  // a border of flowers within a band of box
+  x.fillStyle = '#5c4832'; x.fillRect(0, 0, W, Hh);
+  { const fr = new RNG(93); for (let k = 0; k < 2600; k++) { const px = fr.int(0, W - 1), py = fr.int(0, Hh - 1); if (px > 11 && px < W - 12 && py > 11 && py < Hh - 12) continue; x.fillStyle = fr.pick(['#c8403a', '#e0c840', '#ece8dc', '#8a56aa', '#3f6a2c', '#3f6a2c', '#4c7a34']); x.fillRect(px, py, 1, 1); } } // a ribbon of flowers
+  x.fillStyle = '#cdb98c'; x.fillRect(11, 11, W - 22, Hh - 22);
+  x.beginPath(); x.rect(11.5, 11.5, W - 23, Hh - 23); line(2, G);
+  // the middle: a lozenge with a round bed, red earth within
+  x.beginPath(); x.moveTo(W / 2 - 46, Hh / 2); x.lineTo(W / 2, Hh / 2 - 27); x.lineTo(W / 2 + 46, Hh / 2); x.lineTo(W / 2, Hh / 2 + 27); x.closePath(); x.fillStyle = '#b4502f'; x.fill(); line(4, G);
+  x.beginPath(); x.arc(W / 2, Hh / 2, 13, 0, 6.283); x.fillStyle = '#cdb98c'; x.fill(); line(3, G); x.beginPath(); x.arc(W / 2, Hh / 2, 6, 0, 6.283); x.fillStyle = G2; x.fill();
+  // scrolls in the four corners, each a pair of volutes turning out from a stem, and a leaf between
+  for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { const P = (u, v) => [W / 2 + sx * u, Hh / 2 + sy * v];
+    const spiral = (cu, cv, r0, turns, dir) => { x.beginPath(); for (let k = 0; k <= 40; k++) { const a = k / 40 * turns * 6.283, r = r0 * (1 - 0.8 * k / 40), [px, py] = P(cu + Math.cos(a) * r * dir, cv + Math.sin(a) * r); if (k) x.lineTo(px, py); else x.moveTo(px, py); } line(3.4, G); };
+    spiral(66, 22, 12, 1.6, 1); spiral(40, 30, 8, 1.4, -1); spiral(74, 6, 7, 1.3, -1);
+    x.beginPath(); x.moveTo(...P(48, 2)); x.quadraticCurveTo(...P(60, 10), ...P(54, 22)); x.quadraticCurveTo(...P(46, 14), ...P(48, 2)); x.fillStyle = '#b8a23a'; x.fill(); line(1.6, G);
+    x.beginPath(); x.moveTo(...P(20, 30)); x.quadraticCurveTo(...P(30, 34), ...P(28, 24)); line(2.2, G);
+    x.beginPath(); x.arc(...P(78, 30), 3, 0, 6.283); x.fillStyle = G2; x.fill(); }
+  noiseImg(x, W, Hh, 0.07, new RNG(92)); return c;
+}
+// a run of turned balusters, seen against whatever lies behind (alpha)
+function genBalus() {
+  const [c, x] = cnv(16, 16); x.clearRect(0, 0, 16, 16); const w = [3, 3, 5, 7, 8, 8, 7, 5, 3, 3, 4, 5, 5, 4, 3, 3];
+  for (let j = 0; j < 16; j++) { const ww = w[j]; x.fillStyle = j % 5 === 0 ? '#b9ae94' : '#d4cab0'; x.fillRect(8 - Math.ceil(ww / 2), j, ww, 1); x.fillStyle = '#a89e84'; x.fillRect(8 + Math.floor(ww / 2) - 1, j, 1, 1); }
+  return c;
+}
+// a tall sash window in its stone surround: broad white bars and large panes, so the grid still reads from across a court
+function genSash(rows) {
+  const W = 16, Hh = rows > 2 ? 32 : 18, [c, x] = cnv(W, Hh);
+  x.fillStyle = '#cdc4ac'; x.fillRect(0, 0, W, Hh); x.fillStyle = '#b4aa90'; x.fillRect(0, Hh - 2, W, 2); x.fillRect(6, 0, 4, 2);
+  x.fillStyle = '#f4f1e8'; x.fillRect(2, 2, 12, Hh - 4);
+  const ph = (Hh - 4 - (rows + 1)) / rows;
+  for (let j = 0; j < rows; j++) for (let i = 0; i < 2; i++) { const x0 = 3 + i * 5.5, y0 = 3 + j * (ph + 1);
+    x.fillStyle = j < rows / 2 ? '#1e2a36' : '#283848'; x.fillRect(Math.round(x0), Math.round(y0), 5, Math.round(ph));
+    if ((i + j) % 2 === 0) { x.fillStyle = 'rgba(200,222,255,0.3)'; x.fillRect(Math.round(x0) + 1, Math.round(y0) + 1, 1, 2); } }
+  return c;
+}
 function genPortcullis() {
   const [c, x] = cnv(32, 32);
   x.fillStyle = '#26262a'; for (let i = 1; i < 32; i += 6) x.fillRect(i, 0, 2, 30);
@@ -697,7 +735,7 @@ const LOOKS = {
   guard: { skin: '#e0b088', hair: '#4a3020', hairStyle: 1, shirt: '#7a808a', chain: true, tabard: '#7a1818', pants: '#2e2e30', boots: '#1a1a1a', helmet: true, weapon: 'spear' },
   king: { skin: '#e0b088', hair: '#6a4526', hairStyle: 1, beard: true, robe: '#8a1c1c', trim: '#e0b840', ermine: true, boots: '#2a1c12', crown: true, cape: '#6a1010' },
   queen: { skin: '#8a5a38', hair: '#1a1210', hairStyle: 2, robe: '#4a2a6a', trim: '#e0b840', boots: '#2a1c12', crown: true, cape: '#3a1a5a' },
-  lysandus: { skin: '#d8c8b8', hair: '#8a8a8a', hairStyle: 1, beard: true, shirt: '#9aa0aa', chain: true, pants: '#6a707a', boots: '#4a4a50', crown: true, cape: '#5a2020', weapon: 'sword' },
+  ghostking: { skin: '#d8c8b8', hair: '#8a8a8a', hairStyle: 1, beard: true, shirt: '#9aa0aa', chain: true, pants: '#6a707a', boots: '#4a4a50', crown: true, cape: '#5a2020', weapon: 'sword' },
   thief: { skin: '#cc946a', hair: '#2a1c12', hairStyle: 1, shirt: '#3a2e24', pants: '#2a2420', boots: '#1a1410', hood: '#262420', mask: '#1a1814', weapon: 'dagger' },
   bandit: { skin: '#a8724c', hair: '#7a2a18', hairStyle: 1, beard: true, shirt: '#4a2a1a', pants: '#2a2420', boots: '#1a1410', hood: '#5a1a1a', weapon: 'axe' },
   zombie: { skin: '#7c8a5c', hair: '#3a3a2a', hairStyle: 2, shirt: '#4a3e2e', pants: '#3a3228', boots: '#2a241c', eyes: '#c02010', handCol: '#6c7a4c' },
@@ -728,7 +766,7 @@ function enemySprite(kind) {
     case 'bandit': return humanSprite('bandit', LOOKS.bandit);
     case 'necro': return humanSprite('necro', LOOKS.necro);
     case 'guard': return humanSprite('guard', LOOKS.guard);
-    case 'lysandus': return sprite('lysandus', () => [0, 1, 2, 3].map(f => ghostify(drawHuman(LOOKS.lysandus, f))));
+    case 'ghostking': return sprite('ghostking', () => [0, 1, 2, 3].map(f => ghostify(drawHuman(LOOKS.ghostking, f))));
   }
   return humanSprite('thief', LOOKS.thief);
 }
@@ -794,6 +832,11 @@ function initTextures() {
   T('gravel', genGravel(48, '#7a705c'));
   T('hedge', genSpeckle(49, '#2f4a22', 0.35, 64, [['#48682c', 170, 2, 2], ['#1e3016', 150, 1, 2]]));
   T('crag', genStrata(58));
+  T('ashlar', genBlocks({ seed: 84, bw: 32, bh: 16, base: '#cdc3a8', mortar: '#a2987e', vary: 0.07, noise: 0.1 })); T('balus', genBalus(), { mip: false }); T('broderie', genBroderie(), { repeat: false });
+  T('sash', genSash(4), { repeat: false }); T('sashS', genSash(2), { repeat: false });
+  T('lawn', genSpeckle(81, '#587036', 0.18, 64, [['#62783e', 130, 1, 2], ['#4c6230', 120, 1, 2], ['#6a8244', 40, 1, 1]]));
+  T('gravelPale', genGravel(82, '#b2a37e', { pal: ['#c2b48e', '#a2946e', '#d0c4a0', '#b0a078', '#948664'] }));
+  T('bed', genSpeckle(83, '#4c3c2a', 0.2, 64, [['#3f6a2c', 150, 2, 2], ['#c8403a', 130, 2, 2], ['#e0c840', 110, 2, 2], ['#ece8dc', 90, 2, 2], ['#8a56aa', 70, 2, 2]]));
   T('rock', genVoronoi(52, '#9a9382', 16, 64, '#5e584c', 1.4, 0.45));
   T('wheat', genFurrows(53, '#a49868', '#8a7e52', 2, 5, [['#b4a674', 120, 1, 2]]));
   T('barley', genFurrows(54, '#8c8e64', '#767a52', 2, 5, [['#9c9e72', 90, 1, 2]]));
@@ -809,11 +852,10 @@ function initTextures() {
   for (const [k, sd, w, kind] of [['doorA', 70, '#6a4424', 'z'], ['doorB', 71, '#6e665a', 'z'], ['doorC', 72, '#44583e', 'panel'], ['doorD', 73, '#6a2a22', 'panel'], ['doorE', 74, '#3c4a62', 'panel'], ['doorF', 75, '#4a3020', 'studded'], ['doorG', 76, '#8a6a3a', 'z']]) T(k, genDoorV(sd, w, kind), { repeat: false });
   T('smoke', genPuff(62), { repeat: false, mip: false });
   T('gull1', genGull(true), { repeat: false, mip: false }); T('gull2', genGull(false), { repeat: false, mip: false });
-  T('signLook', genSignBoard(['Pilgrim\'s Rise', '← Daggerfall']), { repeat: false });
+  T('signLook', genSignBoard(['Pilgrim\'s Rise', '← Aldhaven']), { repeat: false });
   for (const k of ['tavern', 'weaponsmith', 'armorer', 'alchemist', 'general', 'mages', 'fighters', 'temple', 'coach', 'hospice']) T('sign_' + k, genSign(k), { repeat: false, mip: false });
   TEX.sun = texFrom(genGlow(255, 240, 190, 64), { repeat: false, mip: false });
-  TEX.masser = texFrom(genMoon(48, '#c89080', 5), { repeat: false, mip: false });
-  TEX.secunda = texFrom(genMoon(24, '#d8d8e0', 6), { repeat: false, mip: false });
+  TEX.moon = texFrom(genMoon(48, '#e4dccb', 5), { repeat: false, mip: false }); // one moon
   TEX.glow = texFrom(genGlow(255, 200, 120, 32), { repeat: false, mip: false });
   TEX.glowBlue = texFrom(genGlow(140, 180, 255, 32), { repeat: false, mip: false });
   TEX.glowGreen = texFrom(genGlow(140, 255, 120, 32), { repeat: false, mip: false });

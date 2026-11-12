@@ -6,10 +6,10 @@ const MATERIALS = {
   iron: { name: 'Iron', dmg: -1, mult: 0.7, rank: 0, col: '#8a8a8a' },
   steel: { name: 'Steel', dmg: 0, mult: 1, rank: 1, col: '#c4c8d0' },
   silver: { name: 'Silver', dmg: 1, mult: 2.2, rank: 2, col: '#eef2fa' },
-  elven: { name: 'Elven', dmg: 2, mult: 4, rank: 3, col: '#a8d8e8' },
-  dwarven: { name: 'Dwarven', dmg: 3, mult: 6, rank: 4, col: '#d8b058' },
-  ebony: { name: 'Ebony', dmg: 5, mult: 12, rank: 5, col: '#4a4460' },
-  daedric: { name: 'Daedric', dmg: 7, mult: 25, rank: 6, col: '#b02828' },
+  blued: { name: 'Blued', dmg: 2, mult: 4, rank: 3, col: '#7a98c8' },
+  damascus: { name: 'Damascus', dmg: 3, mult: 6, rank: 4, col: '#b8b0a0' },
+  blackened: { name: 'Blackened', dmg: 5, mult: 12, rank: 5, col: '#4a4460' },
+  meteoric: { name: 'Meteoric', dmg: 7, mult: 25, rank: 6, col: '#8a3a2a' },
 };
 const WEAPONS = {
   dagger: { name: 'Dagger', min: 2, max: 5, speed: 1.45, reach: 2.1, price: 20, kind: 'blade' },
@@ -35,7 +35,7 @@ const ARMOR = {
 };
 const POTIONS = {
   heal: { name: 'Potion of Healing', price: 30, desc: 'Restores 35 health.' },
-  magicka: { name: 'Potion of Magicka', price: 35, desc: 'Restores 35 magicka.' },
+  spirit: { name: 'Potion of Spirit', price: 35, desc: 'Restores 35 spirit.' },
   stamina: { name: 'Potion of Stamina', price: 15, desc: 'Restores 60 fatigue.' },
 };
 const GEMS = { ruby: ['Ruby', 120], emerald: ['Emerald', 100], sapphire: ['Sapphire', 90], amethyst: ['Amethyst', 40], ring: ['Silver Ring', 60], necklace: ['Gold Necklace', 150], candlestick: ['Silver Candlestick', 35], goblet: ['Pewter Goblet', 12] };
@@ -70,7 +70,7 @@ function itemDesc(it) {
 }
 function randMaterial(level, bias = 0) {
   const r = rnd.next() + level * 0.025 + bias;
-  if (r > 1.32) return 'daedric'; if (r > 1.2) return 'ebony'; if (r > 1.08) return 'dwarven'; if (r > 0.96) return 'elven';
+  if (r > 1.32) return 'meteoric'; if (r > 1.2) return 'blackened'; if (r > 1.08) return 'damascus'; if (r > 0.96) return 'blued';
   if (r > 0.8) return 'silver'; if (r > 0.42) return 'steel'; return 'iron';
 }
 
@@ -78,26 +78,26 @@ function randMaterial(level, bias = 0) {
 const ATTRS = ['STR', 'INT', 'WIL', 'AGI', 'END', 'PER', 'SPD', 'LUC'];
 const ATTR_NAMES = { STR: 'Strength', INT: 'Intelligence', WIL: 'Willpower', AGI: 'Agility', END: 'Endurance', PER: 'Personality', SPD: 'Speed', LUC: 'Luck' };
 const RACES = {
-  Breton: { desc: 'Natives of High Rock, at home in Daggerfall. Gifted in the arcane.', mods: { INT: 10, WIL: 10, STR: -5, AGI: -5 } },
-  Redguard: { desc: 'Warrior folk of Hammerfell, peerless with a blade.', mods: { STR: 10, END: 10, SPD: 5, INT: -10, WIL: -5 } },
-  Nord: { desc: 'Hardy northerners from Skyrim who laugh at the cold.', mods: { STR: 10, END: 15, AGI: -5, INT: -10, PER: -5 } },
-  'Dark Elf': { desc: 'Dunmer of Morrowind: quick of hand and of temper.', mods: { AGI: 10, SPD: 10, INT: 5, WIL: -10, PER: -10 } },
-  'High Elf': { desc: 'Altmer of the Summerset Isles, born to magic.', mods: { INT: 15, WIL: 5, END: -10, STR: -5 } },
-  'Wood Elf': { desc: 'Bosmer of Valenwood, nimble scouts and archers.', mods: { AGI: 15, SPD: 10, STR: -10, END: -10 } },
-  Khajiit: { desc: 'Feline wanderers of Elsweyr. Lucky, agile, and hard to pin down.', mods: { AGI: 10, SPD: 5, LUC: 10, WIL: -10, END: -5 } },
-  Argonian: { desc: 'Reptilian natives of Black Marsh, tough and swift.', mods: { SPD: 10, END: 10, AGI: 5, PER: -15, INT: -5 } },
+  Townborn: { desc: 'Raised among printers, guild halls and counting-houses. Quick with letters and with figures.', mods: { INT: 10, WIL: 10, STR: -5, AGI: -5 } },
+  Marcher: { desc: 'From the border hills, where every farm kept a pike by the door.', mods: { STR: 10, END: 10, SPD: 5, INT: -10, WIL: -5 } },
+  Highlander: { desc: 'Hardy folk of the high pastures, who laugh at the cold.', mods: { STR: 10, END: 15, AGI: -5, INT: -10, PER: -5 } },
+  Portborn: { desc: 'Grown up on the quays: quick of hand and of temper.', mods: { AGI: 10, SPD: 10, INT: 5, WIL: -10, PER: -10 } },
+  Courtborn: { desc: 'Brought up at a noble court among tutors and fencing masters.', mods: { INT: 15, WIL: 5, END: -10, STR: -5 } },
+  Forester: { desc: 'From the deep woods: nimble, watchful, a fair shot.', mods: { AGI: 15, SPD: 10, STR: -10, END: -10 } },
+  Wanderer: { desc: 'Born on the road among tinkers and players. Lucky, agile, and hard to pin down.', mods: { AGI: 10, SPD: 5, LUC: 10, WIL: -10, END: -5 } },
+  Fenlander: { desc: 'From the polders and the reed marshes, tough and swift.', mods: { SPD: 10, END: 10, AGI: 5, PER: -15, INT: -5 } },
 };
 const CLASSES = {
   Warrior: { desc: 'A master of arms who trusts steel over sorcery.', mods: { STR: 10, END: 10, INT: -10 }, hp: 12, mp: 0.5, gold: 90 },
-  Spellsword: { desc: 'A blade in one hand and lightning in the other.', mods: { STR: 5, INT: 5, WIL: 5 }, hp: 6, mp: 1.1, gold: 100 },
-  Mage: { desc: 'A scholar of the arcane who burns what cannot be reasoned with.', mods: { INT: 15, WIL: 10, STR: -10, END: -5 }, hp: 0, mp: 2, gold: 120 },
+  Adept: { desc: 'A blade in one hand and lightning in the other.', mods: { STR: 5, INT: 5, WIL: 5 }, hp: 6, mp: 1.1, gold: 100 },
+  Scholar: { desc: 'A natural philosopher who burns what cannot be reasoned with.', mods: { INT: 15, WIL: 10, STR: -10, END: -5 }, hp: 0, mp: 2, gold: 120 },
   Thief: { desc: 'Quick hands, soft steps and a knack for locks.', mods: { AGI: 10, SPD: 10, LUC: 10, STR: -5 }, hp: 4, mp: 0.5, gold: 220 },
 };
 function startingKit(cls) {
   switch (cls) {
     case 'Warrior': return { items: [makeWeapon('longsword', 'steel'), makeArmor('chain'), makeArmor('buckler'), makePotion('heal', 3)], spells: [] };
-    case 'Spellsword': return { items: [makeWeapon('shortsword', 'steel'), makeArmor('leather'), makePotion('heal', 2), makePotion('magicka', 1)], spells: ['shock'] };
-    case 'Mage': return { items: [makeWeapon('staff', 'iron'), makePotion('heal', 2), makePotion('magicka', 2)], spells: ['fireball', 'heal'] };
+    case 'Adept': return { items: [makeWeapon('shortsword', 'steel'), makeArmor('leather'), makePotion('heal', 2), makePotion('spirit', 1)], spells: ['shock'] };
+    case 'Scholar': return { items: [makeWeapon('staff', 'iron'), makePotion('heal', 2), makePotion('spirit', 2)], spells: ['fireball', 'heal'] };
     default: return { items: [makeWeapon('dagger', 'steel'), makeArmor('leather'), makeArmor('cap'), makePotion('heal', 2), makePotion('stamina', 2)], spells: [] };
   }
 }
@@ -107,11 +107,11 @@ const ENEMIES = {
   rat: { name: 'Giant Rat', hp: 9, dmg: [1, 3], speed: 3.6, reach: 1.4, cd: 1.0, xp: 6, w: 1.1, h: 0.55, radius: 0.3, ac: 2, sight: 14, sprite: 'rat', sound: 'squeak', loot: 'none', corpse: [0.9, 0.3] },
   bat: { name: 'Giant Bat', hp: 10, dmg: [1, 4], speed: 4.8, reach: 1.6, cd: 0.9, xp: 8, w: 1.3, h: 0.65, radius: 0.3, ac: 5, sight: 16, sprite: 'bat', fly: 1.3, sound: 'flap', loot: 'none', noCorpse: true },
   thief: { name: 'Thief', hp: 26, dmg: [2, 7], speed: 3.3, reach: 1.9, cd: 1.2, xp: 22, w: 0.9, h: 1.85, ac: 3, sight: 18, sprite: 'thief', loot: 'thief', bark: ['Your purse or your life!', 'Nobody will miss you, stranger.', 'Empty your pockets!'] },
-  bandit: { name: 'Bandit', hp: 55, dmg: [4, 10], speed: 3.4, reach: 2.0, cd: 1.2, xp: 60, w: 0.95, h: 1.9, ac: 5, sight: 20, sprite: 'bandit', loot: 'thief', bark: ['So the Guild sent a hero. How sweet.'] },
+  bandit: { name: 'Bandit', hp: 55, dmg: [4, 10], speed: 3.4, reach: 2.0, cd: 1.2, xp: 60, w: 0.95, h: 1.9, ac: 5, sight: 20, sprite: 'bandit', loot: 'thief', bark: ['So they sent a hero. How sweet.'] },
   skeleton: { name: 'Skeletal Warrior', hp: 34, dmg: [3, 9], speed: 2.7, reach: 2.0, cd: 1.4, xp: 28, w: 0.9, h: 1.85, ac: 5, sight: 16, sprite: 'skeleton', undead: true, loot: 'skeleton', sound: 'growl' },
   zombie: { name: 'Zombie', hp: 52, dmg: [4, 10], speed: 1.6, reach: 1.9, cd: 1.8, xp: 30, w: 0.95, h: 1.85, ac: 1, sight: 12, sprite: 'zombie', undead: true, loot: 'zombie', sound: 'moan' },
   wraith: { name: 'Wraith', hp: 44, dmg: [5, 12], speed: 3.1, reach: 2.0, cd: 1.5, xp: 60, w: 1.0, h: 2.0, ac: 6, sight: 18, sprite: 'wraith', undead: true, silver: true, transparent: true, opacity: 0.78, fly: 0.25, loot: 'wraith', noCorpse: true, sound: 'ghost' },
-  necro: { name: 'Vharzal the Necromancer', hp: 150, dmg: [6, 14], speed: 2.5, reach: 2.0, cd: 1.6, xp: 320, w: 0.95, h: 1.95, ac: 6, sight: 22, sprite: 'necro', caster: true, boss: true, loot: 'necro', bark: ['You dare intrude upon my work?', "The old king's soul is MINE!"] },
+  necro: { name: 'Corvin Ash the Necromancer', hp: 150, dmg: [6, 14], speed: 2.5, reach: 2.0, cd: 1.6, xp: 320, w: 0.95, h: 1.95, ac: 6, sight: 22, sprite: 'necro', caster: true, boss: true, loot: 'necro', bark: ['You dare intrude upon my work?', "The old king's soul is MINE!"] },
   guard: { name: 'City Guard', hp: 65, dmg: [5, 12], speed: 4.1, reach: 2.2, cd: 1.3, xp: 30, w: 0.95, h: 1.9, ac: 7, sight: 26, sprite: 'guard', loot: 'guard' },
 };
 
@@ -124,8 +124,8 @@ function rollLoot(kind, level) {
     case 'wraith': gold = rnd.int(10, 40); if (rnd.chance(0.5)) items.push(makeGem(rnd.pick(['ruby', 'emerald', 'sapphire']))); break;
     case 'guard': gold = rnd.int(10, 40); if (rnd.chance(0.3)) items.push(makeWeapon('longsword', 'steel')); break;
     case 'citizen': gold = rnd.int(1, 18); break;
-    case 'necro': gold = 250; items.push(makeWeapon('dagger', 'ebony'), makePotion('magicka', 2), makeGem('ruby')); break;
-    case 'chest': gold = rnd.int(15, 80) + L * 5; if (rnd.chance(0.5)) items.push(makePotion(rnd.pick(['heal', 'heal', 'magicka', 'stamina']))); if (rnd.chance(0.3)) items.push(makeWeapon(rnd.pick(Object.keys(WEAPONS)), randMaterial(L, 0.1)));
+    case 'necro': gold = 250; items.push(makeWeapon('dagger', 'blackened'), makePotion('spirit', 2), makeGem('ruby')); break;
+    case 'chest': gold = rnd.int(15, 80) + L * 5; if (rnd.chance(0.5)) items.push(makePotion(rnd.pick(['heal', 'heal', 'spirit', 'stamina']))); if (rnd.chance(0.3)) items.push(makeWeapon(rnd.pick(Object.keys(WEAPONS)), randMaterial(L, 0.1)));
       if (rnd.chance(0.2)) items.push(makeArmor(rnd.pick(Object.keys(ARMOR)), randMaterial(L))); if (rnd.chance(0.4)) items.push(makeGem(rnd.pick(Object.keys(GEMS)))); break;
     case 'house': gold = rnd.int(5, 45); if (rnd.chance(0.45)) items.push(makeGem(rnd.pick(['amethyst', 'ring', 'candlestick', 'necklace', 'goblet']))); if (rnd.chance(0.3)) items.push(makePotion('heal')); break;
   }
@@ -140,12 +140,12 @@ function shopStock(b) {
   const st = G.bState[b.id] || (G.bState[b.id] = {}); const day = dayOf(G.time);
   if (st.stockDay === day && st.stock) return st.stock;
   const rng = new RNG(hashStr(b.id) + day * 7919); const stock = []; const L = G.player ? G.player.level : 1;
-  const mat = (bias = 0) => { const r = rng.next() + L * 0.02 + bias; return r > 1.25 ? 'ebony' : r > 1.12 ? 'dwarven' : r > 1.0 ? 'elven' : r > 0.78 ? 'silver' : r > 0.4 ? 'steel' : 'iron'; };
+  const mat = (bias = 0) => { const r = rng.next() + L * 0.02 + bias; return r > 1.25 ? 'blackened' : r > 1.12 ? 'damascus' : r > 1.0 ? 'blued' : r > 0.78 ? 'silver' : r > 0.4 ? 'steel' : 'iron'; };
   const P_ = (k) => { const p = makePotion(k, 1); p.infinite = true; return p; };
   switch (b.type) {
     case 'weaponsmith': for (let i = 0; i < 11; i++) stock.push(makeWeapon(rng.pick(Object.keys(WEAPONS)), mat(0.05))); stock.push(makeWeapon('longsword', 'silver')); break;
     case 'armorer': for (let i = 0; i < 9; i++) stock.push(makeArmor(rng.pick(Object.keys(ARMOR)), mat())); break;
-    case 'alchemist': stock.push(P_('heal'), P_('magicka'), P_('stamina')); break;
+    case 'alchemist': stock.push(P_('heal'), P_('spirit'), P_('stamina')); break;
     case 'vendor': stock.push(P_('heal'), P_('stamina')); for (let i = 0; i < 2; i++) stock.push(makeGem(rng.pick(['amethyst', 'ring', 'goblet']))); break;
     default: stock.push(P_('heal'), P_('stamina')); for (let i = 0; i < 3; i++) stock.push(makeWeapon(rng.pick(['dagger', 'shortsword', 'mace', 'staff']), rng.chance(0.6) ? 'iron' : 'steel'));
       stock.push(makeArmor('leather'), makeArmor('cap'), makeArmor('buckler'));

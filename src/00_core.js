@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 /* =====================================================================
-   ONE CITY: DAGGERFALL — an unofficial tribute to The Elder Scrolls II
+   ALDHAVEN — a walled port on Merrow Bay, and the country round it
    core: utilities, global state, input plumbing
    ===================================================================== */
 
@@ -40,9 +40,9 @@ const v3dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const v3norm = a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
 /* ---------------- calendar ---------------- */
-const MONTHS = ['Morning Star', "Sun's Dawn", 'First Seed', "Rain's Hand", 'Second Seed', 'Midyear', "Sun's Height", 'Last Seed', 'Hearthfire', 'Frostfall', "Sun's Dusk", 'Evening Star'];
-const WEEKDAYS = ['Sundas', 'Morndas', 'Tirdas', 'Middas', 'Turdas', 'Fredas', 'Loredas'];
-const START_MONTH = 7, START_DOM = 4, START_WD = 1; // Morndas, 4th of Last Seed
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const YEAR = 1652, START_MONTH = 7, START_DOM = 4, START_WD = 1; // Monday, 4th of August
 const hourOf = t => (t / 60) % 24;
 const dayOf = t => Math.floor(t / 1440);
 function dateString(t) {
@@ -50,7 +50,7 @@ function dateString(t) {
   const idx = d + START_DOM - 1;
   const dom = idx % 30 + 1;
   const month = (START_MONTH + Math.floor(idx / 30)) % 12;
-  return `${WEEKDAYS[(d + START_WD) % 7]}, ${ordinal(dom)} of ${MONTHS[month]}, 3E 405`;
+  return `${WEEKDAYS[(d + START_WD) % 7]}, ${ordinal(dom)} of ${MONTHS[month]}, ${YEAR}`;
 }
 function clockString(t) {
   const m = Math.floor(t) % 1440;
@@ -79,13 +79,13 @@ const G = {
   dmgFlash: 0,
   hotStart: null,
 };
-const SETTINGS_KEY = 'onecity_daggerfall_settings';
-const SAVE_KEY = 'onecity_daggerfall_save';
+const SETTINGS_KEY = 'onecity_aldhaven_settings', OLD_SETTINGS_KEY = 'onecity_daggerfall_settings'; // (settings and saves made under the old name are still read)
+const SAVE_KEY = 'onecity_aldhaven_save', OLD_SAVE_KEY = 'onecity_daggerfall_save';
 const settings = { pixelScale: 0, sens: 1, music: 0.5, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, travelSpeed: 20, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
 // the minimalist interface hides character stats and combat until Settings → Interface turns them back on
 const rpgUI = () => !!settings.showRPG;
 function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); if (s) Object.assign(settings, s); } catch (e) { /* storage unavailable */ }
+  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(OLD_SETTINGS_KEY) || 'null'); if (s) Object.assign(settings, s); } catch (e) { /* storage unavailable */ }
 }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* storage unavailable */ }

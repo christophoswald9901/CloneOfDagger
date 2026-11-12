@@ -1,6 +1,7 @@
 """Views of the generated country beyond the surveyed land, for one or more world seeds, on the ground and from the air.
 python3 tools/wild.py OUTDIR [seed ...]          -> OUTDIR/s{seed}_{view}.png and OUTDIR/sheet_s{seed}.jpg (labelled contact sheet)
 SET=transition python3 tools/wild.py OUTDIR 0    -> views across the edge of the hand-made country instead
+SET=hall python3 tools/wild.py OUTDIR 0 1 2     -> eighteen views of Halewood House (SET=sites: all landmarks, SET=town: Corrinvale)
 VIEWS=a,b                                         -> capture only some views"""
 import asyncio, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
@@ -78,14 +79,38 @@ TOWN_V = r"""(()=>{const g=__game,T=g.TOWNS[0],C=T.cfg,look=(x,z,tx,tz)=>Math.at
  at('town_air_low',-C.A*0.55,T.CB+160,T.CA*0.2,-T.CB*0.5,-0.25,80);
  return JSON.stringify(V);})()"""
 
+# views of the great house (Halewood): along its axis from the gate to the obelisk, its courts, and from the air
+HALL_V = r"""(()=>{const g=__game,W=g.hallW,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)); const V={};
+ const at=(name,lx,lz,tx,tz,pitch,fly)=>{const [x,z]=W(lx,lz),[a,b]=W(tx,tz); V[name]=[x,z,look(x,z,a,b),pitch,fly];};
+ at('h_far',0,705,0,0,0.02,null);
+ at('h_gate',0,486,0,0,0.03,null);
+ at('h_avenue',0,260,0,0,0.03,null);
+ at('h_screen',0,98,0,0,0.09,null);
+ at('h_forecourt',0,69,0,0,0.16,null);
+ at('h_front',-33,63,8,0,0.15,null);
+ at('h_stables',55,24,92,18,0.08,null);
+ at('h_kitchen',-54,33,-90,16,0.0,null);
+ at('h_terrace',0,-17,0,-520,-0.12,null);
+ at('h_parterre',0,-122,0,0,0.09,null);
+ at('h_quarter',26,-36,-10,-80,-0.08,null);
+ at('h_basin',15,-343,0,0,0.04,null);
+ at('h_rides',0,-349,0,-520,0.04,null);
+ at('h_obelisk',0,-500,0,0,-0.03,null);
+ at('h_park',-36,330,-150,120,0.03,null);
+ at('h_air_front',0,330,0,0,-0.28,60);
+ at('h_air_garden',0,-330,0,0,-0.3,70);
+ at('h_air_side',330,-60,0,-80,-0.42,170);
+ at('h_air_plan',0,300,0,-110,-0.72,330);
+ return JSON.stringify(V);})()"""
+
 # how far each view may turn to find an open outlook (radians either side of its planned heading)
 ARC = {'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
 
 PLACE = r"""(()=>{const g=__game,G=g.G,P=G.player; G.time=12*60+G.time-(G.time%1440); G.weather='clear'; G.weatherDay=Math.floor(G.time/1440);
   const [x,z,yaw,pitch,fly,arc,margin,name]=ARGS; g.Wild.prime(x,z); let X=x,Z=z;
   // step off to a spot clear of trunks, rocks and walls
-  const clear=(x,z)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=G.area.grid.get((Math.floor(x/8)+i)*10007+Math.floor(z/8)+j)||[]; if(l.some(c=>x>c.x0-margin&&x<c.x1+margin&&z>c.z0-margin&&z<c.z1+margin))return false;} return g.terrainH(x,z)>-0.5;};
-  if(fly===null) for(let r=0;r<(name.startsWith('town')?6:60)&&!clear(X,Z);r+=1.5){const a=r*2.4;X=x+Math.cos(a)*r;Z=z+Math.sin(a)*r;}
+  const clear=(x,z)=>{for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const l=G.area.grid.get((Math.floor(x/8)+i)*10007+Math.floor(z/8)+j)||[]; if(l.some(c=>x>c.x0-margin&&x<c.x1+margin&&z>c.z0-margin&&z<c.z1+margin&&(!c.o||(()=>{const dx=x-c.o.x,dz=z-c.o.z;return Math.abs(dx*c.o.c-dz*c.o.s)<c.o.hx+margin&&Math.abs(dx*c.o.s+dz*c.o.c)<c.o.hz+margin;})())))return false;} return g.terrainH(x,z)>-0.5;}; /* (a turned collider is tested by its own shape, not its bounding box) */
+  if(fly===null) for(let r=0;r<(name.startsWith('town')||name.startsWith('h_')?6:60)&&!clear(X,Z);r+=1.5){const a=r*2.4;X=x+Math.cos(a)*r;Z=z+Math.sin(a)*r;}
   // how far one can see along a heading: nothing (0) if ground or a solid thing stands close in front
   const openD=(X,Z,yy,gy)=>{ const fx=-Math.sin(yy), fz=-Math.cos(yy);
     for(const sd of [-0.35,0,0.35]){ const c=Math.cos(sd),s=Math.sin(sd),ux=fx*c-fz*s,uz=fx*s+fz*c;
@@ -130,11 +155,11 @@ async def main():
         else: print('new game never started', c.errors()[:2]); c.stop(); return
         await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
-        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else FIND))
+        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else HALL_V if SET == 'hall' else FIND))
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
-            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 1.5 if SET == 'town' else 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
+            args = json.dumps([x, z, yaw, pitch, fly, ARC.get(name, 0), 1.5 if SET in ('town', 'hall') else 8, name])  # (8 m clear of trunks and walls, so no sprite fills the frame)
             where = await c.ev(PLACE.replace('ARGS', args))
             if not where or str(where).startswith('ERR'): print(seed, name, 'placement failed:', str(where)[:200]); continue  # never pass a stuck view off as a real one
             await asyncio.sleep(float(os.environ.get('WAIT', '6')))
@@ -142,6 +167,6 @@ async def main():
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
             print(seed, name, where, info)
         allf = [(n, f'{OUT}/s{seed}_{n}.png') for n in views if os.path.exists(f'{OUT}/s{seed}_{n}.png')] # every view taken so far, in order
-        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else ""}s{seed}.jpg')
+        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else "hall" if SET == "hall" else ""}s{seed}.jpg')
         print(seed, 'errors:', [e[:300] for e in c.errors()[:3]]); c.stop()
 asyncio.run(main())
