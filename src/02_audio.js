@@ -77,7 +77,7 @@ const SFX = {
   },
 };
 
-/* ---------------- generative score ---------------- */
+/* ---------------- legacy generative score (moods without a composed piece yet) ---------------- */
 const NOTE = n => 440 * Math.pow(2, (n - 69) / 12);
 const TRACKS = {
   title: { bpm: 66, chords: [[50, 'm'], [46, ''], [41, ''], [48, '']], mel: 0.55, arp: 'slow', lead: 'triangle', pad: true },
@@ -87,21 +87,16 @@ const TRACKS = {
   tavern: { bpm: 126, chords: [[43, ''], [48, ''], [50, ''], [43, '']], mel: 0.7, arp: 'jig', lead: 'square', pad: false },
   hall: { bpm: 60, chords: [[50, 'm'], [43, 'm'], [45, ''], [50, 'm']], mel: 0.3, arp: 'slow', lead: 'triangle', pad: true },
 };
-const Music = {
-  track: null, step: 0, next: 0, timer: null, melNote: 0, rng: new RNG(9),
-  play(name) {
-    if (this.track !== name) { this.track = name; this.step = 0; this.melNote = 0; if (SFX.ctx) this.next = SFX.ctx.currentTime + 0.1; }
-    if (SFX.ctx && !this.timer) { this.next = SFX.ctx.currentTime + 0.1; this.timer = setInterval(() => this.tick(), 60); }
-  },
-  stop() { this.track = null; },
+const Legacy = {
+  track: null, step: 0, next: 0, melNote: 0, rng: new RNG(9),
+  start(name) { if (this.track !== name) { this.track = name; this.step = 0; this.melNote = 0; } this.next = SFX.ctx.currentTime + 0.1; },
   chordNotes(root, q) { const third = q === 'm' || q === 'dim' ? 3 : 4, fifth = q === 'dim' ? 6 : 7; return [root, root + third, root + fifth]; },
-  tick() {
-    if (!SFX.ctx || !this.track || settings.music <= 0) { if (SFX.ctx) this.next = SFX.ctx.currentTime + 0.1; return; }
-    const T = TRACKS[this.track]; const spb = 60 / T.bpm / 2; // eighth notes
+  tick(d) {
+    const T = TRACKS[this.track]; if (!T) return; const spb = 60 / T.bpm / 2; // eighth notes
     if (this.next < SFX.ctx.currentTime - 0.5) this.next = SFX.ctx.currentTime + 0.05; // tab was hidden
     while (this.next < SFX.ctx.currentTime + 0.25) {
       const s = this.step; const bar = Math.floor(s / 8) % T.chords.length; const beat = s % 8; const [root, q] = T.chords[bar];
-      const ch = this.chordNotes(root, q); const t = this.next - SFX.ctx.currentTime; const d = SFX.mus;
+      const ch = this.chordNotes(root, q); const t = this.next - SFX.ctx.currentTime;
       if (beat === 0) {
         SFX.tone(NOTE(root - 12), spb * 7, 'triangle', 0.16, null, t, d, 0.02);
         if (T.pad) ch.forEach(n => SFX.tone(NOTE(n + 12), spb * 8, 'sine', 0.035, null, t, d, 0.3));
