@@ -248,13 +248,18 @@ function reviveAtTemple() {
 }
 let _musicT = 0;
 function pickMusic(force) {
-  if (!force && (_musicT -= 1) > 0) return; _musicT = 60;
+  const now = performance.now(); if (!force && now < _musicT) return; _musicT = now + 1000;
   if (G.state === 'title' || G.state === 'create') return Music.play('title');
   const a = G.area; if (!a) return;
   if (a.kind === 'dungeon') return Music.play('dungeon');
-  if (a.kind === 'interior') return Music.play(a.music || 'day');
-  Music.play(isNight(G.time) ? 'night' : 'day');
+  if (a.kind === 'interior') return Music.play(a.music || 'house');
+  if (isNight(G.time)) return Music.play('night');
+  // outdoors by day: Aldhaven, Corrinvale or the wild; a place has to hold for a few seconds before the music follows
+  const P = G.player, m = !P ? 'wild' : insideCity(P.pos.x, P.pos.z) ? 'city' : TOWNS.some(T => T.inside(P.pos.x, P.pos.z)) ? 'town' : 'wild';
+  if (force || !Music.mood || ['title', 'night', 'dungeon', 'tavern', 'hall', 'house'].includes(Music.mood)) { _moodSeen = m; _moodN = now; return Music.play(m); }
+  if (m !== _moodSeen) { _moodSeen = m; _moodN = now; } else if (now - _moodN >= 5000) Music.play(m);
 }
+let _moodSeen = null, _moodN = 0;
 
 /* ---------------- resting ---------------- */
 function startRest(mode) {
@@ -559,7 +564,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { HALL, hallW, hallL, hallWet, siteWild, TOWNS, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

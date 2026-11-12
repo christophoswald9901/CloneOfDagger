@@ -206,6 +206,7 @@ const UI = {
       <label for="s_sens">Look sensitivity</label><input id="s_sens" type="range" min="0.2" max="3" step="0.1" value="${settings.sens}" data-s="sens">
       <label for="s_fov">Field of view</label><input id="s_fov" type="range" min="55" max="95" step="1" value="${settings.fov}" data-s="fov">
       <label for="s_mus">Music volume</label><input id="s_mus" type="range" min="0" max="1" step="0.05" value="${settings.music}" data-s="music">
+      <label for="s_mpause">Pauses between pieces</label><input id="s_mpause" type="checkbox" ${settings.musicPauses ? 'checked' : ''} data-s="musicPauses">
       <label for="s_sfx">Sound volume</label><input id="s_sfx" type="range" min="0" max="1" step="0.05" value="${settings.sfx}" data-s="sfx">
       <label for="s_inv">Invert look Y</label><input id="s_inv" type="checkbox" ${settings.invertY ? 'checked' : ''} data-s="invertY">
       <div class="sub">Interface</div>

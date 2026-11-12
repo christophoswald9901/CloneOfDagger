@@ -81,7 +81,7 @@ const G = {
 };
 const SETTINGS_KEY = 'onecity_aldhaven_settings', OLD_SETTINGS_KEY = 'onecity_daggerfall_settings'; // (settings and saves made under the old name are still read)
 const SAVE_KEY = 'onecity_aldhaven_save', OLD_SAVE_KEY = 'onecity_daggerfall_save';
-const settings = { pixelScale: 0, sens: 1, music: 0.5, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, travelSpeed: 20, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
+const settings = { pixelScale: 0, sens: 1, music: 0.5, musicPauses: true, sfx: 0.8, fov: 70, invertY: false, touch: 0, touchSize: 1, showRPG: false, travelSpeed: 20, dbgFly: false, dbgStamina: false, dbgNoFall: true, dbgNoClip: false };
 // the minimalist interface hides character stats and combat until Settings → Interface turns them back on
 const rpgUI = () => !!settings.showRPG;
 function loadSettings() {
