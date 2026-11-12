@@ -83,7 +83,7 @@ It is 3E 405. The Emperor sends you to Daggerfall: the ghost of King Lysandus st
 
 - `tools/` — headless-Chrome checks and screenshot scripts (`tools/wild.py OUTDIR 0 1 2` photographs the generated country for three seeds, on the ground and from the air, into labelled contact sheets; `SET=transition` photographs the edge of the hand-made country instead, `SET=town` ten views of Corrinvale (with `?townseed=N` per seed, to judge the generator), `SET=sites` the five landmarks from their roads, from where the generated land blends in and from the air; `tools/shot.py` takes pictures from given places; `tools/wildwalk.py` walks out through the old world edge)
 - `tools/townplan.py OUT 0 1 2`: a town's plan drawn from above as data, per generator seed (fast; look before rendering). `tools/bridgewalk.py`: walks the player across canal bridges and reports whether they got over.
-- `tools/music.py MOOD [INDEX]`: renders a composed music piece offline (e.g. `wild 0`) to `tools/out/music/` as WAV and MP3, with loudness per instrument. Pieces live in `src/02_music.js`; moods without one yet still use the old generative tracks in `src/02_audio.js`.
+- `tools/music.py MOOD [INDEX]`: renders a composed music piece offline (e.g. `wild 0`, or `wild:rain 0` for a weather) to `tools/out/music/` as WAV and MP3, with loudness per instrument (`STEMS=0` skips those). It renders on `tools/music.html`, a bare page with only the music code, so it needs no build; `MUSIC_URL` points it at another server. Pieces live in `src/02_music.js`, chosen by mood and weather (`wild:rain` falls back to `wild` when missing); moods without one yet still use the old generative tracks in `src/02_audio.js`.
 
 After editing anything in `src/`, rebuild:
 
