@@ -251,6 +251,7 @@ function pickMusic(force) {
   const now = performance.now(); if (!force && now < _musicT) return; _musicT = now + 1000;
   if (G.state === 'title' || G.state === 'create') return Music.play('title');
   const a = G.area; if (!a) return;
+  Music.weather = a.kind === 'city' ? G.weather : null; // the next piece outdoors follows the weather
   if (a.kind === 'dungeon') return Music.play('dungeon');
   if (a.kind === 'interior') return Music.play(a.music || 'house');
   if (isNight(G.time)) return Music.play('night');
