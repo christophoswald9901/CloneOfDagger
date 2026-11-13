@@ -6,7 +6,7 @@ Each check counts its failures; a few allow a small share (see LIMIT). Exit code
 The checks read the plan data (rivers, tracks, bridges, places, landmark solids, the road network, the town's lots,
 blocks, streets and gates); see CHECKS below for what each one means."""
 import asyncio, json, os, sys, time
-sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
+sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP, HTTP_PORT
 
 CHECKS = r"""(()=>{const g=__game,W=g.Wild,L=g.LAND,SEA=-0.8,out=[];
  const H=(x,z)=>g.terrainRaw(x,z), r1=v=>Math.round(v), at=(x,z)=>[r1(x),r1(z)];
@@ -85,7 +85,7 @@ async def main():
     args = sys.argv[1:]; verbose = '-v' in args; args = [a for a in args if a != '-v']
     opt = dict(zip(args[::2], args[1::2]))
     runs = [('world', s, f'?seed={s}') for s in seeds(opt.get('--world', '0-5'))] + [('town', s, f'?seed=0&townseed={s}') for s in seeds(opt.get('--town', '0-3'))]
-    port = os.environ.get('HTTP_PORT', '8765')
+    port = HTTP_PORT
     c = CDP(int(os.environ.get('CDP_PORT', '9431'))); failed = []; started = False
     for kind, s, q in runs:
         url = f'http://127.0.0.1:{port}/index.html{q}'; t0 = time.time()

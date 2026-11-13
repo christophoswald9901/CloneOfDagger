@@ -41,14 +41,15 @@ function landCarve(x, z, h) {
 }
 function riverD(x, z) { const T = LAND.rd; if (!T) return 9999; const fx = (x - T.X0) / T.C, fz = (z - T.Z0) / T.C, i = Math.floor(fx), j = Math.floor(fz); if (i < 0 || j < 0 || i >= T.NI - 1 || j >= T.NJ - 1) return 9999; const u = fx - i, v = fz - j, k = j * T.NI + i, D = T.D; return lerp(lerp(D[k], D[k + 1], u), lerp(D[k + T.NI], D[k + T.NI + 1], u), v); }
 function terrainRaw(x, z) { const h = terrainBase(x, z); return siteFix(x, z, LAND.ready ? landCarve(x, z, h) : h); } // the sites' fixed ground last: no river is cut through it
-// the nearest river to a point within reach r: { d, w } (distance to the middle of the water, its width), or null
+// the nearest river to a point within reach r: { d, w } (distance to the middle of the water, its width there), or null. Measured to the water's
+// own course (its meanders), not the valley's broad line, which the water wanders off by tens of metres
 function riverNear(x, z, r = 40) {
-  const L = LAND; if (!L.ready) return null; const list = L.hash.get((Math.floor(x / L.HC) + 4096) * 8192 + Math.floor(z / L.HC) + 4096); if (!list) return null;
-  const S = L.segs; let best = null;
-  for (let q = 0; q < list.length; q++) {
-    const o = list[q] * LS, ax = S[o], az = S[o + 1], dx = S[o + 2] - ax, dz = S[o + 3] - az;
-    let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1); t = t < 0 ? 0 : t > 1 ? 1 : t;
-    const d = Math.hypot(x - ax - dx * t, z - az - dz * t); if (d < r && (!best || d < best.d)) best = { d, w: S[o + 10] };
+  const L = LAND; if (!L.ready || !L.wh) return null; const WH = L.wh, C = WH.C; let best = null, bd = r;
+  for (let i = Math.floor((x - r) / C); i <= Math.floor((x + r) / C); i++) for (let j = Math.floor((z - r) / C); j <= Math.floor((z + r) / C); j++) {
+    const list = WH.get((i + 4096) * 8192 + j + 4096); if (!list) continue;
+    for (let m = 0; m < list.length; m += 2) { const R = L.rivers[list[m]], q = list[m + 1], [ax, az] = R.P[q - 1], [bx, bz] = R.P[q], dx = bx - ax, dz = bz - az;
+      let t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1); t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - ax - dx * t, z - az - dz * t); if (d < bd) { bd = d; best = { d, w: R.w[q - 1] + (R.w[q] - R.w[q - 1]) * t }; } }
   }
   return best;
 }
@@ -108,15 +109,16 @@ function planLand() {
     let V = R.hand ? smoothPath(R.cells, 3) : smoothPath(simplifyPath(R.cells, 28), 4); // the grid's staircase straightened first, so the bends come out broad (not so far that it leaves its valley)
     if (R.parent >= 0) { // run on into the parent river's line, where it meets it
       const Pv = built[R.parent].V, [ex, ez] = V[V.length - 1]; let bq = 0, bd = 1e9; for (let q = 0; q < Pv.length; q++) { const d = Math.hypot(Pv[q][0] - ex, Pv[q][1] - ez); if (d < bd) { bd = d; bq = q; } }
-      V.push(Pv[bq].slice()); R.joinQ = bq;
+      const PP = rivers[R.parent].out.P; let jp = Pv[bq], jd = 1e9; for (const p of PP) { const d = Math.hypot(p[0] - Pv[bq][0], p[1] - Pv[bq][1]); if (d < jd) { jd = d; jp = p; } }
+      V.push(jp.slice()); R.joinQ = bq; // into the parent's water itself, which meanders off its broad line
     }
     V = resampleEven(V, 20);
     const L = V.length, nrm = V.map((_, q) => { const a = V[Math.max(0, q - 1)], b = V[Math.min(L - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
     const sd = rng.next() * 100;
-    if (!R.hand) V = V.map((p, q) => { const off = 48 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
+    if (!R.hand) V = V.map((p, q) => { const off = 66 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
     // width from the land drained, at each point of the line (by its share of the way down)
     const w = V.map((_, q) => widthOf(R.area[Math.min(R.area.length - 1, Math.round(q / (L - 1) * (R.area.length - 1)))]) * (R.hand ? 1 : lerp(0.45, 1, Math.min(1, q * 20 / 400)))); // a spring's trickle at first
-    const Fw = w.map(v => v / 2 + 5 + 1.6 * v);
+    const Fw = w.map(v => v / 2 + 6 + 2.7 * v); // the level floor the water wanders over: some six times its width
     // the water level: the low ground across the valley floor, never rising downstream
     const gb = V.map(([x, z], q) => { if (q % 2 && q < L - 1) return null; const [nx, nz] = nrm[q]; let g = Infinity; for (const f of [-0.5, 0, 0.5]) g = Math.min(g, terrainBase(x + nx * Fw[q] * f, z + nz * Fw[q] * f)); return g; }); // every other point, the rest between
     for (let q = 1; q < L - 1; q += 2) gb[q] = (gb[q - 1] + gb[q + 1]) / 2;
@@ -134,9 +136,9 @@ function planLand() {
     built[rivers.indexOf(R)] = { V, wl, w };
     // the water's own course: meanders within the valley floor, sampled finely for the ground and the water
     const P0 = resampleEven(V, 4), PL = P0.length, Pw = [], Pwl = [];
-    for (let q = 0; q < PL; q++) { const f = q / (PL - 1) * (L - 1), a = Math.floor(f), b = Math.min(L - 1, a + 1), u = f - a; Pw.push(lerp(w[a], w[b], u) * (1 + 0.22 * fbm(q * 4 / 160 + sd * 0.7, 9.1, 2, 383))); Pwl.push(lerp(wl[a], wl[b], u)); } // wider in the pools, narrower at the riffles
+    for (let q = 0; q < PL; q++) { const f = q / (PL - 1) * (L - 1), a = Math.floor(f), b = Math.min(L - 1, a + 1), u = f - a; Pw.push(lerp(w[a], w[b], u) * (1 + 0.34 * fbm(q * 4 / 110 + sd * 0.7, 9.1, 2, 383))); Pwl.push(lerp(wl[a], wl[b], u)); } // wider in the pools, narrower at the riffles
     const pn = P0.map((_, q) => { const a = P0[Math.max(0, q - 1)], b = P0[Math.min(PL - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
-    const P = P0.map((p, q) => { const off = (3 + Pw[q] * 0.9) * fbm(q * 4 / 130 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
+    const P = P0.map((p, q) => { const off = (4 + Pw[q] * 1.7) * fbm(q * 4 / 150 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
     const xs = P.map(p => p[0]), zs = P.map(p => p[1]), pad = 30;
     R.out = { P, w: Pw, wl: Pwl, end: R.end, hand: !!R.hand, box: [Math.min(...xs) - pad, Math.min(...zs) - pad, Math.max(...xs) + pad, Math.max(...zs) + pad] };
   }
@@ -150,6 +152,9 @@ function planLand() {
       const k = (i + 4096) * 8192 + j + 4096; let l = hash.get(k); if (!l) hash.set(k, l = []); l.push(q); } });
   for (const [k, l] of hash) hash.set(k, Int32Array.from(l));
   LAND.segs = S; LAND.hash = hash; LAND.rivers = rivers.filter(R => R.out).map(R => R.out); LAND.ready = true;
+  { const WH = new Map(), C = 48; LAND.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const [ax, az] = R.P[q - 1], [bx, bz] = R.P[q]; // the water's own course, found by the cells it passes
+      for (let i = Math.floor(Math.min(ax, bx) / C); i <= Math.floor(Math.max(ax, bx) / C); i++) for (let j = Math.floor(Math.min(az, bz) / C); j <= Math.floor(Math.max(az, bz) / C); j++) { const k = (i + 4096) * 8192 + j + 4096; let l = WH.get(k); if (!l) WH.set(k, l = []); l.push(ri, q); } } });
+    for (const [k, l] of WH) WH.set(k, Int32Array.from(l)); WH.C = C; LAND.wh = WH; }
   // how far each place lies from a river of some size (chamfer distance on a 32 m grid, to some 700 m): its valley is farmed
   { const C2 = 32, X1 = WORLD.x0 - 600, Z1 = WORLD.z0 - 600, NI2 = Math.ceil((WORLD.x1 - WORLD.x0 + 1200) / C2) + 1, NJ2 = Math.ceil((WORLD.z1 - WORLD.z0 + 1200) / C2) + 1, D = new Float32Array(NI2 * NJ2).fill(9999);
     for (const R of LAND.rivers) for (let q = 0; q < R.P.length; q += 4) { if (R.w[q] < 3.5) continue; const i = Math.round((R.P[q][0] - X1) / C2), j = Math.round((R.P[q][1] - Z1) / C2); if (i >= 0 && j >= 0 && i < NI2 && j < NJ2) D[j * NI2 + i] = 0; }
@@ -157,5 +162,43 @@ function planLand() {
     for (let j = 0; j < NJ2; j++) for (let i = 0; i < NI2; i++) { const k = j * NI2 + i; let v = D[k]; if (i > 0) v = Math.min(v, D[k - 1] + d1); if (j > 0) { v = Math.min(v, D[k - NI2] + d1); if (i > 0) v = Math.min(v, D[k - NI2 - 1] + d2); if (i < NI2 - 1) v = Math.min(v, D[k - NI2 + 1] + d2); } D[k] = v; }
     for (let j = NJ2 - 1; j >= 0; j--) for (let i = NI2 - 1; i >= 0; i--) { const k = j * NI2 + i; let v = D[k]; if (i < NI2 - 1) v = Math.min(v, D[k + 1] + d1); if (j < NJ2 - 1) { v = Math.min(v, D[k + NI2] + d1); if (i < NI2 - 1) v = Math.min(v, D[k + NI2 + 1] + d2); if (i > 0) v = Math.min(v, D[k + NI2 - 1] + d2); } D[k] = v; }
     LAND.rd = { C: C2, X0: X1, Z0: Z1, NI: NI2, NJ: NJ2, D }; }
+  planLandform(A, NI, NJ, X0, Z0, C);
   LAND.ms = Math.round(performance.now() - t0); LAND.prof = [tGrid - t0, tFlood - tGrid, tRiv - tFlood, performance.now() - tRiv].map(Math.round); LAND.grid = { NI, NJ, C, X0, Z0 };
+}
+
+/* ---------- the lie of the land ----------
+   Worked out once for the whole country, on a 50 m grid, after the rivers have cut their valleys: how steep the ground is, whether a place
+   is a valley floor or a hilltop (its height against the mean of the land round it, near and far), how wet it is (the water that gathers
+   to it, held where the ground is flat or hollow) and how it faces the sun. Woods, heath, farmland, the colour of the turf and what grows
+   in it are all read from this one description (landAt), so they agree with each other and with the shape of the ground. */
+function planLandform(A, ANI, ANJ, AX0, AZ0, AC) {
+  const C = 50, M = 400, X0 = WORLD.x0 - M, Z0 = WORLD.z0 - M, NI = Math.round((WORLD.x1 - WORLD.x0 + 2 * M) / C) + 1, NJ = Math.round((WORLD.z1 - WORLD.z0 + 2 * M) / C) + 1, n = NI * NJ;
+  const H = new Float32Array(n); for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) H[j * NI + i] = Math.max(SEA - 1, terrainRaw(X0 + i * C, Z0 + j * C));
+  const W = NI + 1, I = new Float64Array(W * (NJ + 1)); // sums over rectangles, for the mean height round a place
+  for (let j = 0; j < NJ; j++) { let row = 0; for (let i = 0; i < NI; i++) { row += H[j * NI + i]; I[(j + 1) * W + i + 1] = I[j * W + i + 1] + row; } }
+  const mean = (i, j, r) => { const i0 = Math.max(0, i - r), i1 = Math.min(NI - 1, i + r), j0 = Math.max(0, j - r), j1 = Math.min(NJ - 1, j + r); return (I[(j1 + 1) * W + i1 + 1] - I[j0 * W + i1 + 1] - I[(j1 + 1) * W + i0] + I[j0 * W + i0]) / ((i1 - i0 + 1) * (j1 - j0 + 1)); };
+  const gather = (x, z) => { const fx = clamp((x - AX0) / AC, 0, ANI - 1.001), fz = clamp((z - AZ0) / AC, 0, ANJ - 1.001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * ANI + i; return Math.max(lerp(A[k], A[k + 1], u), lerp(A[k + ANI], A[k + ANI + 1], u), lerp(lerp(A[k], A[k + 1], u), lerp(A[k + ANI], A[k + ANI + 1], u), v)); }; // (the larger of the cells beside it, so a line of flow is not broken between them)
+  const SL = new Float32Array(n), TPI = new Float32Array(n), TPL = new Float32Array(n), WET = new Float32Array(n), SUN = new Float32Array(n);
+  const lh = Math.hypot(TERRAIN_LIGHT[0], TERRAIN_LIGHT[2]) || 1, lx = TERRAIN_LIGHT[0] / lh, lz = TERRAIN_LIGHT[2] / lh;
+  for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
+    const k = j * NI + i, h = H[k], gx = (H[j * NI + Math.min(NI - 1, i + 1)] - H[j * NI + Math.max(0, i - 1)]) / (2 * C), gz = (H[Math.min(NJ - 1, j + 1) * NI + i] - H[Math.max(0, j - 1) * NI + i]) / (2 * C), sl = Math.hypot(gx, gz);
+    SL[k] = sl; TPI[k] = h - mean(i, j, 5); TPL[k] = h - mean(i, j, 16);
+    const a = gather(X0 + i * C, Z0 + j * C), run = smoothstep(Math.log(5), Math.log(110), Math.log(a + 1)) * (1 - smoothstep(0.14, 0.4, sl)); // water gathering from above, where the ground is not too steep to hold it
+    const hollow = smoothstep(-1.5, -10, TPI[k]) * (1 - smoothstep(0.03, 0.11, sl));                                                    // and flat ground lying below what is round it
+    WET[k] = h <= SEA ? 0 : clamp(0.85 * run + 0.55 * hollow, 0, 1);
+    SUN[k] = sl > 1e-4 ? (-gx * lx - gz * lz) / sl * smoothstep(0.02, 0.12, sl) : 0;
+  }
+  LAND.lf = { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN };
+}
+// the lie of the land at a place: { sl: how steep (broadly), tpi/tpl: metres above the land round it within 250 m / 800 m, wet 0..1, sun -1..1
+// (1 faces the sun), floor: valley floor 0..1, side: valley side 0..1, expo: open hilltop or ridge 0..1 }
+const LF_NONE = { sl: 0.05, tpi: 0, tpl: 0, wet: 0, sun: 0, floor: 0, side: 0, expo: 0.25 };
+let _lfx = NaN, _lfz = NaN, _lf = LF_NONE;
+function landAt(x, z) {
+  const T = LAND.lf; if (!T) return LF_NONE; if (x === _lfx && z === _lfz) return _lf;
+  const fx = clamp((x - T.X0) / T.C, 0, T.NI - 1.001), fz = clamp((z - T.Z0) / T.C, 0, T.NJ - 1.001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * T.NI + i, N = T.NI;
+  const B = a => (a[k] * (1 - u) + a[k + 1] * u) * (1 - v) + (a[k + N] * (1 - u) + a[k + N + 1] * u) * v;
+  const sl = B(T.SL), tpi = B(T.TPI), tpl = B(T.TPL);
+  _lfx = x; _lfz = z;
+  return _lf = { sl, tpi, tpl, wet: B(T.WET), sun: B(T.SUN), floor: smoothstep(-3, -14, tpi) * (1 - smoothstep(0.06, 0.16, sl)), side: smoothstep(0.1, 0.28, sl), expo: clamp(0.62 * smoothstep(4, 30, tpi) + 0.5 * smoothstep(10, 90, tpl), 0, 1) };
 }

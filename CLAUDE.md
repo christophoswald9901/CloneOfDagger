@@ -34,6 +34,8 @@ python3 tools/check.py                          # boot, new game, report errors
 python3 tools/invariants.py                     # data checks over many seeds (rivers, tracks, bridges, places, roads, plots, doors)
 ```
 
-Run `tools/invariants.py` after changing the terrain, rivers, tracks or a town generator. It exits non-zero on a failure; read the coordinates it prints before rendering anything. If another session's server holds port 8765, start one on another port and set `HTTP_PORT`.
+Run `tools/invariants.py` after changing the terrain, rivers, tracks or a town generator. It exits non-zero on a failure; read the coordinates it prints before rendering anything.
+
+Other sessions may be running the same tools from other worktrees. If port 8765 is taken, serve this checkout on another port and set `HTTP_PORT` to it, and set `CDP_PORT` (default 9333) to a free port, or the tools will photograph or disturb another session's build.
 
 They need Python `websockets` and `Pillow`, and Chrome or Chromium on PATH (or `$CHROME`). In a fresh container: `pip install websockets pillow`, plus a Chromium package if none is installed. If the sandbox blocks `cdn.jsdelivr.net` (where three.js is loaded from), `tools/cdp.py` intercepts those requests and serves them from an `npm pack` copy in `tools/.npmcache/` (gitignored), so npm registry access is enough. Renders go to `tools/out/`, which is gitignored, so earlier renders exist only on the machine that made them.

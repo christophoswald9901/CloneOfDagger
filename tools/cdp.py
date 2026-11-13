@@ -22,11 +22,14 @@ def cdn_file(url):
     f = os.path.join(pkg, rel)
     return f if os.path.isfile(f) else None
 
+# The port this checkout is served on. HTTP_PORT, or GAME_PORT (its earlier name), when another worktree's server holds 8765.
+HTTP_PORT = os.environ.get('HTTP_PORT') or os.environ.get('GAME_PORT') or '8765'
+
 class CDP:
     def __init__(self, port=None): self.port = port or int(os.environ.get('CDP_PORT', '9333')); self.id = 0; self.logs = []  # CDP_PORT: run several tools side by side
     async def start(self, url, w=1280, h=720):
         if not CHROME: raise SystemExit('no Chrome/Chromium found: install one or set $CHROME')
-        url = url.replace(':8765/', f":{os.environ.get('HTTP_PORT', '8765')}/")  # HTTP_PORT: another worktree's server may hold 8765
+        url = url.replace(':8765/', f':{HTTP_PORT}/')  # another worktree's server may hold 8765
         prof = f'{PROFILE}{self.port}'; os.makedirs(prof, exist_ok=True)
         self.proc = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
                                       '--enable-unsafe-swiftshader', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',
