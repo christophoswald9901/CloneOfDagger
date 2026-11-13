@@ -559,13 +559,13 @@ function boot(hotData) {
   // textured UI chrome from the same generator as the walls
   try { document.documentElement.style.setProperty('--stone-img', `url(${genBlocks({ seed: 5, bw: 16, bh: 8, base: '#3b352d', mortar: '#211d18', vary: 0.12 }).toDataURL()})`); } catch (e) { /* cosmetic */ }
   initTextures();
-  G.area = buildCity(); populateCity(G.city);
+  { const t0 = performance.now(); G.area = buildCity(); populateCity(G.city); G.loadMs = Math.round(performance.now() - t0); } // (timed, for the tools)
   $('loading').hidden = true;
   try { window.claude?.hot?.snapshot?.(() => (G.state === 'play' && G.player && !G.player.dead) ? serialize() : null); } catch (e) { /* not in a live host */ }
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

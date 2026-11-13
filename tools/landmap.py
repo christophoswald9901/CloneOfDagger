@@ -2,7 +2,9 @@
 python3 tools/landmap.py OUTDIR [seed ...]   -> OUTDIR/land_s{seed}.png (left: landform, right: cover)
 REGION=x0,z0,x1,z1,step                        -> another window (default: the whole country at 40 m a pixel)
 Left:  red = open hilltop (expo), blue = wet, green = valley floor, brightness = height; valley sides hatched darker.
-Right: dark green woods, yellow farmland, purple heath, blue rivers, grey rock, pale green open grass (shaded by height)."""
+Right: dark green woods, yellow farmland, purple heath, blue rivers, grey rock, pale green open grass (shaded by height).
+Over the right panel, the settlement plan: field blocks (tan: ploughed, olive: pasture), tracks (brown), lanes (white),
+farmsteads (orange dots), hamlets (small red rings) and villages (large red rings with their names)."""
 import asyncio, sys, os, base64
 sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'tools/out/land'
@@ -23,7 +25,13 @@ JS = r"""(()=>{const g=__game,[X0,Z0,X1,Z1,S]=[REGION],W=Math.round((X1-X0)/S),H
   else if(m>0.3){r=30;gg=78;b=38;n.wood++;} else if(cu>0.35){r=214;gg=196;b=96;n.cult++;} else if(he>0.45){r=150;gg=96;b=140;n.heath++;}
   if(riv[j*W+i]){r=40;gg=90;b=220;} if(inSq){r=90;gg=90;b=90;}
   put(W+4,r,gg,b);}
- x.putImageData(im,0,0); return JSON.stringify({ms:Math.round(performance.now()-t0),land:g.LAND.ms,wood:(n.wood/n.land).toFixed(3),cult:(n.cult/n.land).toFixed(3),heath:(n.heath/n.land).toFixed(3),png:c.toDataURL('image/png')});})()"""
+ x.putImageData(im,0,0);
+ x.save();x.beginPath();x.rect(W+4,0,W,Hh);x.clip(); const S2=g.Settle,PX=wx=>W+4+(wx-X0)/S,PZ=wz=>(wz-Z0)/S; x.lineWidth=1;
+ for(const o of S2.blocks){const cs=g.obbCorners(o);x.fillStyle=o.past?'rgba(120,140,60,0.75)':'rgba(205,170,90,0.85)';x.strokeStyle='rgba(60,50,30,0.6)';x.beginPath();cs.forEach(([a,b],q)=>q?x.lineTo(PX(a),PZ(b)):x.moveTo(PX(a),PZ(b)));x.closePath();x.fill();if(S<=15)x.stroke();}
+ for(const T of g.Wild.tracks){x.strokeStyle=T.lane?'rgba(255,255,255,0.9)':'#6a3c14';x.lineWidth=T.lane?1:2;x.beginPath();T.forEach(([a,b],q)=>q?x.lineTo(PX(a),PZ(b)):x.moveTo(PX(a),PZ(b)));x.stroke();}
+ for(const f of S2.farms){x.fillStyle='#ff8a00';x.fillRect(PX(f.x)-2,PZ(f.z)-2,4,4);}
+ x.font='bold 11px sans-serif';for(const V of S2.list){const r=V.kind==='village'?7:4;x.strokeStyle='#e01010';x.lineWidth=2;x.beginPath();x.arc(PX(V.x),PZ(V.z),r,0,7);x.stroke();if(V.kind==='village'){x.fillStyle='#fff';x.fillText(V.name,PX(V.x)+9,PZ(V.z)+4);}}
+ x.restore(); return JSON.stringify({villages:S2.list.filter(v=>v.kind==='village').length,hamlets:S2.list.filter(v=>v.kind==='hamlet').length,farms:S2.farms.length,lanes:S2.lanes.length,blocks:S2.blocks.length,settleMs:S2.ms,prof:S2.prof,laneMs:Math.round(g.Wild.laneMs||0),ms:Math.round(performance.now()-t0),land:g.LAND.ms,wood:(n.wood/n.land).toFixed(3),cult:(n.cult/n.land).toFixed(3),heath:(n.heath/n.land).toFixed(3),png:c.toDataURL('image/png')});})()"""
 async def main():
     import json
     os.makedirs(OUT, exist_ok=True)
