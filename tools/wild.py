@@ -34,6 +34,11 @@ FIND = r"""(()=>{const g=__game,W=g.Wild,h=g.terrainH,R=g.LAND.rivers,T=W.tracks
  { let x=1500,z=-12000; while(h(x,z)<260&&z>-19000) z-=40; z+=700; for(let k=0;k<40&&fm(x,z,h(x,z))>0.15;k++){ x+=(k%2?1:-1)*k*60; } V.rim=[x,z,0,0.08,null]; }
  // from the air: over a river valley, high over the interior, and over the edge of the city's own country looking out
  { const r=R.filter(r=>!r.hand).sort((a,b)=>b.P.length-a.P.length)[0], q=Math.floor(r.P.length*0.45), p=r.P[q], n=r.P[Math.min(r.P.length-1,q+60)]; V.air_valley=[p[0]-(n[1]-p[1])*1.2,p[1]+(n[0]-p[0])*1.2,look(p[0],p[1],n[0],n[1])+0.5,-0.3,150]; }
+ // a village: walking in along its way, and from the air; a farm lane (the settlement plan)
+ { const S=g.Settle, vs=S.list.filter(v=>v.kind==='village').sort((a,b)=>Math.abs(Math.hypot(a.x,a.z)-3500)-Math.abs(Math.hypot(b.x,b.z)-3500)), v=vs[0];
+   if(v){ const t=T[v.ti]; if(t){ const q0=Math.max(0,v.q-45), p=t[q0], n=t[Math.min(t.length-1,q0+4)]; V.village=[p[0],p[1],look(p[0],p[1],v.x,v.z),-0.03,null]; }
+     V.air_village=[v.x+260,v.z+180,look(v.x+260,v.z+180,v.x,v.z),-0.32,140]; }
+   const f=S.farms.find(f=>f.lane&&!f.lane.spur&&f.lane.length>40&&Math.hypot(f.x,f.z)>2500); if(f){ const L=f.lane, p=L[Math.min(L.length-1,30)], q=L[Math.min(L.length-1,22)]; V.lane=[p[0],p[1],look(p[0],p[1],q[0],q[1]),-0.03,null]; } }
  V.air_high=[-2500,-6500,Math.atan2(-0.3,1),-0.22,360];
  V.air_city=[650,-500,look(650,-500,2500,-3000),-0.25,140];
  return JSON.stringify(V);})()"""
