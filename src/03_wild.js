@@ -108,7 +108,7 @@ const Wild = {
     for (const m of [env.mats.wFarO]) { m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 16; }
     { const m = env.mats.wFarH; m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 32; } // and the whole country's mesh under the coarse ring, likewise
     this.farTrees = { grove: new FarTrees(area, treeSprite('grove', 60).tex[0], 10.5, 8), pine: new FarTrees(area, treeSprite('pine', 20).tex[0], 6, 13) };
-    this.mean = { grass: texMeanLin('grass'), cliff: texMeanLin('cliff'), scree: texMeanLin('scree'), sand: texMeanLin('sand'), noise: texMeanLin('farNoise'), water: texMeanLin('water'), dirt: texMeanLin('dirt'),
+    this.mean = { grass: texMeanLin('grass'), cliff: texMeanLin('cliff'), scree: texMeanLin('scree'), sand: texMeanLin('sand'), noise: texMeanLin('farNoise'), water: texMeanLin('water'), dirt: texMeanLin('dirt'), gravel: texMeanLin('gravel'),
       fWheat: texMeanLin('wheat'), fBarley: texMeanLin('barley'), fPlowed: texMeanLin('plowed'), fMeadow: texMeanLin('meadow'), fGreens: texMeanLin('greens') };
     // the open sea, far beyond the charted water round the bay
     { const n = 24, span = 9000, p = [], u = [], c = [], idx = [];
@@ -355,7 +355,16 @@ const Wild = {
     const onBridge = (x, z, m = 0) => brs.some(b => { const dx = x - b.x, dz = z - b.z, al = dx * Math.sin(b.ang) + dz * Math.cos(b.ang), ac = -dx * Math.cos(b.ang) + dz * Math.sin(b.ang); return Math.abs(al) < b.half + m && Math.abs(ac) < 2.6 + m; });
     for (const [M, draw] of [[12, false], [3, true]]) this.tracks.forEach((T, ti) => { // the ground is levelled a little beyond the chunk; the strip is drawn only within it
       let run = []; const TH2 = this.trackH[ti];
-      const flush = () => { if (run.length > 1) { if (draw) { let cur = []; for (const q of run) { if (brs.length && onBridge(T[q][0], T[q][1], -0.6)) { if (cur.length > 1) (cur.lane = T.lane, runs.push(cur)); cur = []; } else cur.push(T[q]); } if (cur.length > 1) (cur.lane = T.lane, runs.push(cur)); } else for (let q = 1; q < run.length; q++) trackSegs.push([...T[run[q - 1]], ...T[run[q]], TH2[run[q - 1]], TH2[run[q]]]); } run = []; };
+      const kind = q => T.cls ? T.cls[q] : T.lane ? WAY.lane : WAY.track, sink = q => T.sink ? T.sink[q] : 0;
+      // drawn in stretches of one kind of way, broken at the bridges; the ground is levelled across its width (and let down in a hollow way)
+      const flush = () => { if (run.length > 1) { if (draw) { let cur = null, ck = 0;
+          const start = k => { cur = []; cur.qs = []; cur.T = T; ck = k; }, end = () => { if (cur && cur.length > 1) { cur.cls = ck; runs.push(cur); } cur = null; };
+          for (const q of run) { if (brs.length && onBridge(T[q][0], T[q][1], -0.6)) { end(); continue; }
+            const k = kind(q); if (!cur) start(k);
+            else if (k !== ck) { const pq = cur.qs[cur.qs.length - 1]; cur.push(T[q]); cur.qs.push(q); end(); start(k); cur.push(T[pq]); cur.qs.push(pq); } // (each stretch runs on a point into the next, so they meet)
+            cur.push(T[q]); cur.qs.push(q); }
+          end(); }
+        else for (let q = 1; q < run.length; q++) { const a = run[q - 1], b = run[q]; trackSegs.push([...T[a], ...T[b], TH2[a], TH2[b], WAY_W[kind(b)] / 2 - 1.7, sink(a), sink(b)]); } } run = []; };
       for (let q = 0; q < T.length; q++) {
         const [px, pz] = T[q], ins = px >= x0 - M && px <= x0 + WC + M && pz >= z0 - M && pz <= z0 + WC + M;
         if (ins) { if (!run.length && q > 0) run.push(q - 1); run.push(q); } else if (run.length) { run.push(q); flush(); }
@@ -369,12 +378,13 @@ const Wild = {
     const best = new Float32Array(S * S).fill(99); // distance to the nearest track, round the chunk
     if (trackSegs.length) {
       const tgt = new Float32Array(S * S);
-      for (const [ax, az, bx, bz, ha, hb2] of trackSegs) {
-        const a0 = Math.max(0, Math.floor((Math.min(ax, bx) - 7 - x0) / WCELL) + B), a1 = Math.min(S - 1, Math.ceil((Math.max(ax, bx) + 7 - x0) / WCELL) + B);
-        const b0 = Math.max(0, Math.floor((Math.min(az, bz) - 7 - z0) / WCELL) + B), b1 = Math.min(S - 1, Math.ceil((Math.max(az, bz) + 7 - z0) / WCELL) + B);
-        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz); if (q.d < best[b * S + a]) { best[b * S + a] = q.d; tgt[b * S + a] = lerp(ha, hb2, q.t) - 0.05; } }
+      const sk = new Float32Array(S * S); // (best holds the distance from the edge of a cart track's width: a wider way reaches further)
+      for (const [ax, az, bx, bz, ha, hb2, sh, sa, sb] of trackSegs) {
+        const a0 = Math.max(0, Math.floor((Math.min(ax, bx) - 8 - x0) / WCELL) + B), a1 = Math.min(S - 1, Math.ceil((Math.max(ax, bx) + 8 - x0) / WCELL) + B);
+        const b0 = Math.max(0, Math.floor((Math.min(az, bz) - 8 - z0) / WCELL) + B), b1 = Math.min(S - 1, Math.ceil((Math.max(az, bz) + 8 - z0) / WCELL) + B);
+        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), d = q.d - sh, k = b * S + a; if (d < best[k]) { best[k] = d; tgt[k] = lerp(ha, hb2, q.t) - 0.05; const s2 = lerp(sa, sb, q.t); sk[k] = s2 > 0 ? s2 * (1 - smoothstep(1.4, 6.2, q.d)) : 0; } }
       }
-      for (let k = 0; k < S * S; k++) if (best[k] < 11) Hb[k] = lerp(Hb[k], tgt[k], 1 - smoothstep(2.4, 11, best[k]));
+      for (let k = 0; k < S * S; k++) if (best[k] < 11) Hb[k] = lerp(Hb[k], tgt[k], 1 - smoothstep(2.4, 11, best[k])) - sk[k]; // a hollow way: its bed sunk between steep banks
     }
     // rivers: the bed cut below the water, a low bank raised where the ground falls away beside it, a shallow ford where a track crosses
     const rD = new Float32Array(S * S).fill(99), rW = new Float32Array(S * S), rL = new Float32Array(S * S), rivRuns = [];
@@ -513,10 +523,17 @@ const Wild = {
     for (const R of this.rivers) if (R.end === 'pond') { const [px, pz] = R.P[R.P.length - 1], hw = 9 + R.w[R.w.length - 1] * 1.3 + 0.8; if (px < x0 || px >= x0 + WC || pz < z0 || pz >= z0 + WC) continue;
       const g = gb.grp('wStream'), y = R.wl[R.wl.length - 1], base = g.p.length / 3; g.p.push(px, y, pz); g.u.push(px / 6, pz / 6); g.c.push(0.78, 0.88, 0.9);
       for (let k = 0; k <= 20; k++) { const a = k / 20 * 6.283, qx = px + Math.cos(a) * hw, qz = pz + Math.sin(a) * hw; g.p.push(qx, y, qz); g.u.push(qx / 6, qz / 6); g.c.push(0.8, 0.9, 0.9); if (k) g.i.push(base, base + k + 1, base + k, base, base + k, base + k + 1); } }
-    for (const run of runs) { if (run.lane) { drapeStrip(gb, 'rDirt', run, 2.5, { lift: 0.068 }); drapeFeather(gb, 'rDirtF', run, 2.5, 0.6, { seed: i * 31 + j }); continue; } // a lane: a narrower, grassier way
-      drapeStrip(gb, 'rDirtCart', run, 3.4, { lift: 0.07, uvAlong: true, tw: 3.4 }); drapeFeather(gb, 'rDirtF', run, 3.4, 0.45, { seed: i * 31 + j }); }
+    for (const run of runs) { const sd = i * 31 + j + runs.indexOf(run);
+      if (run.cls === WAY.road) { drapeStrip(gb, 'rGravel', run, 5.0, { lift: 0.072 }); drapeFeather(gb, 'rGravelF', run, 5.0, 0.55, { seed: sd }); continue; } // a high road: metalled with gravel, wide enough for two carts
+      if (run.cls === WAY.lane) { drapeStrip(gb, 'rDirt', run, 2.5, { lift: 0.068 }); drapeFeather(gb, 'rDirtF', run, 2.5, 0.6, { seed: sd }); continue; } // a lane: narrower, grassier
+      if (run.cls === WAY.green) { for (const o of [-0.68, 0.68]) { const rut = run.map((p, q) => { const a = run[Math.max(0, q - 1)], b = run[Math.min(run.length - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [p[0] - (b[1] - a[1]) / l * o, p[1] + (b[0] - a[0]) / l * o]; });
+          drapeStrip(gb, 'rDirt', rut, 0.5, { lift: 0.066 }); drapeFeather(gb, 'rDirtF', rut, 0.5, 0.5, { seed: sd + (o > 0 ? 7 : 0) }); } continue; } // a green lane: two worn ruts in the grass
+      drapeStrip(gb, 'rDirtCart', run, 3.4, { lift: 0.07, uvAlong: true, tw: 3.4 }); drapeFeather(gb, 'rDirtF', run, 3.4, 0.45, { seed: sd }); }
+    for (const m of Settle.milestones || []) { if (m.x < x0 || m.x >= x0 + WC || m.z < z0 || m.z >= z0 + WC) continue; const y = this.heightAt(m.x, m.z); // a milestone by the high road
+      gb.setXf(m.x, m.z, m.ang, y - 0.3); gb.box(-0.22, 0, -0.14, 0.22, 1.15, 0.14, { side: 'stoneLight', top: 'stone' }, 1, 1); gb.box(-0.24, 1.15, -0.16, 0.24, 1.25, 0.16, 'stone', 1, 1); gb.xf = null;
+      c.cols.push({ x0: m.x - 0.3, z0: m.z - 0.3, x1: m.x + 0.3, z1: m.z + 0.3, y0: y - 1, y1: y + 1 }); }
     for (const b of brs) if (b.x >= x0 && b.x < x0 + WC && b.z >= z0 && b.z < z0 + WC) bridgeMesh(gb, b, c.cols);
-    const nearTrack = (x, z, r) => trackSegs.some(s => segDist(x, z, s[0], s[1], s[2], s[3]).d < r);
+    const nearTrack = (x, z, r) => trackSegs.some(s => segDist(x, z, s[0], s[1], s[2], s[3]).d - s[6] < r);
     for (const T of this.tracks) if (T.joined) { const [jx, jz] = T[T.length - 1]; if (jx >= x0 && jx < x0 + WC && jz >= z0 && jz < z0 + WC) { drapeDisc(gb, 'rDirt', jx, jz, 5.5, { segs: 12, rings: 2, lift: 0.066 }); } } // the gore where tracks meet is trodden bare
     const rngW = new RNG(Math.floor(_h2(i, j, 900 + WSEED) * 2147483647)), fl = c.fl; let rng = rngW;
     const blocks = []; // ground kept clear of plants: yards and buildings
@@ -588,11 +605,13 @@ const Wild = {
     for (const run of runs) for (let q = 1; q < run.length; q += 2) { // the way through farmland runs between hedges, or dry-stone walls on the uplands
       const [ax, az] = run[q - 1], [bx, bz] = run[Math.min(run.length - 1, q + 1)], mx = (ax + bx) / 2, mz = (az + bz) / 2;
       if (mx < x0 || mx >= x0 + WC || mz < z0 || mz >= z0 + WC) continue;
-      const cu = wildCult(mx, mz); if (cu < 0.35 || blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || !near.some(f => circleObb(mx, mz, 16, f)) || townCore(mx, mz) > 0 || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // only where fields border the way (and not across a cottage's front)
+      const T = run.T, sunk = T.sink ? T.sink[run.qs[q]] : 0, hollow = sunk > 0.6, cu = wildCult(mx, mz); // (a hollow way has a hedge on each bank, fields or not, unless it runs through a wood)
+      if (blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || townCore(mx, mz) > 0 || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // not across a cottage's front
+      if (hollow ? E.forestMask(mx, mz, this.heightAt(mx, mz)) > 0.4 : (cu < 0.35 || !near.some(f => circleObb(mx, mz, 16, f)))) continue; // only where fields border the way
       const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, wall = this.heightAt(mx, mz) > 70;
       for (const sd of [-1, 1]) {
-        if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < 0.25 - cu * 0.5) continue; // with gaps and field gates
-        const px = mx + nx * (run.lane ? 3.2 : 3.9) * sd, pz = mz + nz * (run.lane ? 3.2 : 3.9) * sd, y = this.heightAt(px, pz), hh = wall ? 0.95 : rng.range(1.2, 1.6);
+        if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < (hollow ? -0.2 : 0.25 - cu * 0.5)) continue; // with gaps and field gates
+        const off = hollow ? 6.4 : [3.9, 4.7, 3.2, 3.2][run.cls], px = mx + nx * off * sd, pz = mz + nz * off * sd, y = this.heightAt(px, pz), hh = wall ? 0.95 : rng.range(1.2, 1.6);
         const g = smoothstep(120, 900, this.handFD(px, pz)), hw = wall ? 0.35 : 0.6; // the same hedge as round the fields, growing wilder away from the city
         gb.setXf(px, pz, ha, y - 0.1); gb.box(-hw, -0.6, -L / 2 - 0.15, hw, wall ? hh : hh + g * 0.3, L / 2 + 0.15, wall ? { side: 'stone', top: 'stone' } : { side: 'hedge', top: 'hedge' }, 2, 2, { skip: 'ns' }); gb.xf = null;
         if (!wall && g > 0.15 && rng.chance(g * 0.8)) fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([px, y + hh - 0.5, pz, rng.range(0.55, 0.85)]);
@@ -685,7 +704,7 @@ const Wild = {
       if (s > 1.2 && rng.chance(0.6)) for (let k = 0; k < 3; k++) { const bx = x + rng.range(-2.5, 2.5) * s, bz = z + rng.range(-2.5, 2.5) * s; if (!nearTrack(bx, bz, 2.5)) boulder(gb, 'boulder', bx, this.heightAt(bx, bz), bz, s * rng.range(0.2, 0.45), rng); }
     }
     // tracks and fields lie in the same light as the ground under them; the crops keep their own colour (not the tint of heath or wood floor round them)
-    for (const [k, g] of gb.g) { if (!/^(rDirt|f[A-Z]|gDirt)/.test(k)) continue; const st = g.rgba ? 4 : 3, crop = k[0] === 'f', ft = k === 'fMeadow' ? [1.12, 1.0, 0.74] : [1.06, 0.98, 0.8];
+    for (const [k, g] of gb.g) { if (!/^(rDirt|rGravel|f[A-Z]|gDirt)/.test(k)) continue; const st = g.rgba ? 4 : 3, crop = k[0] === 'f', ft = k === 'fMeadow' ? [1.12, 1.0, 0.74] : [1.06, 0.98, 0.8];
       for (let v = 0; v < g.p.length / 3; v++) { const x = g.p[v * 3], z = g.p[v * 3 + 2], cc = crop ? litAt(x, z).map((l, q) => l * ft[q]) : colAt(x, z); g.c[v * st] = cc[0]; g.c[v * st + 1] = cc[1]; g.c[v * st + 2] = cc[2]; } }
     if (gb.g.size) group.add(gb.build(E.mats));
     group.traverse(o => { o.matrixAutoUpdate = false; });
@@ -767,7 +786,12 @@ const Wild = {
         for (let k = 0; k < o.n; k++) { const lx = -o.hx + o.pw / 2 + k * (o.pw + 2.4), [sx, sz] = xfP(o, lx, 0); if (Settle.ufAt(sx, sz) < 0.3 || this.trackD(sx, sz) < 9) continue; const rv = riverNear(sx, sz, 40); if (rv && rv.d < rv.w / 2 + 20) continue;
           const op = o.open; patch(o, lx - o.pw / 2 - 1.2, lx + o.pw / 2 + 1.2, -o.hz - 1.2, o.hz + 1.2, Settle.cropOf(o, k), [!op || k === 0, !op || k === o.n - 1, 1, 1]); }
       } }
-    for (const T of this.tracks) strip(T.filter((_, q) => q % (inner ? 5 : 12) === 0), () => inner ? 4 : 8, dc, inner ? 0.9 : 2.6);
+    { const gc = M.gravel.map((v, q) => v * 0.98 / M.noise[q]), grc = dc.map((v, q) => lerp(v, M.grass[q] * [1.02, 0.96, 0.78][q] / M.noise[q], 0.55)), st = inner ? 5 : 12; // each kind of way in its own width and colour (the coarse ring leaves out the lanes)
+      for (const T of this.tracks) { const kind = q => T.cls ? T.cls[q] : T.lane ? WAY.lane : WAY.track, idx = []; for (let q = 0; q < T.length; q += st) idx.push(q); if (idx[idx.length - 1] !== T.length - 1) idx.push(T.length - 1);
+        let pts = [T[idx[0]]], k0 = kind(idx[Math.min(1, idx.length - 1)]);
+        const out = () => { if (pts.length > 1 && (inner || k0 === WAY.track || k0 === WAY.road)) strip(pts, () => (inner ? [4, 6, 3, 2.4] : [8, 11, 6, 6])[k0], [dc, gc, dc, grc][k0], inner ? 0.9 : 2.6); };
+        for (let n = 1; n < idx.length; n++) { const k = kind(idx[n]); if (k !== k0) { out(); pts = [pts[pts.length - 1]]; k0 = k; } pts.push(T[idx[n]]); }
+        out(); } }
     yield;
     const group = new THREE.Group(); group.add(groupMesh(g, inner ? E.mats.wFar : E.mats.wFarO)); if (r.i.length) group.add(groupMesh(r, inner ? E.mats.wFarR : E.mats.wFarRO));
     group.traverse(o => { o.matrixAutoUpdate = false; });

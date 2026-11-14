@@ -364,7 +364,11 @@ const MapView = {
       if (scale > 0.12) { for (const h of Settle.housesIn(vx0, vz0, vx1, vz1)) poly(obbCorners(mkObb(h.x, h.z, h.ang, 4.5, 3.5)), '#6e5a44'); for (const b of Settle.builds) if (b.x > vx0 && b.x < vx1 && b.z > vz0 && b.z < vz1) poly(obbCorners(mkObb(b.x, b.z, b.ang, 7.5, 4.6)), '#8a8478');
         for (const f of Settle.farms) if (f.x > vx0 && f.x < vx1 && f.z > vz0 && f.z < vz1) { const FX = makeXf(f.x, f.z, f.ang); for (const [lx, lz, hx, hz, a] of [[-4, 3, 5, 3.5, 0], [6, -5, 6, 4.5, Math.PI / 2]]) { const [px, pz] = xfP(FX, lx, lz); poly(obbCorners(mkObb(px, pz, f.ang + a, hx, hz)), '#6e5a44'); } } }
     }
-    for (const T of Wild.tracks) { if (T.lane) { if (scale < 0.08) continue; x.strokeStyle = '#7d6a4a'; x.lineWidth = Math.max(1, 2.6 * scale); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); continue; }
+    for (const T of Wild.tracks) { if (T.cls && (T.lane || T.cls.includes(WAY.road))) { // by kind of way: the high roads broad and pale, the lanes thin (a lane carrying a village's traffic is drawn as a track)
+        const sty = [['#8a7350', 4, 1.5], ['#b39c6c', 6.5, 2.4], ['#7d6a4a', 2.6, 1], ['#6f7448', 2.2, 1]];
+        for (let q = 3; q < T.length + 2; q += 3) { const a = Math.min(q - 3, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const k = T.cls[b], [col, w, mw] = sty[k]; if (k >= 2 && scale < 0.08) continue;
+          x.strokeStyle = col; x.lineWidth = Math.max(mw, w * scale); x.lineCap = 'round'; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); }
+        continue; }
       x.strokeStyle = '#8a7350'; x.lineWidth = Math.max(1.5, 4 * scale); x.setLineDash(region ? [] : [6, 4]); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); x.setLineDash([]); }
     const FCOL = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' };
     for (const f of M.fields) poly(f.poly, FCOL[f.key] || '#5a5a30');
