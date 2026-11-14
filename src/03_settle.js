@@ -13,6 +13,9 @@
    same whichever chunk asks.
    ===================================================================== */
 const SETTLE_R = { village: [950, 1400], hamlet: [520, 850], city: [2200, 2900], town: [1400, 1850] }; // how far (in walking effort) the fields and the pasture reach
+// the kinds of way, by the traffic they carry: a high road (gravel, between the towns and through the busiest country), a cart track,
+// a lane to the farms, and a green lane (two worn ruts in the grass, little used)
+const WAY = { track: 0, road: 1, lane: 2, green: 3 }, WAY_W = [3.4, 5.0, 2.5, 2.4];
 const SETTLE_NAMES = [['Ash', 'Bram', 'Cold', 'Elm', 'Fern', 'Gor', 'Hart', 'Kel', 'Lark', 'Mer', 'Oak', 'Rook', 'Sedge', 'Thorn', 'Wil', 'Bar', 'Dun', 'Hol', 'Brack', 'Stan', 'Ald', 'Bur', 'Cran', 'Ever', 'Fox', 'Lang', 'Mill', 'Nor', 'Sut', 'Wether'],
   ['ford', 'ham', 'wick', 'by', 'stead', 'ley', 'combe', 'thorpe', 'well', 'hollow', 'cote', 'mere', 'field', 'bridge', 'worth', 'ton', 'den', 'hurst']];
 function _chamfer(D, NI, NJ, C) { // distances on a grid from the cells set to 0 (two passes)
@@ -275,7 +278,60 @@ const Settle = {
       for (const S of list) { const R = S.kind === 'village' ? 260 : 150; for (let j = Math.max(0, Math.floor((S.z - R - Z1) / C2)); j <= Math.min(M2 - 1, Math.ceil((S.z + R - Z1) / C2)); j++) for (let i = Math.max(0, Math.floor((S.x - R - X1) / C2)); i <= Math.min(N2 - 1, Math.ceil((S.x + R - X1) / C2)); i++) {
         const c = 0.55 * (1 - ss(R * 0.4, R, Math.hypot(X1 + i * C2 - S.x, Z1 + j * C2 - S.z))); if (c > CU[j * N2 + i]) CU[j * N2 + i] = c; } } // the green, the crofts and the commons round the houses
       this.cu = { C: C2, X0: X1, Z0: Z1, NI: N2, NJ: M2, CU }; }
-    prof.push(['cult', performance.now()]); this.prof = prof.slice(1).map(([k, t], q) => k + ':' + Math.round(t - prof[q][1])).join(' '); this.ready = true; this.ms = Math.round(performance.now() - t0);
+    prof.push(['cult', performance.now()]); this.classifyWays(); prof.push(['ways', performance.now()]); this.prof = prof.slice(1).map(([k, t], q) => k + ':' + Math.round(t - prof[q][1])).join(' '); this.ready = true; this.ms = Math.round(performance.now() - t0);
+  },
+  /* ---- the kinds of way: every village and hamlet sends its people to the nearer market town (Aldhaven or a town) along the ways,
+     and the two towns trade with each other; a way that carries much of it is a high road, a lane that carries a village's is a cart
+     track, the rest stay lanes. Lanes and tracks on a slope wear down into hollow ways. ---- */
+  classifyWays() {
+    const t0 = performance.now(), TT = Wild.tracks, off = []; let N = 0; for (const T of TT) { off.push(N); N += T.length; }
+    const X = new Float32Array(N), Z = new Float32Array(N), TI = new Int32Array(N), HC = 32, hash = new Map(), hk = (x, z) => Math.floor(x / HC) * 100003 + Math.floor(z / HC);
+    TT.forEach((T, ti) => { for (let q = 0; q < T.length; q++) { const k = off[ti] + q; X[k] = T[q][0]; Z[k] = T[q][1]; TI[k] = ti; const h = hk(X[k], Z[k]); let l = hash.get(h); if (!l) hash.set(h, l = []); l.push(k); } });
+    const nearNodes = (x, z, r, f) => { for (let i = Math.floor((x - r) / HC); i <= Math.floor((x + r) / HC); i++) for (let j = Math.floor((z - r) / HC); j <= Math.floor((z + r) / HC); j++) { const l = hash.get(i * 100003 + j); if (l) for (const k of l) if (Math.hypot(X[k] - x, Z[k] - z) < r) f(k); } };
+    // where the ways meet: each end of a way joins the nearest point of another
+    const links = new Map(), junc = [], addL = (a, b) => { for (const [u, v] of [[a, b], [b, a]]) { let l = links.get(u); if (!l) links.set(u, l = []); l.push(v); } };
+    TT.forEach((T, ti) => { for (const q of [0, T.length - 1]) { const k = off[ti] + q; let bj = -1, bd = 40; nearNodes(X[k], Z[k], 40, j => { if (TI[j] === ti) return; const d = Math.hypot(X[j] - X[k], Z[j] - Z[k]); if (d < bd) { bd = d; bj = j; } }); if (bj >= 0) { addL(k, bj); junc.push([X[k], Z[k]]); } } });
+    const walk = srcs => { const dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), hp = new _Heap(); for (const k of srcs) { dist[k] = 0; hp.push(0, k); }
+      const relax = (k, j) => { const nd = dist[k] + Math.hypot(X[j] - X[k], Z[j] - Z[k]) + 0.01; if (nd < dist[j]) { dist[j] = nd; prev[j] = k; hp.push(nd, j); } };
+      while (hp.size) { const k = hp.pop(); if (k > 0 && TI[k - 1] === TI[k]) relax(k, k - 1); if (k < N - 1 && TI[k + 1] === TI[k]) relax(k, k + 1); const l = links.get(k); if (l) for (const j of l) relax(k, j); }
+      return { dist, prev }; };
+    const cityS = [], townS = []; TT.forEach((T, ti) => { if (!T.lane && Math.max(Math.abs(T[0][0]), Math.abs(T[0][1])) < TG.R + 220) cityS.push(off[ti]); });
+    for (const Tn of TOWNS) for (const g of Tn.gates) nearNodes(g.ox, g.oz, 260, k => { if (!TT[TI[k]].lane) townS.push(k); });
+    const C = walk(cityS), Tw = townS.length ? walk(townS) : null, WT = new Float32Array(N);
+    const carry = (prev, k, w) => { for (let n = 0; k >= 0 && n < N; k = prev[k], n++) WT[k] += w; };
+    for (const S of this.list) { if (S.ti < 0 || !TT[S.ti]) continue; const k = off[S.ti] + clamp(S.q, 0, TT[S.ti].length - 1), dc = C.dist[k], dt = Tw ? Tw.dist[k] : Infinity; if (!isFinite(dc) && !isFinite(dt)) continue;
+      carry(dc <= dt ? C.prev : Tw.prev, k, S.kind === 'village' ? 3 : 1); }
+    for (const S of SITES) if (S.track >= 0 && TT[S.track] && isFinite(C.dist[off[S.track]])) carry(C.prev, off[S.track], 1); // (the landmarks draw a few visitors from the city)
+    if (townS.length) { let bk = -1, bd = Infinity; for (const k of townS) if (C.dist[k] < bd) { bd = C.dist[k]; bk = k; } if (bk >= 0) carry(C.prev, bk, 12); } // the city and the towns trade along one way
+    // the kind of each point of each way, with no stretch of high road shorter than some 150 m
+    const ROAD = 9, km = [0, 0, 0, 0]; this.milestones = [];
+    TT.forEach((T, ti) => {
+      const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (_h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75);
+      for (let q = 0; q < L; q++) { const w = WT[off[ti] + q]; cls[q] = !T.lane ? (w >= ROAD ? WAY.road : WAY.track) : w >= 2.5 ? WAY.track : green ? WAY.green : WAY.lane; }
+      for (let q = 0; q < L;) { if (cls[q] !== WAY.road) { q++; continue; } let e = q; while (e < L && cls[e] === WAY.road) e++; if (e - q < 50) for (let k = q; k < e; k++) cls[k] = WAY.track; q = e; }
+      T.cls = cls; for (let q = 1; q < L; q++) km[cls[q]] += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]) / 1000;
+      // a milestone every mile or so along a high road, on its left hand
+      let run = 0; for (let q = 1; q < L - 1; q++) { if (cls[q] !== WAY.road) { run = 0; continue; } run += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]); if (run < 1400) continue; run = 0;
+        const [ax, az] = T[q - 1], [bx, bz] = T[q + 1], l = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / l, nz = (bx - ax) / l, x = T[q][0] + nx * 3.6, z = T[q][1] + nz * 3.6;
+        if (!riverNear(x, z, 12) && !Wild.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 8)) this.milestones.push({ x, z, ang: Math.atan2(bx - ax, bz - az), seed: ti * 977 + q }); }
+    });
+    for (const b of Wild.bridges) { const T = TT[b.ti]; if (T.cls && T.cls[clamp(b.q, 0, T.length - 1)] === WAY.road) b.stone = true; } // the high roads cross the rivers on stone
+    // hollow ways: where a lane or a track climbs a slope its bed has worn down below the fields, a metre or two, between banks;
+    // not at its ends, its meetings, a crossing, a yard or among houses, where it comes up to the level of the ground
+    const jh = new SHash(48); for (const p of junc) jh.add(p, [p[0], p[1], p[0], p[1]]);
+    const calm = (x, z) => jh.query(x - 45, z - 45, x + 45, z + 45).some(p => Math.hypot(p[0] - x, p[1] - z) < 45) || this.list.some(S => Math.hypot(S.x - x, S.z - z) < 170) || this.farmHash.query(x - 50, z - 50, x + 50, z + 50).length > 0 || riverNear(x, z, 45) || Wild.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 50);
+    let sunk = 0;
+    TT.forEach((T, ti) => {
+      const L = T.length, H = Wild.trackH[ti]; if (!H || L < 30 || !T.cls) return; let any = false; const sk = new Float32Array(L);
+      for (let q = 12; q < L - 12; q++) { const c = T.cls[q]; if (c === WAY.road) continue; const g = Math.abs(H[Math.min(L - 1, q + 5)] - H[Math.max(0, q - 5)]) / 30; if (g < 0.045) continue;
+        sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g); any = true; }
+      if (!any) return;
+      for (let q = 0; q < L; q += 3) if (sk[q] > 0 || sk[Math.min(L - 1, q + 1)] > 0 || sk[Math.min(L - 1, q + 2)] > 0) { if (calm(T[q][0], T[q][1])) for (let k = Math.max(0, q - 3); k <= Math.min(L - 1, q + 5); k++) sk[k] = -1; }
+      for (let q = 0; q < L; q++) if (sk[q] < 0) sk[q] = 0;
+      const out = new Float32Array(L); for (let q = 0; q < L; q++) { let a = 0, n = 0; for (let k = -9; k <= 9; k++) { const v = sk[clamp(q + k, 0, L - 1)]; a += v; n++; } out[q] = a / n * Math.min(1, q / 12, (L - 1 - q) / 12); } // (in and out of it gradually)
+      let m = 0; for (let q = 0; q < L; q++) m = Math.max(m, out[q]); if (m > 0.2) { T.sink = out; for (let q = 1; q < L; q++) if (out[q] > 0.6) sunk += 3; }
+    });
+    this.wayKm = { road: Math.round(km[1]), track: Math.round(km[0]), lane: Math.round(km[2]), green: Math.round(km[3]), hollow: Math.round(sunk / 1000), ms: Math.round(performance.now() - t0) };
   },
   // the nearest seed of a field system (the lattice a place belongs to)
   seedAt(x, z) { let best = null, bd = 1e9; for (const s of this.seedHash.query(x - 600, z - 600, x + 600, z + 600)) { const d = (s.x - x) ** 2 + (s.z - z) ** 2; if (d < bd) { bd = d; best = s; } } return best; },
@@ -304,8 +360,8 @@ const Settle = {
     let out = this.stripCache.get(o.id); if (out) return out;
     out = []; const W = Wild, ss = smoothstep, S = o.seed, step = 4, NS = Math.max(2, Math.round(2 * o.hz / step)), dv = 2 * o.hz / NS;
     const [bx0, bz0, bx1, bz1] = obbAabb(o), m = 30, segs = [];
-    for (const T of W.tracks) { if (T.box && (T.box[0] > bx1 + m || T.box[2] < bx0 - m || T.box[1] > bz1 + m || T.box[3] < bz0 - m)) continue; const c = T.lane ? 6 : 11;
-      for (let q = 1; q < T.length; q++) { const [ax, az] = T[q - 1], [cx, cz] = T[q]; if (Math.max(ax, cx) < bx0 - m || Math.min(ax, cx) > bx1 + m || Math.max(az, cz) < bz0 - m || Math.min(az, cz) > bz1 + m) continue; segs.push([ax, az, cx, cz, c]); } }
+    for (const T of W.tracks) { if (T.box && (T.box[0] > bx1 + m || T.box[2] < bx0 - m || T.box[1] > bz1 + m || T.box[3] < bz0 - m)) continue;
+      for (let q = 1; q < T.length; q++) { const [ax, az] = T[q - 1], [cx, cz] = T[q]; if (Math.max(ax, cx) < bx0 - m || Math.min(ax, cx) > bx1 + m || Math.max(az, cz) < bz0 - m || Math.min(az, cz) > bz1 + m) continue; const k = T.cls ? T.cls[q] : T.lane ? WAY.lane : WAY.track; segs.push([ax, az, cx, cz, [11, 13, 6, 6][k] + (T.sink && T.sink[q] > 0.3 ? 2.5 : 0)]); } }
     if (LAND.wh) { const WH = LAND.wh, CC = WH.C; for (let i = Math.floor((bx0 - m) / CC); i <= Math.floor((bx1 + m) / CC); i++) for (let j = Math.floor((bz0 - m) / CC); j <= Math.floor((bz1 + m) / CC); j++) { const l = WH.get((i + 4096) * 8192 + j + 4096); if (!l) continue;
       for (let q = 0; q < l.length; q += 2) { const R = LAND.rivers[l[q]], p = l[q + 1]; segs.push([...R.P[p - 1], ...R.P[p], R.w[p] / 2 + 18]); } } }
     const HF = W.handHash.query(bx0 - 10, bz0 - 10, bx1 + 10, bz1 + 10), FM = this.farmHash.query(bx0 - 40, bz0 - 40, bx1 + 40, bz1 + 40), HS = this.houseHash.query(bx0 - 20, bz0 - 20, bx1 + 20, bz1 + 20);
