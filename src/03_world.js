@@ -7,7 +7,7 @@
    by the border itself (edgeFeat, in 03_terrain.js).
    ===================================================================== */
 Object.assign(World, {
-  ready: [], rev: 0, _all: {}, job: null, NEED: 3700, SOON: 6200, DROP: 15000, planMs: [], onReady: null,
+  ready: [], rev: 0, _all: {}, job: null, stage: '', worst: {}, NEED: 3700, SOON: 6200, DROP: 15000, planMs: [], onReady: null,
   // lists across every planned country (the home country's own while it is the only one)
   pick(K, kind) { return kind === 'tracks' ? (K.ways ? K.ways.tracks : []) : kind === 'bridges' ? (K.ways ? K.ways.bridges : []) : kind === 'rivers' ? K.land.rivers : K.settle ? (kind === 'places' ? K.settle.list : K.settle[kind] || []) : []; },
   all(kind) {
@@ -16,6 +16,7 @@ Object.assign(World, {
     let list = base.slice(); for (const K of this.ready) list = list.concat(this.pick(K, kind));
     this._all[kind] = { rev: this.rev, n: base.length, list }; return list;
   },
+  due() { return performance.now() - this.t1 > 3.5; }, t1: 0, // true when the step of a plan in hand has run long enough
   finishHome() { Settle.finishHome(); this.home.state = 2; },
   // how far a point lies from a country's box
   boxDist(i, j, x, z) { const home = isHomeTile(i, j), x0 = home ? WORLD.x0 : WORLD.x0 + i * TILE, x1 = home ? WORLD.x1 : x0 + TILE, z0 = home ? WORLD.z0 : WORLD.z0 + j * TILE, z1 = home || j >= 1 ? 1e12 : z0 + TILE; return Math.hypot(Math.max(0, x0 - x, x - x1), Math.max(0, z0 - z, z - z1)); },
@@ -26,19 +27,19 @@ Object.assign(World, {
   // a country's whole plan, in steps: its rivers and the lie of its land, its ways, its settlement, the places in it
   *planGen(K) {
     const t0 = performance.now(); K.state = 1; K.cpu = 0;
-    yield* planLandGen(K);
-    K.ways = makeWays(K); yield* K.ways.planCountry();
-    K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
-    K.settle.classifyWays(); yield;
-    POI.plan(K);
-    yield* MapView.countryImage(K);
+    this.stage = 'land'; yield* planLandGen(K);
+    this.stage = 'ways'; K.ways = makeWays(K); yield* K.ways.planCountry();
+    this.stage = 'settle'; K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
+    this.stage = 'kinds'; K.settle.classifyWays(); yield;
+    this.stage = 'places'; POI.plan(K); yield;
+    this.stage = 'map'; yield* MapView.countryImage(K);
     K.state = 2; K.wall = performance.now() - t0; this.ready.push(K); this.rev++; this.planMs.push(Math.round(K.cpu));
     if (this.onReady) this.onReady(K);
   },
   // run the plan in hand for up to ms milliseconds (each step sees only that country's own plan)
   step(ms) {
-    const J = this.job; if (!J) return false; const t0 = performance.now(), o = this.only; this.only = J.K; let done = false, n = 0, worst = 0, t1 = t0;
-    try { for (;;) { done = J.gen.next().done; n++; const t = performance.now(); worst = Math.max(worst, t - t1); t1 = t; if (done || t - t0 >= ms) break; } }
+    const J = this.job; if (!J) return false; const t0 = this.t1 = performance.now(), o = this.only; this.only = J.K; let done = false, n = 0, worst = 0, t1 = t0;
+    try { for (;;) { done = J.gen.next().done; n++; const t = this.t1 = performance.now(), dt = t - t1; worst = Math.max(worst, dt); t1 = t; if (dt > (this.worst[this.stage] || 0)) this.worst[this.stage] = Math.round(dt); if (done || t - t0 >= ms) break; } }
     catch (e) { console.error('country plan failed', J.K.i, J.K.j, e); done = true; J.K.state = 2; J.K.failed = true; if (!this.ready.includes(J.K)) this.ready.push(J.K); this.rev++; }
     finally { this.only = o; }
     J.K.cpu += performance.now() - t0; this.worstStep = Math.max(this.worstStep || 0, worst);

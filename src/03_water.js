@@ -135,7 +135,7 @@ function* planLandGen(K) {
     if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.us < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
     H[k] = terrainBase(x, z);
     // (the river will cut its own way through the border at the gap: the ground there is no sill for the country to fill up behind)
-    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.us < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
+    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.us < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (World.due()) yield; }
   const outK = gaps.out ? cellAt(gaps.out.x, gaps.out.z) : -1, inK = gaps.ins.map(g => cellAt(g.x, g.z));
   if (outK >= 0) st[outK] = 0; for (const k of inK) st[k] = 0;
   const tGrid = performance.now();
@@ -151,7 +151,7 @@ function* planLandGen(K) {
   const order = new Int32Array(n); let on = 0;
   const DI = [1, -1, 0, 0, 1, 1, -1, -1], DJ = [0, 0, 1, -1, 1, -1, 1, -1];
   while (hn) {
-    if (!home && on % 3000 === 2999) yield;
+    if (!home && (on & 255) === 0 && World.due()) yield;
     const k = pop(); order[on++] = k; const i = k % NI, j = (k - i) / NI, f = F[k];
     for (let d = 0; d < 8; d++) { const a = i + DI[d], b = j + DJ[d]; if (a < 0 || b < 0 || a >= NI || b >= NJ) continue; const q = b * NI + a; if (st[q]) continue;
       st[q] = 1; F[q] = Math.max(H[q], f + (d < 4 ? 0.02 : 0.028) * (home ? 1 : 0.2 + 1.6 * _h2(a, b, 5105))); rec[q] = k; push(q, F[q]); } // (beyond the home country the water finds a crooked way over level ground, not a ruled one)
@@ -269,14 +269,14 @@ function* planLandGen(K) {
    in it are all read from this one description (landAt), so they agree with each other and with the shape of the ground. */
 function* planLandform(K, A, ANI, ANJ, AX0, AZ0, AC) {
   const C = 50, M = 400, X0 = K.x0 - M, Z0 = K.z0 - M, NI = Math.round((K.x1 - K.x0 + 2 * M) / C) + 1, NJ = Math.round((K.z1 - K.z0 + 2 * M) / C) + 1, n = NI * NJ, home = K.home;
-  const H = new Float32Array(n); for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) H[j * NI + i] = Math.max(SEA - 1, terrainRaw(X0 + i * C, Z0 + j * C)); if (!home && j % 8 === 7) yield; }
+  const H = new Float32Array(n); for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) H[j * NI + i] = Math.max(SEA - 1, terrainRaw(X0 + i * C, Z0 + j * C)); if (!home && World.due()) yield; }
   const W = NI + 1, I = new Float64Array(W * (NJ + 1)); // sums over rectangles, for the mean height round a place
   for (let j = 0; j < NJ; j++) { let row = 0; for (let i = 0; i < NI; i++) { row += H[j * NI + i]; I[(j + 1) * W + i + 1] = I[j * W + i + 1] + row; } }
   const mean = (i, j, r) => { const i0 = Math.max(0, i - r), i1 = Math.min(NI - 1, i + r), j0 = Math.max(0, j - r), j1 = Math.min(NJ - 1, j + r); return (I[(j1 + 1) * W + i1 + 1] - I[j0 * W + i1 + 1] - I[(j1 + 1) * W + i0] + I[j0 * W + i0]) / ((i1 - i0 + 1) * (j1 - j0 + 1)); };
   const gather = (x, z) => { const fx = clamp((x - AX0) / AC, 0, ANI - 1.001), fz = clamp((z - AZ0) / AC, 0, ANJ - 1.001), i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, k = j * ANI + i; return Math.max(lerp(A[k], A[k + 1], u), lerp(A[k + ANI], A[k + ANI + 1], u), lerp(lerp(A[k], A[k + 1], u), lerp(A[k + ANI], A[k + ANI + 1], u), v)); }; // (the larger of the cells beside it, so a line of flow is not broken between them)
   const SL = new Float32Array(n), TPI = new Float32Array(n), TPL = new Float32Array(n), WET = new Float32Array(n), SUN = new Float32Array(n);
   const lh = Math.hypot(TERRAIN_LIGHT[0], TERRAIN_LIGHT[2]) || 1, lx = TERRAIN_LIGHT[0] / lh, lz = TERRAIN_LIGHT[2] / lh;
-  for (let j = 0; j < NJ; j++) { if (!home && j % 40 === 39) yield; for (let i = 0; i < NI; i++) {
+  for (let j = 0; j < NJ; j++) { if (!home && World.due()) yield; for (let i = 0; i < NI; i++) {
     const k = j * NI + i, h = H[k], gx = (H[j * NI + Math.min(NI - 1, i + 1)] - H[j * NI + Math.max(0, i - 1)]) / (2 * C), gz = (H[Math.min(NJ - 1, j + 1) * NI + i] - H[Math.max(0, j - 1) * NI + i]) / (2 * C), sl = Math.hypot(gx, gz);
     SL[k] = sl; TPI[k] = h - mean(i, j, 5); TPL[k] = h - mean(i, j, 16);
     const a = gather(X0 + i * C, Z0 + j * C), run = smoothstep(Math.log(5), Math.log(110), Math.log(a + 1)) * (1 - smoothstep(0.14, 0.4, sl)); // water gathering from above, where the ground is not too steep to hold it

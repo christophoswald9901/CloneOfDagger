@@ -312,8 +312,8 @@ const MapView = {
     this.imgs.set(World.key(K.i, K.j), { c, x0: K.x0, z0: K.z0, x1: K.x1, z1: K.z1 }); },
   *imageGen(K, N) {
     const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
-    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (j % 10 === 9) yield; }
-    for (let j = 0; j < N; j++) { if (j % 6 === 5) yield; for (let i = 0; i < N; i++) {
+    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; }
+    for (let j = 0; j < N; j++) { if (World.due()) yield; for (let i = 0; i < N; i++) {
       const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
       if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
       const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);

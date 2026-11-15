@@ -39,7 +39,7 @@ const SettleProto = {
     const cellOf = (x, z) => { const i = Math.round((x - X0) / C), j = Math.round((z - Z0) / C); return i < 0 || j < 0 || i >= NI || j >= NJ ? -1 : j * NI + i; };
     /* ---- what each 50 m cell of the country is good for ---- */
     const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n); // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
-    for (let j = 0; j < NJ; j++) { if (!home && j % 50 === 49) yield; for (let i = 0; i < NI; i++) {
+    for (let j = 0; j < NJ; j++) { if (!home && World.due()) yield; for (let i = 0; i < NI; i++) {
       const k = j * NI + i, x = cx(i), z = cz(j), h = H[k];
       if (h < SEA + 2.5 || x < K.x0 || x > K.x1 || z < K.z0 || z > K.z1 || Math.max(Math.abs(x), Math.abs(z)) < TG.R + 30 || coastZ(x) - z < 60 || (home ? rimDist(x, z) : rimEval(K.i, K.j, x, z) - 350) < 1000) { EX[k] = 1; continue; }
       if (townCore(x, z) > 0 || siteWild(x, z) > 0.05) { EX[k] = 2; continue; }
@@ -70,7 +70,7 @@ const SettleProto = {
     prof.push(['cand', performance.now()]); if (!home) yield;
     /* ---- the places worth settling, best first ---- */
     const cand = [];
-    for (let j = 2; j < NJ - 2; j++) { if (!home && j % 30 === 29) yield; for (let i = 2; i < NI - 2; i++) {
+    for (let j = 2; j < NJ - 2; j++) { if (!home && World.due()) yield; for (let i = 2; i < NI - 2; i++) {
       const k = j * NI + i; if (EX[k] || AR[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
       const x = cx(i), z = cz(j), td = W.trackD(x, z); if (cityOut(x, z) < 1150 || townOut(x, z) < 1150) continue;
       const floor = ss(-3, -14, TPI[k]) * (1 - ss(0.06, 0.16, SL[k])), expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), sd = SD[k];
@@ -102,9 +102,9 @@ const SettleProto = {
       const name = (() => { for (let t = 0; t < 30; t++) { const nm = rng.pick(SETTLE_NAMES[0]) + rng.pick(SETTLE_NAMES[1]); if (!used.has(nm)) { used.add(nm); return nm; } } return 'Newton'; })();
       list.push({ kind, x, z, ti, q, name, id: (kind === 'village' ? 'v' : 'h') + Math.round(x) + '_' + Math.round(z), score: c.s });
     };
-    { let nc = 0; for (const c of cand) { if (!home && ++nc % 1500 === 0) yield; if (cityOut(c.x, c.z) > 1700 && townOut(c.x, c.z) > 1600) place(c, 'village'); } }
+    { let nc = 0; for (const c of cand) { if (!home && World.due()) yield; if (cityOut(c.x, c.z) > 1700 && townOut(c.x, c.z) > 1600) place(c, 'village'); } }
     const sMin = cand.length ? cand[Math.floor(cand.length * 0.6)].s : 0;
-    { let nc = 0; for (const c of cand) { if (!home && ++nc % 1500 === 0) yield; if (c.s > sMin) place(c, 'hamlet'); } }
+    { let nc = 0; for (const c of cand) { if (!home && World.due()) yield; if (c.s > sMin) place(c, 'hamlet'); } }
     prof.push(['use', performance.now()]); if (!home) yield;
     /* ---- the houses of each place: along its way, a green with a well; a village has its chapel ---- */
     prof.push(['places', performance.now()]);
@@ -163,7 +163,7 @@ const SettleProto = {
       else src(cellOf(o.x, o.z), oi);
     });
     const stepCost = (k, q, len) => { const g = Math.abs(H[q] - H[k]) / len; return len * (1 + (g / 0.1) ** 2 + (EX[q] === 1 ? 3 : 0) + (WR[q] ? 5 : 0)); };
-    let nt = 0; while (hp.size) { if (!home && ++nt % 6000 === 0) yield; const k = hp.pop(), d = D[k]; if (d > 3600) continue; const i = k % NI, j = (k - i) / NI;
+    let nt = 0; while (hp.size) { if (!home && World.due()) yield; const k = hp.pop(), d = D[k]; if (d > 3600) continue; const i = k % NI, j = (k - i) / NI;
       for (let e = 0; e < 8; e++) { const a = i + DI[e], b = j + DJ[e]; if (a < 0 || b < 0 || a >= NI || b >= NJ) continue; const q = b * NI + a; if (H[q] < SEA) continue;
         const nd = d + stepCost(k, q, e < 4 ? C : C * 1.4142); if (nd < D[q]) { D[q] = nd; OWN[q] = OWN[k]; hp.push(nd, q); } } }
     prof.push(['terr', performance.now()]); if (!home) yield;
@@ -214,7 +214,7 @@ const SettleProto = {
     for (const f of W.endFarms) { const k = cellOf(f.x, f.z), F = { x: f.x, z: f.z, ang: f.ang, end: true, owner: k >= 0 ? OWN[k] : -1 }; farms.push(F); farmHash.add(F, [f.x, f.z, f.x, f.z]); }
     { const order = []; for (let k = 0; k < n; k++) if (USE[k] && OWN[k] >= 0) { const i = k % NI, j = (k - i) / NI, td = W.trackD(cx(i), cz(j)); order.push([_h2(i, j, 7350 + WSEED) - (td > 30 && td < 170 ? 0.45 : 0), k]); } // (those beside a way first: walking it, you pass them) order.sort((a, b) => a[0] - b[0]);
       let nf = 0; for (const [hv, k] of order) {
-        if (!home && ++nf % 400 === 0) yield;
+        if (!home && World.due()) yield;
         const oi = OWN[k], o = owners[oi]; if ((cnt.get(oi) || 0) >= cap[o.kind] || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
         const i = k % NI, j = (k - i) / NI; let x = cx(i) + (_h2(i, j, 7351) - 0.5) * C * 0.8, z = cz(j) + (_h2(i, j, 7352) - 0.5) * C * 0.8;
         const ci = W.ci(x), cj = W.ci(z), x0 = -TG.R + ci * WC, z0 = -TG.R + cj * WC; x = clamp(x, x0 + 34, x0 + WC - 34); z = clamp(z, z0 + 34, z0 + WC - 34); // well inside one chunk, which builds it
@@ -224,7 +224,7 @@ const SettleProto = {
     prof.push(['farms', performance.now()]);
     // their lanes, nearest the village first, so the later ones join them
     let nl = 0; for (const F of farms.filter(F => !F.end).sort((a, b) => a.d - b.d)) {
-      if (!home && ++nl % 6 === 0) yield;
+      if (!home && World.due()) yield;
       const o = owners[F.owner], w = wayNear(F.x, F.z, 170), hpt = o && (o.kind === 'village' || o.kind === 'hamlet') ? [o.x, o.z] : null;
       let tx, tz; if (w) { tx = w.x; tz = w.z; } else if (hpt) { tx = hpt[0]; tz = hpt[1]; } else { const w2 = wayNear(F.x, F.z, 1500); if (!w2) { tx = F.x; tz = F.z + 1; } else { tx = w2.x; tz = w2.z; } }
       const dl = Math.hypot(tx - F.x, tz - F.z) || 1; F.ang = Math.atan2(-(tx - F.x) / dl, -(tz - F.z) / dl) + Math.PI; // its front to the way
@@ -236,12 +236,12 @@ const SettleProto = {
     const kept = farms.filter(F => F.end || F.lane); this.farmHash = new SHash(200);
     for (const F of kept) { F.o = mkObb(F.x, F.z, F.ang, 16, 15); this.farmHash.add(F, [F.x, F.z, F.x, F.z]); }
     this.farms = kept; this.lanes = lanes; if (!home) yield;
-    W.addLanes(lanes);
+    yield* W.addLanesGen(lanes);
     prof.push(['addLanes', performance.now()]); if (!home) yield;
     /* ---- the field systems: seeds of furlong lattices over the farmland, each turned to a lane, the contour or the city's fields ---- */
     const seeds = [], seedHash = new SHash(300); let sid = 0;
     { const order = []; for (let k = 0; k < n; k++) if (USE[k]) order.push([_h2(k % NI, Math.floor(k / NI), 7370 + WSEED), k]); order.sort((a, b) => a[0] - b[0]);
-      let ns = 0; for (const [, k] of order) { if (!home && ++ns % 3000 === 0) yield; const i = k % NI, j = (k - i) / NI, x = cx(i) + (_h2(i, j, 7371) - 0.5) * C, z = cz(j) + (_h2(i, j, 7372) - 0.5) * C;
+      let ns = 0; for (const [, k] of order) { if (!home && World.due()) yield; const i = k % NI, j = (k - i) / NI, x = cx(i) + (_h2(i, j, 7371) - 0.5) * C, z = cz(j) + (_h2(i, j, 7372) - 0.5) * C;
         if (seedHash.query(x - 300, z - 300, x + 300, z + 300).some(s => Math.hypot(s.x - x, s.z - z) < 290)) continue;
         const fd = W.handFD(x, z), ha = fd < 340 ? W.handAng(x, z) : NaN; let ang;
         if (ha === ha) ang = ha + (_h2(i, j, 7373) - 0.5) * 0.08;
@@ -255,7 +255,7 @@ const SettleProto = {
     // the lattice: columns of blocks (each a few strips wide) side by side, the blocks of a column end to end, the columns staggered
     const blocks = [], blockHash = new SHash(64), RS = 440;
     for (const S of seeds) {
-      if (!home && S.id % 12 === 11) yield;
+      if (!home && World.due()) yield;
       const ca = Math.cos(S.ang), sa = Math.sin(S.ang); let u = -RS - _h2(S.id, 0, 7380) * 30, col = 0;
       while (u < RS) {
         const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = 14 + 8 * _h2(S.id, col, 7382), wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
@@ -278,7 +278,7 @@ const SettleProto = {
     // how farmed each place is, from the blocks themselves (25 m), with the commons round each village
     if (!home) yield;
     { const C2 = 25, X1 = K.x0 - 400, Z1 = K.z0 - 400, N2 = Math.ceil((K.x1 - K.x0 + 800) / C2) + 1, M2 = Math.ceil((K.z1 - K.z0 + 800) / C2) + 1, CU = new Float32Array(N2 * M2);
-      let nb = 0; for (const o of blocks) { if (!home && ++nb % 800 === 0) yield; const [a0, b0, a1, b1] = obbAabb(o), v = o.past ? 0.72 : 0.92;
+      let nb = 0; for (const o of blocks) { if (!home && World.due()) yield; const [a0, b0, a1, b1] = obbAabb(o), v = o.past ? 0.72 : 0.92;
         for (let j = Math.max(0, Math.floor((b0 - 32 - Z1) / C2)); j <= Math.min(M2 - 1, Math.ceil((b1 + 32 - Z1) / C2)); j++) for (let i = Math.max(0, Math.floor((a0 - 32 - X1) / C2)); i <= Math.min(N2 - 1, Math.ceil((a1 + 32 - X1) / C2)); i++) {
           const d = padDist({ o }, X1 + i * C2, Z1 + j * C2), c = v * (1 - ss(4, 30, d)); if (c > CU[j * N2 + i]) CU[j * N2 + i] = c; } }
       for (const S of list) { const R = S.kind === 'village' ? 260 : 150; for (let j = Math.max(0, Math.floor((S.z - R - Z1) / C2)); j <= Math.min(M2 - 1, Math.ceil((S.z + R - Z1) / C2)); j++) for (let i = Math.max(0, Math.floor((S.x - R - X1) / C2)); i <= Math.min(N2 - 1, Math.ceil((S.x + R - X1) / C2)); i++) {

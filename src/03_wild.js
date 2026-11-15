@@ -133,8 +133,9 @@ const WaysProto = {
     return out;
   },
   // a road from a pass in to the ways of the country (or to `goal`): it starts on the border's line, where the next country's road ends
-  passRoad(P, goal, seed, avoid) {
-    const pre = [[P.x, P.z], [P.x + P.nx * 45, P.z + P.nz * 45]], r = routeWild(pre[1], goal, seed, this.used, this.rc, TRC, { avoid, nodes: 140000 }); if (!r) return null;
+  passRoad(...a) { const g = this.passRoadGen(...a); let r; do r = g.next(); while (!r.done); return r.value; },
+  *passRoadGen(P, goal, seed, avoid) {
+    const pre = [[P.x, P.z], [P.x + P.nx * 45, P.z + P.nz * 45]], r = yield* routeWildGen(pre[1], goal, seed, this.used, this.rc, TRC, { avoid, nodes: 140000 }); if (!r) return null;
     let pts = pre.concat(r.path.slice(1));
     if (r.joined) { const [ex, ez] = pts[pts.length - 1]; let bp = null, bb = 1e9; for (const T of this.tracks) { if (T.lane) continue; for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bb) { bb = d; bp = q; } } } if (bp) pts.push(bp.slice()); }
     const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.pass = P.f; out[0] = [P.x, P.z];
@@ -160,26 +161,27 @@ const WaysProto = {
         const c = Math.hypot(a, b) * 0.35 + L.sl * 30 + (rv ? 4 : 0) + L.wet * 3 + Math.max(0, h - 150) / 30 + L.expo * 2; if (c < best) { best = c; this.centre = [x, z]; } }
       if (!this.centre) this.centre = [mx, mz]; }
     const PS = this.passes(); let n = 0;
-    for (const P of PS) { yield; const t = this.passRoad(P, this.centre, 1400 + (n++) * 31 + WSEED * 97 + K.i * 7 + K.j * 13); if (t) this.tracks.push(t); else console.warn('no road to the pass at', P.x, P.z); }
+    for (const P of PS) { yield; const t = yield* this.passRoadGen(P, this.centre, 1400 + (n++) * 31 + WSEED * 97 + K.i * 7 + K.j * 13); if (t) this.tracks.push(t); else console.warn('no road to the pass at', P.x, P.z); }
     // tracks out from the middle, into the widest gaps between the roads
     { const [cx, cz] = this.centre, dirs = PS.map(P => Math.atan2(P.x - cx, P.z - cz)).sort((a, b) => a - b), gapsA = [];
       for (let q = 0; q < dirs.length; q++) { const a = dirs[q], b = q + 1 < dirs.length ? dirs[q + 1] : dirs[0] + Math.PI * 2; gapsA.push([b - a, (a + b) / 2]); } if (!dirs.length) gapsA.push([6.28, 0], [6.28, 2.1], [6.28, 4.2]);
       gapsA.sort((a, b) => b[0] - a[0]);
       for (let q = 0; q < Math.min(3, gapsA.length); q++) { if (gapsA[q][0] < 1.0) break; yield; const a = gapsA[q][1], seed = 1500 + q * 31 + WSEED * 97 + K.i * 7 + K.j * 13;
-        const t = wildTrack([[cx, cz], [cx + Math.sin(a) * 40, cz + Math.cos(a) * 40]], _h2(seed, 1, 5310) < 0.5 ? [a] : [a, a + (_h2(seed, 2, 5311) - 0.5) * 1.2], seed, used, this.tracks, rc);
+        const t = yield* wildTrackGen([[cx, cz], [cx + Math.sin(a) * 40, cz + Math.cos(a) * 40]], _h2(seed, 1, 5310) < 0.5 ? [a] : [a, a + (_h2(seed, 2, 5311) - 0.5) * 1.2], seed, used, this.tracks, rc);
         if (t.length > 20) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } } }
     yield;
     this.endFarms = this.farmsAtEnds();
     const rh = new Map(); this.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const k = Math.floor(R.P[q][0] / 32) * 8192 + Math.floor(R.P[q][1] / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
     this.rh = rh; this.bridges = []; this.trackH = [];
-    this.waysFrom(0); yield;
+    yield* this.waysFromGen(0);
     this.stampTracks();
     this.trackMs = performance.now() - t0;
   },
   // the bridges and the grade of the ways from the ti0-th on (the tracks, then the lanes the settlement plan adds)
-  waysFrom(ti0) {
+  waysFrom(ti0) { const g = this.waysFromGen(ti0); while (!g.next().done); },
+  *waysFromGen(ti0) {
     const rh = this.rh;
-    this.tracks.forEach((T, ti) => { if (ti < ti0) return; for (let q = 1; q < T.length; q++) {
+    for (let ti = ti0; ti < this.tracks.length; ti++) { const T = this.tracks[ti]; if (World.due()) yield; for (let q = 1; q < T.length; q++) {
       if (T.lane && riverD(T[q][0], T[q][1]) > 60) continue; // (no water here a lane would need a bridge over)
       const [ax, az] = T[q - 1], [bx, bz] = T[q], l = []; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const c = rh.get((Math.floor(bx / 32) + i) * 8192 + Math.floor(bz / 32) + j); if (c) l.push(...c); } if (!l.length) continue; // (the river's point can lie in the next cell over from the crossing)
       for (let m = 0; m < l.length; m += 2) { const R = this.rivers[l[m]], p = l[m + 1], [cx, cz] = R.P[p - 1], [dx, dz] = R.P[p]; if (!segCross(ax, az, bx, bz, cx, cz, dx, dz)) continue;
@@ -194,16 +196,17 @@ const WaysProto = {
         const mx = long ? (px + rx) / 2 : (ax + bx) / 2, mz = long ? (pz + rz) / 2 : (az + bz) / 2, half = Math.max(w / 2, Math.hypot(rx - px, rz - pz) / 2) + 6;
         const ux = Math.sin(ang), uz = Math.cos(ang), h1 = terrainRaw(mx - ux * half, mz - uz * half), h2 = terrainRaw(mx + ux * half, mz + uz * half);
         this.bridges.push({ ti, q: long ? Math.round((k0 + k1) / 2) : q, x: mx, z: mz, ang, w, wl, half, deck: clamp(Math.min(h1, h2), wl + 1.6, wl + 5), stone: !!R.hand, pass: !!T.pass, T });
-      } } });
+      } } }
     // each track keeps an even grade: its bed is the ground along it, smoothed over some tens of metres, starting level with the gate road, level over its bridges
-    for (let ti = ti0; ti < this.tracks.length; ti++) this.trackH[ti] = ((T, ti) => { let h = T.lane ? T.map(([x, z], q) => q % 6 && q < T.length - 1 ? 0 : terrainRaw(x, z)) : T.map(([x, z]) => terrainRaw(x, z)); if (T.lane) for (let q = 0; q < h.length; q++) if (q % 6 && q < h.length - 1) { const a = q - q % 6, b = Math.min(h.length - 1, a + 6); h[q] = lerp(h[a], h[b], (q - a) / (b - a)); } // (a lane's ground taken every 18 m: its grade is smoothed over some 40 m anyway)
+    for (let ti = ti0; ti < this.tracks.length; ti++) { if (World.due()) yield; this.trackH[ti] = ((T, ti) => { let h = T.lane ? T.map(([x, z], q) => q % 6 && q < T.length - 1 ? 0 : terrainRaw(x, z)) : T.map(([x, z]) => terrainRaw(x, z)); if (T.lane) for (let q = 0; q < h.length; q++) if (q % 6 && q < h.length - 1) { const a = q - q % 6, b = Math.min(h.length - 1, a + 6); h[q] = lerp(h[a], h[b], (q - a) / (b - a)); } // (a lane's ground taken every 18 m: its grade is smoothed over some 40 m anyway)
       const bs = this.bridges.filter(b => b.ti === ti), pin = q => { for (const b of bs) { const d = Math.abs(q - b.q) * 3; if (d < b.half + 12) return [b.deck, 1 - smoothstep(b.half, b.half + 12, d)]; } return null; };
       for (let it = 0; it < 4; it++) h = h.map((_, q) => { let s = 0, n = 0; for (let k = -6; k <= 6; k++) { const v = h[clamp(q + k, 0, h.length - 1)]; s += v; n++; } const p = pin(q); return p ? lerp(s / n, p[0], p[1]) : s / n; });
-      const h0 = T.lane ? h[0] : terrainH(T[0][0], T[0][1]); for (let q = 0; q < Math.min(12, h.length); q++) h[q] = lerp(h0, h[q], q / 12); return h; })(this.tracks[ti], ti);
+      const h0 = T.lane ? h[0] : terrainH(T[0][0], T[0][1]); for (let q = 0; q < Math.min(12, h.length); q++) h[q] = lerp(h0, h[q], q / 12); return h; })(this.tracks[ti], ti); }
     for (let ti = ti0; ti < this.tracks.length; ti++) { const T = this.tracks[ti]; T.h = this.trackH[ti]; T.K = this.K; let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const [x, z] of T) { a = Math.min(a, x); b = Math.min(b, z); c = Math.max(c, x); d = Math.max(d, z); } T.box = [a, b, c, d]; }
   },
   // the lanes of the settlement plan join the ways: bridged, graded, and counted in the distance to the nearest way
-  addLanes(lanes) { const t0 = performance.now(), ti0 = this.tracks.length; this.tracks.push(...lanes); this.waysFrom(ti0); this.stampTracks(); this.laneMs = performance.now() - t0; },
+  addLanes(lanes) { const g = this.addLanesGen(lanes); while (!g.next().done); },
+  *addLanesGen(lanes) { const t0 = performance.now(), ti0 = this.tracks.length; this.tracks.push(...lanes); yield* this.waysFromGen(ti0); if (World.due()) yield; this.stampTracks(); this.laneMs = performance.now() - t0; },
   // distance to the nearest track on a coarse raster (bilinear), for the farmed belt along them
   stampTracks() {
     const K = this.K, C = 32, X0 = K.x0 - 600, Z0 = K.z0 - 600, NI = Math.ceil((K.x1 - K.x0 + 1200) / C) + 1, NJ = Math.ceil((K.z1 - K.z0 + 1200) / C) + 1, D = new Float32Array(NI * NJ).fill(999), rad = 1;
@@ -1026,14 +1029,15 @@ function bridgeMesh(gb, b, cols) {
 // a track that runs on from a gate road into the wild: routed leg by leg to low, dry ground about 3 km on in the heading of each leg,
 // through the passes, never back into the surveyed land. `used` holds the cells of earlier tracks: meeting one, this track joins it and ends there
 const TRC = 32; // the routing grid
-function wildTrack(pre, aims, seed, used, prev, rc) {
+function wildTrack(...a) { const g = wildTrackGen(...a); let r; do r = g.next(); while (!r.done); return r.value; }
+function* wildTrackGen(pre, aims, seed, used, prev, rc) {
   let pts = pre.map(p => p.slice()), joined = false;
   for (let leg = 0; leg < aims.length; leg++) {
     const [sx, sz] = pts[pts.length - 1];
     let goal = null, best = Infinity; const drift = (_h2(seed, leg, 5) - 0.5) * 0.5;
     for (let t = -6; t <= 6; t++) { const a = aims[leg] + drift + t * 0.16, gx = sx + Math.sin(a) * 3000, gz = sz + Math.cos(a) * 3000; if (rimDist(gx, gz) < 1500) continue; const h = terrainRaw(gx, gz); if (h < SEA + 4 || coastZ(gx) - gz < 150) continue; const c = Math.abs(t) * 0.16 + Math.max(0, h - 60) / 40 + (riverNear(gx, gz, 30) ? 1.5 : 0); if (c < best) { best = c; goal = [gx, gz]; } }
     if (!goal) break;
-    const r = routeWild([sx, sz], goal, seed + leg, used, rc); if (!r) break;
+    const r = yield* routeWildGen([sx, sz], goal, seed + leg, used, rc); if (!r) break;
     pts = pts.concat(r.path.slice(1));
     if (r.joined) { // run on to the track it met
       const [ex, ez] = pts[pts.length - 1]; let bp = null, bd = 1e9; for (const T of prev) for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bd) { bd = d; bp = q; } }
@@ -1049,7 +1053,9 @@ function wildTrack(pre, aims, seed, used, prev, rc) {
   for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); } // near enough to meet
   return out;
 }
-function routeWild(from, to, seed, used, rc = null, C = TRC, opts = {}) {
+// (a search runs in steps, so a country planned while the game runs does not hold a frame up; routeWild runs one through at once)
+function routeWild(...a) { const g = routeWildGen(...a); let r; do r = g.next(); while (!r.done); return r.value; }
+function* routeWildGen(from, to, seed, used, rc = null, C = TRC, opts = {}) {
   const si = Math.round(from[0] / C), sj = Math.round(from[1] / C), ti = Math.round(to[0] / C), tj = Math.round(to[1] / C), OI = si - 4096, OJ = sj - 4096; // (cells are numbered from the start, so the search works as far from the city as it likes)
   const key = (i, j) => (i - OI) * 8192 + (j - OJ), hs = new Map();
   const hAt = (i, j) => { const k = key(i, j); let h = hs.get(k); if (h === undefined) hs.set(k, h = terrainRaw(i * C, j * C)); return h; };
@@ -1059,6 +1065,7 @@ function routeWild(from, to, seed, used, rc = null, C = TRC, opts = {}) {
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
   const S = key(si, sj), T = key(ti, tj); g.set(S, 0); push(S, 0); let n = 0, found = null;
   while (heap.length && n++ < (opts.nodes || 55000)) {
+    if ((n & 127) === 0 && World.due()) yield;
     const [, k] = pop(); if (closed.has(k)) continue; closed.add(k);
     const i = Math.floor(k / 8192) + OI, j = k % 8192 + OJ, hk = hAt(i, j);
     if (k === T || (used.has(i * 8192 + j) && Math.hypot(i * C - from[0], j * C - from[1]) > 60 && Math.hypot(i * C, j * C) > 1800)) { found = k; break; } // tracks from different gates meet out in the country, not under the walls
