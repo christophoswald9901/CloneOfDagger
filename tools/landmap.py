@@ -1,6 +1,9 @@
 """Plans of the generated country from above: the lie of the land, and what covers it.
 python3 tools/landmap.py OUTDIR [seed ...]   -> OUTDIR/land_s{seed}.png (left: landform, right: cover)
-REGION=x0,z0,x1,z1,step                        -> another window (default: the whole country at 40 m a pixel)
+REGION=x0,z0,x1,z1,step                        -> another window (default: the home country at 40 m a pixel); every country it
+                                                  touches is planned first, e.g. REGION=-30000,-38000,30000,2000,80 for the home country
+                                                  and the ring of countries round it. Borders are drawn as thin black lines, the passes
+                                                  as white squares and the river gaps as cyan squares.
 Left:  red = open hilltop (expo), blue = wet, green = valley floor, brightness = height; valley sides hatched darker.
 Right: dark green woods, yellow farmland, purple heath, blue rivers, grey rock, pale green open grass (shaded by height).
 Over the right panel, the settlement plan: field blocks (tan: ploughed, olive: pasture), high roads (yellow), tracks (brown), lanes (white),
@@ -12,8 +15,9 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else 'tools/out/land'
 SEEDS = [int(a) for a in sys.argv[2:]] or [0]
 REGION = os.environ.get('REGION', '-10000,-18000,10000,2000,40')
 JS = r"""(()=>{const g=__game,[X0,Z0,X1,Z1,S]=[REGION],W=Math.round((X1-X0)/S),Hh=Math.round((Z1-Z0)/S),c=document.createElement('canvas');c.width=W*2+4;c.height=Hh;
+ g.World.DROP=1e12; const tp=performance.now(), planned=g.World.planBox(X0,Z0,X1-1,Z1-1), planMs=Math.round(performance.now()-tp);
  const x=c.getContext('2d'),im=x.createImageData(W*2+4,Hh),d=im.data,fm=g.G.city.forestMask,t0=performance.now();
- const riv=new Uint8Array(W*Hh); for(const R of g.LAND.rivers)for(let q=0;q<R.P.length;q++){const i=Math.floor((R.P[q][0]-X0)/S),j=Math.floor((R.P[q][1]-Z0)/S); if(i>=0&&j>=0&&i<W&&j<Hh&&R.w[q]>2)riv[j*W+i]=1;}
+ const riv=new Uint8Array(W*Hh); for(const R of g.Wild.rivers)for(let q=0;q<R.P.length;q++){const i=Math.floor((R.P[q][0]-X0)/S),j=Math.floor((R.P[q][1]-Z0)/S); if(i>=0&&j>=0&&i<W&&j<Hh&&R.w[q]>2)riv[j*W+i]=1;}
  let n={wood:0,cult:0,heath:0,land:0};
  for(let j=0;j<Hh;j++)for(let i=0;i<W;i++){const wx=X0+(i+0.5)*S,wz=Z0+(j+0.5)*S,h=g.terrainRaw(wx,wz),L=g.landAt(wx,wz),sea=h<0.2;
   const put=(o,r,gg,b)=>{const k=(j*(W*2+4)+i+o)*4;d[k]=r;d[k+1]=gg;d[k+2]=b;d[k+3]=255;};
@@ -33,13 +37,16 @@ JS = r"""(()=>{const g=__game,[X0,Z0,X1,Z1,S]=[REGION],W=Math.round((X1-X0)/S),H
  for(const T of g.Wild.tracks){for(let q=1;q<T.length;q++){const k=T.cls?T.cls[q]:(T.lane?2:0),[c,w]=WS[k];x.strokeStyle=(T.sink&&T.sink[q]>0.6)?'#ff40ff':c;x.lineWidth=w;x.beginPath();x.moveTo(PX(T[q-1][0]),PZ(T[q-1][1]));x.lineTo(PX(T[q][0]),PZ(T[q][1]));x.stroke();}}
  for(const f of S2.farms){x.fillStyle='#ff8a00';x.fillRect(PX(f.x)-2,PZ(f.z)-2,4,4);}
  x.font='bold 11px sans-serif';for(const V of S2.list){const r=V.kind==='village'?7:4;x.strokeStyle='#e01010';x.lineWidth=2;x.beginPath();x.arc(PX(V.x),PZ(V.z),r,0,7);x.stroke();if(V.kind==='village'){x.fillStyle='#fff';x.fillText(V.name,PX(V.x)+9,PZ(V.z)+4);}}
- x.restore(); return JSON.stringify({villages:S2.list.filter(v=>v.kind==='village').length,hamlets:S2.list.filter(v=>v.kind==='hamlet').length,farms:S2.farms.length,lanes:S2.lanes.length,blocks:S2.blocks.length,settleMs:S2.ms,ways:S2.wayKm,milestones:(S2.milestones||[]).length,laneMs:Math.round(g.Wild.laneMs||0),ms:Math.round(performance.now()-t0),land:g.LAND.ms,wood:(n.wood/n.land).toFixed(3),cult:(n.cult/n.land).toFixed(3),heath:(n.heath/n.land).toFixed(3),png:c.toDataURL('image/png')});})()"""
+ for(const K of g.World.list){x.strokeStyle='rgba(0,0,0,0.55)';x.lineWidth=1;x.strokeRect(PX(K.x0),PZ(K.z0),(K.x1-K.x0)/S,(K.z1-K.z0)/S);
+  if(K.ways)for(const P of K.ways.passes()){x.fillStyle='#fff';x.fillRect(PX(P.x)-3,PZ(P.z)-3,6,6);}}
+ for(const f of g.EDGES.values())if(f.gap===f.gap){const px=f.vert?-10000+f.n*10000:f.gap,pz=f.vert?f.gap:-18000+f.n*10000;x.fillStyle='#00ffff';x.fillRect(PX(px)-3,PZ(pz)-3,6,6);}
+ x.restore(); return JSON.stringify({planned,planMs,planCpu:g.World.planMs,worstStep:Math.round(g.World.worstStep||0),villages:S2.list.filter(v=>v.kind==='village').length,hamlets:S2.list.filter(v=>v.kind==='hamlet').length,farms:S2.farms.length,lanes:S2.lanes.length,blocks:S2.blocks.length,settleMs:S2.ms,ways:S2.wayKm,milestones:(S2.milestones||[]).length,laneMs:Math.round(g.Wild.laneMs||0),ms:Math.round(performance.now()-t0),land:g.LAND.ms,wood:(n.wood/n.land).toFixed(3),cult:(n.cult/n.land).toFixed(3),heath:(n.heath/n.land).toFixed(3),png:c.toDataURL('image/png')});})()"""
 async def main():
     import json
     os.makedirs(OUT, exist_ok=True)
     for seed in SEEDS:
         c = CDP()
-        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}'): print('boot failed', c.errors()[:2]); c.stop(); return
+        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}', timeout=240): print('boot failed', c.errors()[:2]); c.stop(); return
         r = await c.ev(JS.replace('[REGION]', '[' + REGION + ']'))
         try: o = json.loads(r)
         except Exception: print(seed, 'failed:', str(r)[:400]); c.stop(); continue

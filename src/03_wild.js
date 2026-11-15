@@ -66,9 +66,10 @@ class WildPool {
   set(lists) {
     let n = 0; for (const l of lists) n += l.length;
     if (n > this.cap) this.grow(Math.ceil(n * 1.3));
-    const m = this._m.elements; let k = 0;
-    for (const l of lists) for (const p of l) { const s = p[3] || 1; m.fill(0); m[0] = m[5] = m[10] = s; m[12] = p[0]; m[13] = p[1]; m[14] = p[2]; m[15] = 1; this.mesh.setMatrixAt(k++, this._m); }
-    this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
+    const m = this._m.elements; let k = 0, ox = 0, oz = 0;
+    for (const l of lists) if (l.length) { ox = Math.round(l[0][0] / 256) * 256; oz = Math.round(l[0][2] / 256) * 256; break; } // (placed from a point near them: see localize)
+    for (const l of lists) for (const p of l) { const s = p[3] || 1; m.fill(0); m[0] = m[5] = m[10] = s; m[12] = p[0] - ox; m[13] = p[1]; m[14] = p[2] - oz; m[15] = 1; this.mesh.setMatrixAt(k++, this._m); }
+    this.mesh.position.set(ox, 0, oz); this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
 // mean linear colour of a texture, so the horizon mesh (colour in its vertices) matches the textured ground up close
@@ -78,98 +79,15 @@ function texMeanLin(key) {
   return s.map(v => v / (d.length / 4));
 }
 
-const Wild = {
-  on: false, area: null, env: null, chunks: new Map(), job: null, jobKey: null, dirty: false,
-  yawU: { value: 0 }, pools: {}, tracks: [], tD: null,
-  // the far ground, beyond the chunks: a finer ring out to some 1.2 km and a coarse one to some 3 km, each kept round the camera.
-  // A chunk's square of far ground is not drawn while the chunk itself is there (the mask), and the coarse ring is not drawn over the fine one
-  FAR: [{ C: 16, R: 1232, snap: WC, move: WC * 2, inner: true }, { C: 64, R: 3072, snap: WC * 4, move: WC * 6 }],
-  maskU: { value: null }, innerU: { value: new THREE.Vector4(1e9, 1e9, -1e9, -1e9) }, outerU: { value: new THREE.Vector4(-3072, -3072, 3072, 3072) },
-
-  init(area, env) {
-    this.area = area; this.env = env; this.on = true;
-    for (const [k, [tex, seed, w, h, , small]] of Object.entries(WILD_KINDS)) {
-      const [, sk, fr] = tex.split(':'); this.pools[k] = new WildPool(area, tex.startsWith('s:') ? simpleSprite(sk, { flowers: 4, heather: 2, weed: 3 }[sk] || 1).tex[+fr || 0] : treeSprite(tex, seed).tex[0], w, h, small ? (/^flowers/.test(k) ? 1 : 0.8) : 0);
-    }
-    // which chunks have their full ground (and the surveyed square): one texel a chunk over the whole world
-    { const N = 128, d = new Uint8Array(N * N * 4), t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true; this.maskData = d; this.maskTex = t; this.maskU.value = t;
-      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.setMask(i, j, true); }
-    // the far ground's haze matches the near ground's, then turns bluer with distance; it is not drawn where nearer ground lies
-    const farShader = (m, outer, pull = false) => { m.onBeforeCompile = sh => {
-      sh.uniforms.wMask = this.maskU; sh.uniforms.wInner = this.innerU; sh.uniforms.wOuter = this.outerU;
-      sh.vertexShader = 'varying vec2 vWxz; varying float vWy;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n { vec4 wp = modelMatrix * vec4(transformed, 1.0); vWxz = wp.xz; vWy = wp.y; }');
-      if (pull) sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', 'vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0); mvPosition.xyz *= 0.995; gl_Position = projectionMatrix * mvPosition;'); // (rivers drawn over the far ground win where it would hide them)
-      sh.fragmentShader = '#define FAR_HIGH\nuniform sampler2D wMask; uniform vec4 wInner; uniform vec4 wOuter; varying vec2 vWxz; varying float vWy;\n' + sh.fragmentShader.replace('void main() {', `void main() {
-        if (texture2D(wMask, (floor((vWxz + 352.0) / 176.0) + vec2(64.5, 112.5)) / 128.0).r > 0.5) discard;
-        ${outer === 1 ? 'if (vWxz.x > wInner.x + 64.0 && vWxz.y > wInner.y + 64.0 && vWxz.x < wInner.z - 64.0 && vWxz.y < wInner.w - 64.0) discard;' : outer === 2 ? 'if (vWxz.x > wOuter.x + 200.0 && vWxz.y > wOuter.y + 200.0 && vWxz.x < wOuter.z - 200.0 && vWxz.y < wOuter.w - 200.0) discard;' : ''}`).replace('#include <fog_fragment>', FAR_FOG); };
-      m.customProgramCacheKey = () => 'wildFar' + outer + (pull ? 'p' : ''); };
-    farShader(env.mats.wFar, 0); farShader(env.mats.wFarR, 0, true); farShader(env.mats.wFarO, 1); farShader(env.mats.wFarRO, 1, true); farShader(env.mats.wFarH, 2);
-    // the coarse ring reaches a cell under the fine one, pushed back in depth: where they overlap the fine ground shows, and no crack opens between them
-    for (const m of [env.mats.wFarO]) { m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 16; }
-    { const m = env.mats.wFarH; m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 32; } // and the whole country's mesh under the coarse ring, likewise
-    this.farTrees = { grove: new FarTrees(area, treeSprite('grove', 60).tex[0], 10.5, 8), pine: new FarTrees(area, treeSprite('pine', 20).tex[0], 6, 13) };
-    this.mean = { grass: texMeanLin('grass'), cliff: texMeanLin('cliff'), scree: texMeanLin('scree'), sand: texMeanLin('sand'), noise: texMeanLin('farNoise'), water: texMeanLin('water'), dirt: texMeanLin('dirt'), gravel: texMeanLin('gravel'),
-      fWheat: texMeanLin('wheat'), fBarley: texMeanLin('barley'), fPlowed: texMeanLin('plowed'), fMeadow: texMeanLin('meadow'), fGreens: texMeanLin('greens') };
-    // the open sea, far beyond the charted water round the bay
-    { const n = 24, span = 9000, p = [], u = [], c = [], idx = [];
-      for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const x = -span / 2 + span * i / n, z = -span / 2 + span * j / n; p.push(x, 0, z); u.push(x / 6, z / 6); c.push(1.16, 1.18, 1.16); }
-      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i; idx.push(a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2); }
-      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); geo.setIndex(idx);
-      this.sea = new THREE.Mesh(geo, env.mats.wSea); this.sea.frustumCulled = false; this.sea.renderOrder = -1; area.scene.add(this.sea);
-      // it is not drawn inland, where it would show as a band of water beyond the edge of the far ground: the coastline, every 50 m along it
-      const N = 512, d = new Float32Array(N * 4); for (let q = 0; q < N; q++) d[q * 4] = coastZ(-12800 + q * 50);
-      const ct = new THREE.DataTexture(d, N, 1, THREE.RGBAFormat, THREE.FloatType); ct.magFilter = ct.minFilter = THREE.NearestFilter; ct.needsUpdate = true; const cu = { value: ct };
-      const prev = env.mats.wSea.onBeforeCompile; env.mats.wSea.onBeforeCompile = sh => { if (prev) prev(sh); sh.uniforms.wCoast = cu;
-        sh.vertexShader = 'varying vec2 vSxz;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSxz = (modelMatrix * vec4(transformed, 1.0)).xz;');
-        sh.fragmentShader = 'uniform sampler2D wCoast; varying vec2 vSxz;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSxz.y < texture2D(wCoast, vec2((vSxz.x + 12800.0) / 25600.0, 0.5)).r - 90.0) discard;'); };
-      env.mats.wSea.customProgramCacheKey = () => 'wildSea'; env.mats.wSea.needsUpdate = true; }
-    if (!this.tracks.length) this.planTracks(env.tracksFrom);
-    // the hand-made country round the city (its fields, hedges and orchards): nothing generated is laid over it, and how far a point lies
-    // from it (or from the surveyed square) sets how much the generated land beside it still follows its pattern
-    this.hand = env.handFields || []; this.handHash = new SHash(48); for (const o of this.hand) this.handHash.add(o, obbAabb(o));
-    { const C = 8, R = 1100, N = Math.round(2 * R / C) + 1, D = new Float32Array(N * N), FD = new Float32Array(N * N).fill(1e9), A = new Float32Array(N * N).fill(NaN);
-      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) D[j * N + i] = Math.max(0, Math.max(Math.abs(-R + i * C), Math.abs(-R + j * C)) - TG.R);
-      for (const o of this.hand) { const [bx0, bz0, bx1, bz1] = obbAabb(o), m = 180;
-        for (let j = Math.max(0, Math.floor((bz0 - m + R) / C)); j <= Math.min(N - 1, Math.ceil((bz1 + m + R) / C)); j++) for (let i = Math.max(0, Math.floor((bx0 - m + R) / C)); i <= Math.min(N - 1, Math.ceil((bx1 + m + R) / C)); i++) {
-          const k = j * N + i, d = padDist({ o }, -R + i * C, -R + j * C); if (d < D[k]) D[k] = d; if (d < FD[k]) { FD[k] = d; A[k] = o.ang; } } }
-      this.hR = { C, R, N, D, A, FD }; }
-    this.rivers = LAND.rivers;
-    { const t0 = performance.now(); Settle.plan(); this.settleMs = performance.now() - t0; } // the villages, hamlets, farmsteads, lanes and fields of the whole country
-    Sites.build(area, env.mats); // the landmarks' buildings, kept for good (each is seen from far off)
-    POI.plan(); // the small places out in the country
-    this.buildFarNow(this.FAR[0], 0, 0); this.FAR[1].job = this.genFar(this.FAR[1], 0, 0); // the coarse ring is built over the first frames
-    this.buildHorizon();
-  },
-  // the whole country, very coarsely, behind the far rings: from anywhere the mountains round its edge stand on the skyline
-  buildHorizon() {
-    const C = 200, X0 = WORLD.x0 - 2600, Z0 = WORLD.z0 - 2600, NI = Math.round((WORLD.x1 - WORLD.x0 + 5200) / C), NJ = Math.round((WORLD.z1 - WORLD.z0 + 3800) / C), M = this.mean;
-    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = siteFix(X0 + i * C, Z0 + j * C, terrainBase(X0 + i * C, Z0 + j * C));
-    const hb = (i, j) => H[clamp(j, 0, NJ) * (NI + 1) + clamp(i, 0, NI)], col = new Float32Array((NI + 1) * (NJ + 1) * 3);
-    for (let j = 0; j <= NJ; j++) for (let i = 0; i <= NI; i++) {
-      const x = X0 + i * C, z = Z0 + j * C, h = hb(i, j), gx = (hb(i + 1, j) - hb(i - 1, j)) / (2 * C), gz = (hb(i, j + 1) - hb(i, j - 1)) / (2 * C), nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), sh = terrainShade(nn), k = (j * (NI + 1) + i) * 3;
-      const TL = wildTreeLine(x, z), SL = wildSnowLine(x, z) + 120, wood = 0.55 * (1 - smoothstep(TL - 30, TL + 10, h)), rock = Math.max(smoothstep(0.35, 0.75, Math.hypot(gx, gz) * 2.2), 0.6 * smoothstep(TL + 60, TL + 200, h)) * smoothstep(TL - 20, TL + 80, h), snow = 0.8 * smoothstep(SL, SL + 120, h) * smoothstep(0.35, 0.75, nn[1]);
-      for (let q = 0; q < 3; q++) { const grass = M.grass[q] * [1.02, 0.96, 0.78][q] * (1 - wood * 0.45), v = lerp(lerp(grass, M.cliff[q] * [0.78, 0.84, 0.98][q], rock), 1.45, snow); col[k + q] = sh[q] * v / M.noise[q]; } // dark rock, snow only on the tops
-    }
-    const g = { p: [], u: [], c: [], i: [] };
-    for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
-      const hs = [hb(i, j), hb(i + 1, j), hb(i, j + 1), hb(i + 1, j + 1)]; if (Math.max(...hs) < SEA - 3) continue;
-      const base = g.p.length / 3; [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([di, dj], q) => { const vx = X0 + (i + di) * C, vz = Z0 + (j + dj) * C, k = ((j + dj) * (NI + 1) + i + di) * 3; g.p.push(vx, hs[q] - 1.5, vz); g.u.push(vx / 6, vz / 6); g.c.push(col[k], col[k + 1], col[k + 2]); });
-      g.i.push(base, base + 3, base + 1, base, base + 2, base + 3);
-    }
-    const m = groupMesh(g, this.env.mats.wFarH); m.frustumCulled = false; this.horizon = m; this.area.scene.add(m);
-  },
-  setMask(i, j, on) { const u = i + 64, v = j + 112; if (u < 0 || v < 0 || u >= 128 || v >= 128) return; this.maskData[(v * 128 + u) * 4] = on ? 255 : 0; this.maskTex.needsUpdate = true; },
+// the ways of one country: its tracks (and the lanes the settlement plan adds), their bridges and grades, and how far any place lies from one
+const WaysProto = {
   // tracks run on from the gate roads far into the country; a later one that meets an earlier one joins it, the others end at a farmstead.
   // They keep to easy ground, wade the small rivers and cross the large ones by bridges.
   // Planned before the city lays its ground, so the surveyed land can be levelled for them where they leave it
   planTracks(from) {
     const t0 = performance.now(), used = new Set();
-    this.tracks = []; this.trackEnds = []; this.rivers = LAND.rivers;
-    const rc = new Map(); // the route grid's cells a river runs through, with its width there
-    const rn = new Set(); // cells within a stone's throw of a river: a track keeps to the valley side, not the bank
-    for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 6) { const [x, z] = R.P[q], r = R.w[q] / 2 + 30; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) rn.add(i * 8192 + j); }
-    rc.near = rn;
-    for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q], r = R.w[q] / 2 + 3; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) { const k = i * 8192 + j; rc.set(k, Math.max(rc.get(k) || 0, R.hand ? 99 : R.w[q])); } }
+    this.tracks = []; this.trackEnds = []; this.rivers = this.K.land.rivers;
+    const rc = this.riverCells();
     from.forEach(({ pre, aims }, i) => { const t = wildTrack(pre, aims, 700 + i * 31 + WSEED * 97, used, this.tracks, rc); if (t.length > 1) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } });
     // each site's road: its own fixed way out, then on over the country to the nearest track, which it joins
     SITES.flatMap(S => (S.roads || [S.road]).map((rd, ri) => [S, rd, ri])).forEach(([S, rd, ri], si) => {
@@ -182,16 +100,79 @@ const Wild = {
       for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); }
     });
     // a farmstead where a track ends: its yard a little beyond the end, well inside one chunk, its front to the way
-    this.endFarms = this.trackEnds.map(({ ti }) => { const T = this.tracks[ti], L = T.length, [ex, ez] = T[L - 1], [px, pz] = T[Math.max(0, L - 8)], l = Math.hypot(ex - px, ez - pz) || 1, ux = (ex - px) / l, uz = (ez - pz) / l;
-      const spot = (a, r) => { const c = Math.cos(a), s = Math.sin(a); let fx = ex + (ux * c - uz * s) * r, fz = ez + (ux * s + uz * c) * r; const i0 = this.ci(fx), j0 = this.ci(fz), cx0 = -TG.R + i0 * WC, cz0 = -TG.R + j0 * WC;
-        return [clamp(fx, cx0 + 34, cx0 + WC - 34), clamp(fz, cz0 + 34, cz0 + WC - 34)]; };
-      const clear = ([x, z]) => { const rv = riverNear(x, z, 60); return rv ? rv.d - rv.w / 2 : 60; }; // how far the yard keeps from any stream
-      let fx, fz, bc = -1e9; look: for (const r of [24, 36, 48]) for (const a of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.3, -2.3]) { const p = spot(a, r), c = clear(p); if (c > bc) { bc = c; [fx, fz] = p; } if (c > 14) break look; } // the first spot clear of the water, or failing that the clearest
-      return { x: fx, z: fz, ang: Math.atan2(-(ex - fx), -(ez - fz)) + Math.PI, sg: [px, pz, ex, ez] }; });
+    this.endFarms = this.farmsAtEnds();
     // where a track meets a river: a ford through the shallows, or a bridge over it
     const rh = new Map(); this.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const k = Math.floor(R.P[q][0] / 32) * 8192 + Math.floor(R.P[q][1] / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
     this.rh = rh; this.bridges = []; this.trackH = []; this.used = used; this.rc = rc;
     this.waysFrom(0);
+    this.stampTracks();
+    this.trackMs = performance.now() - t0;
+  },
+  // a farmstead where a track ends: its yard a little beyond the end, well inside one chunk, its front to the way
+  farmsAtEnds() {
+    return this.trackEnds.map(({ ti }) => { const T = this.tracks[ti], L = T.length, [ex, ez] = T[L - 1], [px, pz] = T[Math.max(0, L - 8)], l = Math.hypot(ex - px, ez - pz) || 1, ux = (ex - px) / l, uz = (ez - pz) / l;
+      const spot = (a, r) => { const c = Math.cos(a), s = Math.sin(a); let fx = ex + (ux * c - uz * s) * r, fz = ez + (ux * s + uz * c) * r; const i0 = Wild.ci(fx), j0 = Wild.ci(fz), cx0 = -TG.R + i0 * WC, cz0 = -TG.R + j0 * WC;
+        return [clamp(fx, cx0 + 34, cx0 + WC - 34), clamp(fz, cz0 + 34, cz0 + WC - 34)]; };
+      const clear = ([x, z]) => { const rv = riverNear(x, z, 60); return rv ? rv.d - rv.w / 2 : 60; }; // how far the yard keeps from any stream
+      let fx, fz, bc = -1e9; look: for (const r of [24, 36, 48]) for (const a of [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.3, -2.3]) { const p = spot(a, r), c = clear(p); if (c > bc) { bc = c; [fx, fz] = p; } if (c > 14) break look; } // the first spot clear of the water, or failing that the clearest
+      return { x: fx, z: fz, ang: Math.atan2(-(ex - fx), -(ez - fz)) + Math.PI, sg: [px, pz, ex, ez] }; });
+  },
+  // the grid cells of the routing grid the rivers run through (rc: with the width there) and near (rc.near)
+  riverCells() {
+    const rc = new Map(), rn = new Set();
+    for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 6) { const [x, z] = R.P[q], r = R.w[q] / 2 + 30; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) rn.add(i * 8192 + j); }
+    rc.near = rn;
+    for (const R of this.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q], r = R.w[q] / 2 + 3; for (let i = Math.floor((x - r) / TRC); i <= Math.floor((x + r) / TRC); i++) for (let j = Math.floor((z - r) / TRC); j <= Math.floor((z + r) / TRC); j++) { const k = i * 8192 + j; rc.set(k, Math.max(rc.get(k) || 0, R.hand ? 99 : R.w[q])); } }
+    return rc;
+  },
+  // the passes of this country's borders: where a road crosses each (on the border's line), and the way in from there
+  passes() {
+    const K = this.K, out = [], add = (f, nx, nz) => { if (f.pass === f.pass) out.push({ f, x: f.vert ? WORLD.x0 + f.n * TILE : f.pass, z: f.vert ? f.pass : WORLD.z0 + f.n * TILE, nx, nz }); };
+    if (K.home) { add(edgeFeat(1, 0, 1), 1, 0); add(edgeFeat(1, 2, 1), -1, 0); add(edgeFeat(0, 0, 0), 0, 1); return out; }
+    add(edgeFeat(1, K.i, K.j), 1, 0); add(edgeFeat(1, K.i + 1, K.j), -1, 0); add(edgeFeat(0, K.j, K.i), 0, 1); if (K.j < 1) add(edgeFeat(0, K.j + 1, K.i), 0, -1);
+    return out;
+  },
+  // a road from a pass in to the ways of the country (or to `goal`): it starts on the border's line, where the next country's road ends
+  passRoad(P, goal, seed, avoid) {
+    const pre = [[P.x, P.z], [P.x + P.nx * 45, P.z + P.nz * 45]], r = routeWild(pre[1], goal, seed, this.used, this.rc, TRC, { avoid, nodes: 140000 }); if (!r) return null;
+    let pts = pre.concat(r.path.slice(1));
+    if (r.joined) { const [ex, ez] = pts[pts.length - 1]; let bp = null, bb = 1e9; for (const T of this.tracks) { if (T.lane) continue; for (const q of T) { const d = Math.hypot(q[0] - ex, q[1] - ez); if (d < bb) { bb = d; bp = q; } } } if (bp) pts.push(bp.slice()); }
+    const out = resampleEven(smoothPath(simplifyPath(pts, 3), 2), 3); out.joined = true; out.pass = P.f; out[0] = [P.x, P.z];
+    for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) this.used.add((i + di) * 8192 + j + dj); }
+    return out;
+  },
+  // the home country's roads out: from each pass in to the nearest track, laid after everything else so the country's own plan stays as it was
+  homePasses() {
+    const S = this.K.settle, avoid = (x, z) => S.near(x, z, 34) || S.builds.some(b => Math.hypot(b.x - x, b.z - z) < 40) || POI.near(x, z, 16).length > 0 || siteZone(x, z, 40), list = [];
+    this.passes().forEach((P, pi) => {
+      let tp = null, bd = 1e9; for (const T of this.tracks) { if (T.lane) continue; for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - P.x, T[q][1] - P.z); if (d < bd) { bd = d; tp = T[q]; } } }
+      const t = tp && this.passRoad(P, tp, 1300 + pi * 17 + WSEED * 97, avoid); if (t) list.push(t); else console.warn('no road to the pass at', P.x, P.z); });
+    this.addLanes(list);
+  },
+  // the ways of a country beyond the home one: a meeting place near its middle, a road in from each pass (the later ones join the earlier),
+  // and a few tracks wandering out from the middle into the rest of it
+  *planCountry() {
+    const t0 = performance.now(), K = this.K, used = new Set(); this.tracks = []; this.trackEnds = []; this.rivers = K.land.rivers;
+    const rc = this.riverCells(); this.used = used; this.rc = rc; yield;
+    { let best = 1e9; const mx = (K.x0 + K.x1) / 2, mz = (K.z0 + K.z1) / 2; // the meeting place: level, dry, low ground near the middle
+      for (let a = -5; a <= 5; a++) for (let b = -5; b <= 5; b++) { const x = mx + a * 420 + 300 * (_h2(a + K.i * 31, b + K.j * 17, 5300 + WSEED) - 0.5), z = mz + b * 420 + 300 * (_h2(a + K.i * 31, b + K.j * 17, 5301 + WSEED) - 0.5), h = terrainRaw(x, z);
+        if (h < SEA + 4 || coastZ(x) - z < 400 || rimEval(K.i, K.j, x, z) - 350 < 2000) continue; const rv = riverNear(x, z, 90), L = landAt(x, z);
+        const c = Math.hypot(a, b) * 0.35 + L.sl * 30 + (rv ? 4 : 0) + L.wet * 3 + Math.max(0, h - 150) / 30 + L.expo * 2; if (c < best) { best = c; this.centre = [x, z]; } }
+      if (!this.centre) this.centre = [mx, mz]; }
+    const PS = this.passes(); let n = 0;
+    for (const P of PS) { yield; const t = this.passRoad(P, this.centre, 1400 + (n++) * 31 + WSEED * 97 + K.i * 7 + K.j * 13); if (t) this.tracks.push(t); else console.warn('no road to the pass at', P.x, P.z); }
+    // tracks out from the middle, into the widest gaps between the roads
+    { const [cx, cz] = this.centre, dirs = PS.map(P => Math.atan2(P.x - cx, P.z - cz)).sort((a, b) => a - b), gapsA = [];
+      for (let q = 0; q < dirs.length; q++) { const a = dirs[q], b = q + 1 < dirs.length ? dirs[q + 1] : dirs[0] + Math.PI * 2; gapsA.push([b - a, (a + b) / 2]); } if (!dirs.length) gapsA.push([6.28, 0], [6.28, 2.1], [6.28, 4.2]);
+      gapsA.sort((a, b) => b[0] - a[0]);
+      for (let q = 0; q < Math.min(3, gapsA.length); q++) { if (gapsA[q][0] < 1.0) break; yield; const a = gapsA[q][1], seed = 1500 + q * 31 + WSEED * 97 + K.i * 7 + K.j * 13;
+        const t = wildTrack([[cx, cz], [cx + Math.sin(a) * 40, cz + Math.cos(a) * 40]], _h2(seed, 1, 5310) < 0.5 ? [a] : [a, a + (_h2(seed, 2, 5311) - 0.5) * 1.2], seed, used, this.tracks, rc);
+        if (t.length > 20) { this.tracks.push(t); if (!t.joined) this.trackEnds.push({ ti: this.tracks.length - 1 }); } } }
+    yield;
+    this.endFarms = this.farmsAtEnds();
+    const rh = new Map(); this.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const k = Math.floor(R.P[q][0] / 32) * 8192 + Math.floor(R.P[q][1] / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
+    this.rh = rh; this.bridges = []; this.trackH = [];
+    this.waysFrom(0); yield;
     this.stampTracks();
     this.trackMs = performance.now() - t0;
   },
@@ -212,30 +193,20 @@ const Wild = {
         const long = k1 - k0 > 2, [px, pz] = T[k0], [rx, rz] = T[k1], ang = long ? Math.atan2(rx - px, rz - pz) : Math.atan2(bx - ax, bz - az);
         const mx = long ? (px + rx) / 2 : (ax + bx) / 2, mz = long ? (pz + rz) / 2 : (az + bz) / 2, half = Math.max(w / 2, Math.hypot(rx - px, rz - pz) / 2) + 6;
         const ux = Math.sin(ang), uz = Math.cos(ang), h1 = terrainRaw(mx - ux * half, mz - uz * half), h2 = terrainRaw(mx + ux * half, mz + uz * half);
-        this.bridges.push({ ti, q: long ? Math.round((k0 + k1) / 2) : q, x: mx, z: mz, ang, w, wl, half, deck: clamp(Math.min(h1, h2), wl + 1.6, wl + 5), stone: !!R.hand });
+        this.bridges.push({ ti, q: long ? Math.round((k0 + k1) / 2) : q, x: mx, z: mz, ang, w, wl, half, deck: clamp(Math.min(h1, h2), wl + 1.6, wl + 5), stone: !!R.hand, pass: !!T.pass, T });
       } } });
     // each track keeps an even grade: its bed is the ground along it, smoothed over some tens of metres, starting level with the gate road, level over its bridges
     for (let ti = ti0; ti < this.tracks.length; ti++) this.trackH[ti] = ((T, ti) => { let h = T.lane ? T.map(([x, z], q) => q % 6 && q < T.length - 1 ? 0 : terrainRaw(x, z)) : T.map(([x, z]) => terrainRaw(x, z)); if (T.lane) for (let q = 0; q < h.length; q++) if (q % 6 && q < h.length - 1) { const a = q - q % 6, b = Math.min(h.length - 1, a + 6); h[q] = lerp(h[a], h[b], (q - a) / (b - a)); } // (a lane's ground taken every 18 m: its grade is smoothed over some 40 m anyway)
       const bs = this.bridges.filter(b => b.ti === ti), pin = q => { for (const b of bs) { const d = Math.abs(q - b.q) * 3; if (d < b.half + 12) return [b.deck, 1 - smoothstep(b.half, b.half + 12, d)]; } return null; };
       for (let it = 0; it < 4; it++) h = h.map((_, q) => { let s = 0, n = 0; for (let k = -6; k <= 6; k++) { const v = h[clamp(q + k, 0, h.length - 1)]; s += v; n++; } const p = pin(q); return p ? lerp(s / n, p[0], p[1]) : s / n; });
       const h0 = T.lane ? h[0] : terrainH(T[0][0], T[0][1]); for (let q = 0; q < Math.min(12, h.length); q++) h[q] = lerp(h0, h[q], q / 12); return h; })(this.tracks[ti], ti);
-    for (let ti = ti0; ti < this.tracks.length; ti++) { const T = this.tracks[ti]; let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const [x, z] of T) { a = Math.min(a, x); b = Math.min(b, z); c = Math.max(c, x); d = Math.max(d, z); } T.box = [a, b, c, d]; }
+    for (let ti = ti0; ti < this.tracks.length; ti++) { const T = this.tracks[ti]; T.h = this.trackH[ti]; T.K = this.K; let a = 1e9, b = 1e9, c = -1e9, d = -1e9; for (const [x, z] of T) { a = Math.min(a, x); b = Math.min(b, z); c = Math.max(c, x); d = Math.max(d, z); } T.box = [a, b, c, d]; }
   },
   // the lanes of the settlement plan join the ways: bridged, graded, and counted in the distance to the nearest way
   addLanes(lanes) { const t0 = performance.now(), ti0 = this.tracks.length; this.tracks.push(...lanes); this.waysFrom(ti0); this.stampTracks(); this.laneMs = performance.now() - t0; },
-  // the ground a track leaves the surveyed land over is cut for it the same way as in the wild beyond
-  levelFine() {
-    const { C, R, N } = TG, S = N + 1, segs = [];
-    this.tracks.forEach((T, ti) => { for (let q = 1; q < T.length; q++) { const [ax, az] = T[q - 1], [bx, bz] = T[q]; if (Math.max(Math.abs(ax), Math.abs(az)) > R + 14 && Math.max(Math.abs(bx), Math.abs(bz)) > R + 14) continue; segs.push([ax, az, bx, bz, this.trackH[ti][q - 1], this.trackH[ti][q]]); } });
-    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
-      const x = -R + i * C, z = -R + j * C; if (Math.max(Math.abs(x), Math.abs(z)) < R - 30) continue;
-      let bd = 99, bt = 0; for (const [ax, az, bx, bz, ha, hb] of segs) { const q = segDist(x, z, ax, az, bx, bz); if (q.d < bd) { bd = q.d; bt = lerp(ha, hb, q.t) - 0.05; } }
-      if (bd < 11) TH[j * S + i] = lerp(TH[j * S + i], bt, 1 - smoothstep(2.4, 11, bd));
-    }
-  },
   // distance to the nearest track on a coarse raster (bilinear), for the farmed belt along them
   stampTracks() {
-    const C = 32, X0 = WORLD.x0 - 600, Z0 = WORLD.z0 - 600, NI = Math.ceil((WORLD.x1 - WORLD.x0 + 1200) / C) + 1, NJ = Math.ceil((WORLD.z1 - WORLD.z0 + 1200) / C) + 1, D = new Float32Array(NI * NJ).fill(999), rad = 1;
+    const K = this.K, C = 32, X0 = K.x0 - 600, Z0 = K.z0 - 600, NI = Math.ceil((K.x1 - K.x0 + 1200) / C) + 1, NJ = Math.ceil((K.z1 - K.z0 + 1200) / C) + 1, D = new Float32Array(NI * NJ).fill(999), rad = 1;
     for (const T of this.tracks) for (let q = 0; q < T.length; q += 4) { // exact near the way, then spread out over the grid (a chamfer distance: within a few per cent)
       const [px, pz] = T[q], ci = Math.round((px - X0) / C), cj = Math.round((pz - Z0) / C);
       for (let j = cj - rad; j <= cj + rad; j++) for (let i = ci - rad; i <= ci + rad; i++) { if (i < 0 || j < 0 || i >= NI || j >= NJ) continue; const d = Math.hypot(X0 + i * C - px, Z0 + j * C - pz); if (d < D[j * NI + i]) D[j * NI + i] = d; }
@@ -247,6 +218,123 @@ const Wild = {
     const T = this.tD; if (!T) return 999; const fx = (x - T.X0) / T.C, fz = (z - T.Z0) / T.C, i = Math.floor(fx), j = Math.floor(fz);
     if (i < 0 || j < 0 || i >= T.NI - 1 || j >= T.NJ - 1) return 999; const u = fx - i, v = fz - j, k = j * T.NI + i, D = T.D;
     return lerp(lerp(D[k], D[k + 1], u), lerp(D[k + T.NI], D[k + T.NI + 1], u), v);
+  },
+  handFD(x, z) { return Wild.handFD(x, z); }, handAng(x, z) { return Wild.handAng(x, z); }, get handHash() { return Wild.handHash; }, ci(v) { return Wild.ci(v); },
+};
+function makeWays(K) { const W = Object.create(WaysProto); return Object.assign(W, { K, tracks: [], bridges: [], trackH: [], trackEnds: [], endFarms: [], tD: null, rivers: K.land.rivers }); }
+// while the home country is planned: the land as it was, and only its own plan in sight
+function homePlan(fn) { const l = LEGACY, o = World.only; LEGACY = 1; World.only = World.home; try { return fn(); } finally { LEGACY = l; World.only = o; } }
+
+const Wild = {
+  on: false, area: null, env: null, chunks: new Map(), job: null, jobKey: null, dirty: false,
+  yawU: { value: 0 }, pools: {},
+  // the ways, bridges and rivers of every country that is planned (while one is being planned: its own only)
+  get tracks() { return World.only ? World.only.ways.tracks : World.all('tracks'); },
+  get bridges() { return World.only ? World.only.ways.bridges : World.all('bridges'); },
+  get rivers() { return World.only ? World.only.land.rivers : World.all('rivers'); },
+  get endFarms() { return World.home.ways.endFarms; }, get trackH() { return World.home.ways.trackH; },
+  planTracks(from) { const W = World.home.ways || (World.home.ways = makeWays(World.home)); homePlan(() => W.planTracks(from)); this.trackMs = W.trackMs; },
+  trackD(x, z) { if (World.only) return World.only.ways ? World.only.ways.trackD(x, z) : 999; let d = 999; for (const K of World.around(x, z, 650)) if (K.ways) d = Math.min(d, K.ways.trackD(x, z)); return d; },
+  // the far ground, beyond the chunks: a finer ring out to some 1.2 km and a coarse one to some 3 km, each kept round the camera.
+  // A chunk's square of far ground is not drawn while the chunk itself is there (the mask), and the coarse ring is not drawn over the fine one
+  FAR: [{ C: 16, R: 1232, snap: WC, move: WC * 2, inner: true }, { C: 64, R: 3072, snap: WC * 4, move: WC * 6 }],
+  HZ: { C: 200, R: 11000, move: 1600, at: null, job: null },
+  maskU: { value: null }, maskO: { value: new THREE.Vector2(-64, -64) }, coastO: { value: -12800 }, innerU: { value: new THREE.Vector4(1e9, 1e9, -1e9, -1e9) }, outerU: { value: new THREE.Vector4(-3072, -3072, 3072, 3072) },
+
+  init(area, env) {
+    this.area = area; this.env = env; this.on = true;
+    for (const [k, [tex, seed, w, h, , small]] of Object.entries(WILD_KINDS)) {
+      const [, sk, fr] = tex.split(':'); this.pools[k] = new WildPool(area, tex.startsWith('s:') ? simpleSprite(sk, { flowers: 4, heather: 2, weed: 3 }[sk] || 1).tex[+fr || 0] : treeSprite(tex, seed).tex[0], w, h, small ? (/^flowers/.test(k) ? 1 : 0.8) : 0);
+    }
+    // which chunks have their full ground (and the surveyed square): one texel a chunk over the whole world
+    { const N = 128, d = new Uint8Array(N * N * 4), t = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); t.magFilter = t.minFilter = THREE.NearestFilter; t.needsUpdate = true; this.maskData = d; this.maskTex = t; this.maskU.value = t;
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.setMask(i, j, true); }
+    World.onReady = () => { for (const L of this.FAR) L.stale = true; }; // a country newly planned: the far ground over it is drawn again, with its rivers, fields and ways
+    // the far ground's haze matches the near ground's, then turns bluer with distance; it is not drawn where nearer ground lies
+    const farShader = (m, outer, pull = false) => { m.onBeforeCompile = sh => {
+      sh.uniforms.wMask = this.maskU; sh.uniforms.wMaskO = this.maskO; sh.uniforms.wInner = this.innerU; sh.uniforms.wOuter = this.outerU;
+      sh.vertexShader = 'varying vec2 vWxz; varying float vWy;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n { vec4 wp = modelMatrix * vec4(transformed, 1.0); vWxz = wp.xz; vWy = wp.y; }');
+      if (pull) sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', 'vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0); mvPosition.xyz *= 0.995; gl_Position = projectionMatrix * mvPosition;'); // (rivers drawn over the far ground win where it would hide them)
+      sh.fragmentShader = '#define FAR_HIGH\nuniform sampler2D wMask; uniform vec2 wMaskO; uniform vec4 wInner; uniform vec4 wOuter; varying vec2 vWxz; varying float vWy;\n' + sh.fragmentShader.replace('void main() {', `void main() {
+        { vec2 mc = floor((vWxz + 352.0) / 176.0) - wMaskO; if (mc.x >= 0.0 && mc.y >= 0.0 && mc.x < 128.0 && mc.y < 128.0 && texture2D(wMask, (mc + 0.5) / 128.0).r > 0.5) discard; }
+        ${outer === 1 ? 'if (vWxz.x > wInner.x + 64.0 && vWxz.y > wInner.y + 64.0 && vWxz.x < wInner.z - 64.0 && vWxz.y < wInner.w - 64.0) discard;' : outer === 2 ? 'if (vWxz.x > wOuter.x + 200.0 && vWxz.y > wOuter.y + 200.0 && vWxz.x < wOuter.z - 200.0 && vWxz.y < wOuter.w - 200.0) discard;' : ''}`).replace('#include <fog_fragment>', FAR_FOG); };
+      m.customProgramCacheKey = () => 'wildFar' + outer + (pull ? 'p' : ''); };
+    farShader(env.mats.wFar, 0); farShader(env.mats.wFarR, 0, true); farShader(env.mats.wFarO, 1); farShader(env.mats.wFarRO, 1, true); farShader(env.mats.wFarH, 2);
+    // the coarse ring reaches a cell under the fine one, pushed back in depth: where they overlap the fine ground shows, and no crack opens between them
+    for (const m of [env.mats.wFarO]) { m.polygonOffset = true; m.polygonOffsetFactor = 2; m.polygonOffsetUnits = 16; }
+    { const m = env.mats.wFarH; m.polygonOffset = true; m.polygonOffsetFactor = 4; m.polygonOffsetUnits = 32; } // and the whole country's mesh under the coarse ring, likewise
+    this.farTrees = { grove: new FarTrees(area, treeSprite('grove', 60).tex[0], 10.5, 8), pine: new FarTrees(area, treeSprite('pine', 20).tex[0], 6, 13) };
+    this.mean = { grass: texMeanLin('grass'), cliff: texMeanLin('cliff'), scree: texMeanLin('scree'), sand: texMeanLin('sand'), noise: texMeanLin('farNoise'), water: texMeanLin('water'), dirt: texMeanLin('dirt'), gravel: texMeanLin('gravel'),
+      fWheat: texMeanLin('wheat'), fBarley: texMeanLin('barley'), fPlowed: texMeanLin('plowed'), fMeadow: texMeanLin('meadow'), fGreens: texMeanLin('greens') };
+    // the open sea, far beyond the charted water round the bay
+    { const n = 24, span = 9000, p = [], u = [], c = [], idx = [];
+      for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) { const x = -span / 2 + span * i / n, z = -span / 2 + span * j / n; p.push(x, 0, z); u.push(x / 6, z / 6); c.push(1.16, 1.18, 1.16); }
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i; idx.push(a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2); }
+      const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(u, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(c, 3)); geo.setIndex(idx);
+      this.sea = new THREE.Mesh(geo, env.mats.wSea); this.sea.frustumCulled = false; this.sea.renderOrder = -1; area.scene.add(this.sea);
+      // it is not drawn inland, where it would show as a band of water beyond the edge of the far ground: the coastline, every 50 m along it
+      const N = 512, d = new Float32Array(N * 4); for (let q = 0; q < N; q++) d[q * 4] = coastZ(-12800 + q * 50);
+      const ct = new THREE.DataTexture(d, N, 1, THREE.RGBAFormat, THREE.FloatType); ct.magFilter = ct.minFilter = THREE.NearestFilter; ct.needsUpdate = true; const cu = { value: ct }; this.coastData = d; this.coastTex = ct;
+      const prev = env.mats.wSea.onBeforeCompile; env.mats.wSea.onBeforeCompile = sh => { if (prev) prev(sh); sh.uniforms.wCoast = cu; sh.uniforms.wCoastO = this.coastO;
+        sh.vertexShader = 'varying vec2 vSxz;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vSxz = (modelMatrix * vec4(transformed, 1.0)).xz;');
+        sh.fragmentShader = 'uniform sampler2D wCoast; uniform float wCoastO; varying vec2 vSxz;\n' + sh.fragmentShader.replace('void main() {', 'void main() {\n if (vSxz.y < texture2D(wCoast, vec2((vSxz.x - wCoastO) / 25600.0, 0.5)).r - 90.0) discard;'); };
+      env.mats.wSea.customProgramCacheKey = () => 'wildSea'; env.mats.wSea.needsUpdate = true; }
+    if (!World.home.ways) this.planTracks(env.tracksFrom);
+    // the hand-made country round the city (its fields, hedges and orchards): nothing generated is laid over it, and how far a point lies
+    // from it (or from the surveyed square) sets how much the generated land beside it still follows its pattern
+    this.hand = env.handFields || []; this.handHash = new SHash(48); for (const o of this.hand) this.handHash.add(o, obbAabb(o));
+    { const C = 8, R = 1100, N = Math.round(2 * R / C) + 1, D = new Float32Array(N * N), FD = new Float32Array(N * N).fill(1e9), A = new Float32Array(N * N).fill(NaN);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) D[j * N + i] = Math.max(0, Math.max(Math.abs(-R + i * C), Math.abs(-R + j * C)) - TG.R);
+      for (const o of this.hand) { const [bx0, bz0, bx1, bz1] = obbAabb(o), m = 180;
+        for (let j = Math.max(0, Math.floor((bz0 - m + R) / C)); j <= Math.min(N - 1, Math.ceil((bz1 + m + R) / C)); j++) for (let i = Math.max(0, Math.floor((bx0 - m + R) / C)); i <= Math.min(N - 1, Math.ceil((bx1 + m + R) / C)); i++) {
+          const k = j * N + i, d = padDist({ o }, -R + i * C, -R + j * C); if (d < D[k]) D[k] = d; if (d < FD[k]) { FD[k] = d; A[k] = o.ang; } } }
+      this.hR = { C, R, N, D, A, FD }; }
+    { const t0 = performance.now(); Settle.plan(); this.settleMs = performance.now() - t0; } // the villages, hamlets, farmsteads, lanes and fields of the home country
+    Sites.build(area, env.mats); // the landmarks' buildings, kept for good (each is seen from far off)
+    homePlan(() => POI.plan(World.home)); // the small places out in the country
+    World.finishHome();
+    this.buildFarNow(this.FAR[0], 0, 0); this.FAR[1].job = this.genFar(this.FAR[1], 0, 0); // the coarse ring is built over the first frames
+    this.horizonNow(0, 0);
+  },
+  // the land out to some 11 km, very coarsely, behind the far rings: the ranges between the countries stand on the skyline. It follows
+  // the camera, built again (over some frames) each time the camera has gone 1.6 km
+  *genHorizon(cx, cz) {
+    const Z = this.HZ, C = Z.C, n = Math.round(2 * Z.R / C), X0 = Math.round(cx / 800) * 800 - Z.R, Z0 = Math.round(cz / 800) * 800 - Z.R, NI = n, NJ = n, M = this.mean;
+    const H = new Float32Array((NI + 1) * (NJ + 1)); for (let j = 0; j <= NJ; j++) { for (let i = 0; i <= NI; i++) H[j * (NI + 1) + i] = siteFix(X0 + i * C, Z0 + j * C, terrainBase(X0 + i * C, Z0 + j * C)); if (j % 3 === 2) yield; }
+    const hb = (i, j) => H[clamp(j, 0, NJ) * (NI + 1) + clamp(i, 0, NI)], col = new Float32Array((NI + 1) * (NJ + 1) * 3);
+    for (let j = 0; j <= NJ; j++) { if (j % 8 === 7) yield; for (let i = 0; i <= NI; i++) {
+      const x = X0 + i * C, z = Z0 + j * C, h = hb(i, j), gx = (hb(i + 1, j) - hb(i - 1, j)) / (2 * C), gz = (hb(i, j + 1) - hb(i, j - 1)) / (2 * C), nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), sh = terrainShade(nn), k = (j * (NI + 1) + i) * 3;
+      const TL = wildTreeLine(x, z), SL = wildSnowLine(x, z) + 120, wood = 0.55 * (1 - smoothstep(TL - 30, TL + 10, h)), rock = Math.max(smoothstep(0.35, 0.75, Math.hypot(gx, gz) * 2.2), 0.6 * smoothstep(TL + 60, TL + 200, h)) * smoothstep(TL - 20, TL + 80, h), snow = 0.8 * smoothstep(SL, SL + 120, h) * smoothstep(0.35, 0.75, nn[1]);
+      for (let q = 0; q < 3; q++) { const grass = M.grass[q] * [1.02, 0.96, 0.78][q] * (1 - wood * 0.45), v = lerp(lerp(grass, M.cliff[q] * [0.78, 0.84, 0.98][q], rock), 1.45, snow); col[k + q] = sh[q] * v / M.noise[q]; } // dark rock, snow only on the tops
+    } }
+    const g = { p: [], u: [], c: [], i: [] };
+    for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
+      const hs = [hb(i, j), hb(i + 1, j), hb(i, j + 1), hb(i + 1, j + 1)]; if (Math.max(...hs) < SEA - 3) continue;
+      const base = g.p.length / 3; [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([di, dj], q) => { const vx = X0 + (i + di) * C, vz = Z0 + (j + dj) * C, k = ((j + dj) * (NI + 1) + i + di) * 3; g.p.push(vx, hs[q] - 1.5, vz); g.u.push(vx / 6, vz / 6); g.c.push(col[k], col[k + 1], col[k + 2]); });
+      g.i.push(base, base + 3, base + 1, base, base + 2, base + 3);
+    }
+    yield;
+    const m = groupMesh(g, this.env.mats.wFarH, X0 + Z.R, Z0 + Z.R); m.frustumCulled = false;
+    if (this.horizon) { this.area.scene.remove(this.horizon); this.horizon.geometry.dispose(); }
+    this.horizon = m; this.area.scene.add(m); Z.at = [cx, cz];
+  },
+  horizonNow(x, z) { const g = this.genHorizon(x, z); while (!g.next().done); this.HZ.job = null; },
+  setMask(i, j, on) { const u = i - this.maskO.value.x, v = j - this.maskO.value.y; if (u < 0 || v < 0 || u >= 128 || v >= 128) return; this.maskData[(v * 128 + u) * 4] = on ? 255 : 0; this.maskTex.needsUpdate = true; },
+  // the mask covers 128 chunks square round the camera, and the coastline 25.6 km of shore: both are moved on as the camera nears their edges
+  follow(x, z) {
+    const ci = this.ci(x), cj = this.ci(z), O = this.maskO.value;
+    if (Math.abs(ci - O.x - 64) > 24 || Math.abs(cj - O.y - 64) > 24) { O.set(ci - 64, cj - 64); this.maskData.fill(0); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) this.setMask(i, j, true); for (const c of this.chunks.values()) if (c.done) this.setMask(c.i, c.j, true); this.maskTex.needsUpdate = true; }
+    if (Math.abs(x - this.coastO.value - 12800) > 3200) { const x0 = Math.round(x / 3200) * 3200 - 12800, d = this.coastData; for (let q = 0; q < 512; q++) d[q * 4] = coastZ(x0 + q * 50); this.coastO.value = x0; this.coastTex.needsUpdate = true; }
+  },
+  // the ground a track leaves the surveyed land over is cut for it the same way as in the wild beyond
+  levelFine() {
+    const { C, R, N } = TG, S = N + 1, segs = [];
+    this.tracks.forEach((T, ti) => { for (let q = 1; q < T.length; q++) { const [ax, az] = T[q - 1], [bx, bz] = T[q]; if (Math.max(Math.abs(ax), Math.abs(az)) > R + 14 && Math.max(Math.abs(bx), Math.abs(bz)) > R + 14) continue; segs.push([ax, az, bx, bz, T.h[q - 1], T.h[q]]); } });
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+      const x = -R + i * C, z = -R + j * C; if (Math.max(Math.abs(x), Math.abs(z)) < R - 30) continue;
+      let bd = 99, bt = 0; for (const [ax, az, bx, bz, ha, hb] of segs) { const q = segDist(x, z, ax, az, bx, bz); if (q.d < bd) { bd = q.d; bt = lerp(ha, hb, q.t) - 0.05; } }
+      if (bd < 11) TH[j * S + i] = lerp(TH[j * S + i], bt, 1 - smoothstep(2.4, 11, bd));
+    }
   },
   // how far a point lies from the hand-made country (0 on it), and the heading of the nearest hand-made field (NaN if none near)
   handD(x, z) {
@@ -266,7 +354,7 @@ const Wild = {
   /* ---------- the ways near a box (the farmed land itself is laid out by the settlement plan, Settle) ---------- */
   trackPtsNear(x0, z0, x1, z1, step = 2) { const out = []; for (const T of this.tracks) for (let q = 0; q < T.length; q += step) { const [x, z] = T[q]; if (x > x0 && x < x1 && z > z0 && z < z1) out.push(T[q]); } return out; },
   ci(v) { return Math.floor((v + TG.R) / WC); },
-  key(i, j) { return i * 4096 + j; },
+  key(i, j) { return (i + 524288) * 1048576 + j + 524288; },
   inCity(i, j) { const n = 2 * TG.R / WC; return i >= 0 && j >= 0 && i < n && j < n; },
   rectDist(i, j, x, z) { const x0 = -TG.R + i * WC, z0 = -TG.R + j * WC; return Math.hypot(Math.max(0, x0 - x, x - x0 - WC), Math.max(0, z0 - z, z - z0 - WC)); },
 
@@ -283,18 +371,22 @@ const Wild = {
   // build what the player needs right now in one go (a new game, a loaded save, a journey's end)
   prime(x, z) {
     if (!this.on) return;
+    World.prime(x, z); this.follow(x, z);
     if (this.job) { this.finish(this.jobKey[0], this.jobKey[1], this.job); this.job = null; }
-    for (const L of this.FAR) if (!L.at || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move) this.buildFarNow(L, x, z);
+    for (const L of this.FAR) if (!L.at || L.stale || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move) this.buildFarNow(L, x, z);
+    if (!this.HZ.at || Math.hypot(this.HZ.at[0] - x, this.HZ.at[1] - z) > this.HZ.move * 2) this.horizonNow(x, z);
     for (;;) { const w = this.wanted(x, z); if (!w.length || w[0].d > 200) break; this.finish(w[0].i, w[0].j, this.genChunk(w[0].i, w[0].j)); }
     this.refreshPools(x, z);
   },
-  buildFarNow(L, x, z) { const g = this.genFar(L, x, z); let r; do r = g.next(); while (!r.done); L.job = null; },
+  buildFarNow(L, x, z) { L.stale = false; const g = this.genFar(L, x, z); let r; do r = g.next(); while (!r.done); L.job = null; },
 
   wanted(x, z) {
     const out = [], i0 = this.ci(x - WILD.near), i1 = this.ci(x + WILD.near), j0 = this.ci(z - WILD.near), j1 = this.ci(z + WILD.near);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       if (this.inCity(i, j) || this.chunks.has(this.key(i, j))) continue;
-      const d = this.rectDist(i, j, x, z); if (d < WILD.near) out.push({ i, j, d });
+      const d = this.rectDist(i, j, x, z); if (d >= WILD.near) continue;
+      const cx0 = -TG.R + i * WC, cz0 = -TG.R + j * WC; if (!World.readyIn(cx0, cz0, cx0 + WC, cz0 + WC, 1000)) continue; // (its country, and any other near enough to reach into it, must be planned first)
+      out.push({ i, j, d });
     }
     return out.sort((a, b) => a.d - b.d);
   },
@@ -303,13 +395,17 @@ const Wild = {
     if (!this.on) return;
     this.yawU.value = yaw;
     this.sea.position.set(Math.round(cp.x / 60) * 60, SEA - 0.12, Math.round(cp.z / 60) * 60);
-    const x = cp.x, z = cp.z, t0 = performance.now();
+    const x = cp.x, z = cp.z; this.follow(x, z);
+    World.update(x, z, this.fast); // the countries ahead are planned a little each frame
+    const t0 = performance.now();
     for (const [k, c] of this.chunks) if (c.done && this.rectDist(c.i, c.j, x, z) > WILD.drop) this.unload(k, c);
     // trees and small plants follow the player at their own distances
     let sig = ''; for (const c of this.chunks.values()) if (c.done) { const d = this.rectDist(c.i, c.j, x, z); sig += d < WILD.small ? 2 : d < WILD.trees ? 1 : 0; }
     if (sig !== this.sig) { this.sig = sig; this.dirty = true; }
     // the far rings follow the camera; while one has fallen well behind (fast travel) it gets a share of every frame even when chunks are waiting
-    for (const L of this.FAR) if (!L.job && (!L.at || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move)) L.job = this.genFar(L, x, z);
+    for (const L of this.FAR) if (!L.job && (!L.at || L.stale || Math.hypot(L.at[0] - x, L.at[1] - z) > L.move)) { L.stale = false; L.job = this.genFar(L, x, z); }
+    { const Z = this.HZ; if (!Z.job && (!Z.at || Math.hypot(Z.at[0] - x, Z.at[1] - z) > Z.move)) Z.job = this.genHorizon(x, z);
+      if (Z.job) { const t1 = performance.now(); while (Z.job && performance.now() - t1 < 1.5) if (Z.job.next().done) Z.job = null; } }
     for (const L of this.FAR) if (L.job && Math.hypot(L.at ? L.at[0] - x : 1e9, L.at ? L.at[1] - z : 1e9) > L.R * 0.45) { const t1 = performance.now(); while (L.job && performance.now() - t1 < 2) { if (L.job.next().done) L.job = null; } }
     while (performance.now() - t0 < (this.fast ? 13 : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling)
       if (!this.job) {
@@ -354,7 +450,7 @@ const Wild = {
     const brs = this.bridges.filter(b => b.x > x0 - 60 && b.x < x0 + WC + 60 && b.z > z0 - 60 && b.z < z0 + WC + 60);
     const onBridge = (x, z, m = 0) => brs.some(b => { const dx = x - b.x, dz = z - b.z, al = dx * Math.sin(b.ang) + dz * Math.cos(b.ang), ac = -dx * Math.cos(b.ang) + dz * Math.sin(b.ang); return Math.abs(al) < b.half + m && Math.abs(ac) < 2.6 + m; });
     for (const [M, draw] of [[12, false], [3, true]]) this.tracks.forEach((T, ti) => { // the ground is levelled a little beyond the chunk; the strip is drawn only within it
-      let run = []; const TH2 = this.trackH[ti];
+      let run = []; const TH2 = T.h;
       const kind = q => T.cls ? T.cls[q] : T.lane ? WAY.lane : WAY.track, sink = q => T.sink ? T.sink[q] : 0;
       // drawn in stretches of one kind of way, broken at the bridges; the ground is levelled across its width (and let down in a hollow way)
       const flush = () => { if (run.length > 1) { if (draw) { let cur = null, ck = 0;
@@ -504,7 +600,7 @@ const Wild = {
     }
     yield;
     const group = c.group = new THREE.Group();
-    for (const [k, g] of groups) { const m = groupMesh(g, E.mats[k]); m.renderOrder = { wMudO: 1, wEarthO: 1, wScreeO: 2, wRockO: 3, wFoam: 4 }[k] || 0; group.add(m); }
+    for (const [k, g] of groups) { const m = groupMesh(g, E.mats[k], x0, z0); m.renderOrder = { wMudO: 1, wEarthO: 1, wScreeO: 2, wRockO: 3, wFoam: 4 }[k] || 0; group.add(m); }
     // tracks through this chunk
     const gb = new GB();
     for (const { R, q0, q1 } of rivRuns) { // the water: one ribbon along the river, level across, always falling downstream
@@ -706,7 +802,7 @@ const Wild = {
     // tracks and fields lie in the same light as the ground under them; the crops keep their own colour (not the tint of heath or wood floor round them)
     for (const [k, g] of gb.g) { if (!/^(rDirt|rGravel|f[A-Z]|gDirt)/.test(k)) continue; const st = g.rgba ? 4 : 3, crop = k[0] === 'f', ft = k === 'fMeadow' ? [1.12, 1.0, 0.74] : [1.06, 0.98, 0.8];
       for (let v = 0; v < g.p.length / 3; v++) { const x = g.p[v * 3], z = g.p[v * 3 + 2], cc = crop ? litAt(x, z).map((l, q) => l * ft[q]) : colAt(x, z); g.c[v * st] = cc[0]; g.c[v * st + 1] = cc[1]; g.c[v * st + 2] = cc[2]; } }
-    if (gb.g.size) group.add(gb.build(E.mats));
+    if (gb.g.size) group.add(gb.build(E.mats, x0, z0));
     group.traverse(o => { o.matrixAutoUpdate = false; });
     return c;
   },
@@ -793,8 +889,7 @@ const Wild = {
         for (let n = 1; n < idx.length; n++) { const k = kind(idx[n]); if (k !== k0) { out(); pts = [pts[pts.length - 1]]; k0 = k; } pts.push(T[idx[n]]); }
         out(); } }
     yield;
-    const group = new THREE.Group(); group.add(groupMesh(g, inner ? E.mats.wFar : E.mats.wFarO)); if (r.i.length) group.add(groupMesh(r, inner ? E.mats.wFarR : E.mats.wFarRO));
-    group.traverse(o => { o.matrixAutoUpdate = false; });
+    const group = new THREE.Group(); group.add(groupMesh(g, inner ? E.mats.wFar : E.mats.wFarO, ox, oz)); if (r.i.length) group.add(groupMesh(r, inner ? E.mats.wFarR : E.mats.wFarRO, ox, oz));
     if (L.group) { this.area.scene.remove(L.group); L.group.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
     L.group = group; this.area.scene.add(group); L.at = [cx, cz];
     if (inner) { this.innerU.value.set(ox, oz, x1, z1); for (const k in trees) this.farTrees[k].set(trees[k]); } else this.outerU.value.set(ox, oz, x1, z1);
@@ -804,23 +899,30 @@ const Wild = {
 class FarTrees {
   constructor(area, tex, w, h) {
     this.area = area; this.geo = planeGeo(w, h); this.mat = spriteMat(tex); area.tintMats.push(this.mat);
-    this.mat.onBeforeCompile = sh => { sh.uniforms.wYaw = Wild.yawU; sh.uniforms.wMask = Wild.maskU;
-      sh.vertexShader = 'uniform float wYaw; uniform sampler2D wMask;\n' + sh.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3(position.x * cos(wYaw), position.y, -position.x * sin(wYaw));
-        if (texture2D(wMask, (floor((vec2(instanceMatrix[3][0], instanceMatrix[3][2]) + 352.0) / 176.0) + vec2(64.5, 112.5)) / 128.0).r > 0.5) transformed = vec3(0.0);`); sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', FAR_FOG); };
+    this.mat.onBeforeCompile = sh => { sh.uniforms.wYaw = Wild.yawU; sh.uniforms.wMask = Wild.maskU; sh.uniforms.wMaskO = Wild.maskO;
+      sh.vertexShader = 'uniform float wYaw; uniform sampler2D wMask; uniform vec2 wMaskO;\n' + sh.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3(position.x * cos(wYaw), position.y, -position.x * sin(wYaw));
+        { vec2 mc = floor(((modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xz + 352.0) / 176.0) - wMaskO; if (mc.x >= 0.0 && mc.y >= 0.0 && mc.x < 128.0 && mc.y < 128.0 && texture2D(wMask, (mc + 0.5) / 128.0).r > 0.5) transformed = vec3(0.0); }`); sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', FAR_FOG); };
     this.mat.customProgramCacheKey = () => 'wildFarTree';
     this.mesh = null; this.cap = 0; this._m = new THREE.Matrix4();
   }
   set(list) {
     if (list.length > this.cap) { if (this.mesh) { this.area.scene.remove(this.mesh); this.mesh.dispose(); } this.cap = Math.ceil(list.length * 1.3) + 64; this.mesh = new THREE.InstancedMesh(this.geo, this.mat, this.cap); this.mesh.frustumCulled = false; this.area.scene.add(this.mesh); }
-    const m = this._m.elements; let k = 0;
-    for (const p of list) { const s = p[3]; m.fill(0); m[0] = m[5] = m[10] = s; m[12] = p[0]; m[13] = p[1]; m[14] = p[2]; m[15] = 1; this.mesh.setMatrixAt(k++, this._m); }
-    this.mesh.count = list.length; this.mesh.instanceMatrix.needsUpdate = true;
+    const m = this._m.elements; let k = 0; const ox = list.length ? Math.round(list[0][0] / 256) * 256 : 0, oz = list.length ? Math.round(list[0][2] / 256) * 256 : 0;
+    for (const p of list) { const s = p[3]; m.fill(0); m[0] = m[5] = m[10] = s; m[12] = p[0] - ox; m[13] = p[1]; m[14] = p[2] - oz; m[15] = 1; this.mesh.setMatrixAt(k++, this._m); }
+    if (!this.mesh) return; this.mesh.position.set(ox, 0, oz); this.mesh.count = list.length; this.mesh.instanceMatrix.needsUpdate = true;
   }
 }
-function groupMesh(g, mat) {
+// geometry is kept in numbers small enough for the graphics card's 32-bit floats however far from the city it lies: each mesh holds its
+// points relative to an origin near it (and its texture coordinates less their whole part), and is placed at that origin
+function localize(g, ox, oz) {
+  if (!ox && !oz) return; const p = g.p; for (let k = 0; k < p.length; k += 3) { p[k] -= ox; p[k + 2] -= oz; }
+  const u = g.u; if (u.length > 1) { const du = Math.floor(u[0]), dv = Math.floor(u[1]); if (du || dv) for (let k = 0; k < u.length; k += 2) { u[k] -= du; u[k + 1] -= dv; } }
+}
+function groupMesh(g, mat, ox = 0, oz = 0) {
+  localize(g, ox, oz);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(g.p, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.u, 2)); geo.setAttribute('color', new THREE.Float32BufferAttribute(g.c, g.rgba ? 4 : 3));
-  geo.setIndex(g.i); geo.computeBoundingSphere(); const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; return m;
+  geo.setIndex(g.i); geo.computeBoundingSphere(); const m = new THREE.Mesh(geo, mat); m.matrixAutoUpdate = false; if (ox || oz) { m.position.set(ox, 0, oz); m.updateMatrix(); } return m;
 }
 // a hedge that reads as one: bushes of uneven height crowding along the line, over a low core
 function hedgeBushes(fl, ax, az, bx, bz, rng, W) {
@@ -947,30 +1049,30 @@ function wildTrack(pre, aims, seed, used, prev, rc) {
   for (let q = 0; q < out.length; q += 2) { const i = Math.round(out[q][0] / TRC), j = Math.round(out[q][1] / TRC); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) used.add((i + di) * 8192 + j + dj); } // near enough to meet
   return out;
 }
-function routeWild(from, to, seed, used, rc = null, C = TRC) {
-  const key = (i, j) => (i + 4096) * 8192 + (j + 4096), hs = new Map();
+function routeWild(from, to, seed, used, rc = null, C = TRC, opts = {}) {
+  const si = Math.round(from[0] / C), sj = Math.round(from[1] / C), ti = Math.round(to[0] / C), tj = Math.round(to[1] / C), OI = si - 4096, OJ = sj - 4096; // (cells are numbered from the start, so the search works as far from the city as it likes)
+  const key = (i, j) => (i - OI) * 8192 + (j - OJ), hs = new Map();
   const hAt = (i, j) => { const k = key(i, j); let h = hs.get(k); if (h === undefined) hs.set(k, h = terrainRaw(i * C, j * C)); return h; };
-  const si = Math.round(from[0] / C), sj = Math.round(from[1] / C), ti = Math.round(to[0] / C), tj = Math.round(to[1] / C);
   const g = new Map(), came = new Map(), closed = new Set(), heap = [];
   const push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const q = (i - 1) >> 1; if (heap[q][0] <= heap[i][0]) break; [heap[q], heap[i]] = [heap[i], heap[q]]; i = q; } };
   const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
   const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1], [2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
   const S = key(si, sj), T = key(ti, tj); g.set(S, 0); push(S, 0); let n = 0, found = null;
-  while (heap.length && n++ < 55000) {
+  while (heap.length && n++ < (opts.nodes || 55000)) {
     const [, k] = pop(); if (closed.has(k)) continue; closed.add(k);
-    const i = Math.floor(k / 8192) - 4096, j = k % 8192 - 4096, hk = hAt(i, j);
+    const i = Math.floor(k / 8192) + OI, j = k % 8192 + OJ, hk = hAt(i, j);
     if (k === T || (used.has(i * 8192 + j) && Math.hypot(i * C - from[0], j * C - from[1]) > 60 && Math.hypot(i * C, j * C) > 1800)) { found = k; break; } // tracks from different gates meet out in the country, not under the walls
     for (const [di, dj] of DIRS) {
       const ni = i + di, nj = j + dj, nk = key(ni, nj); if (closed.has(nk)) continue;
       const x = ni * C, z = nj * C; if (Math.abs(x) < TG.R + 12 && Math.abs(z) < TG.R + 12 && Math.hypot(x - from[0], z - from[1]) > 45) continue;
       if (townCore(x, z) > 0.2 && Math.hypot(x - from[0], z - from[1]) > 60) continue;
-      const nh = hAt(ni, nj); if ((nh < SEA + 1.8 && !(nh > SEA + 0.3 && rc && rc.near.has(ni * 8192 + nj))) || rimDist(x, z) < 900) continue; // (low ground on a river's floor near its mouth can be crossed: the floors are too wide to step over)
+      const nh = hAt(ni, nj); if ((nh < SEA + 1.8 && !(nh > SEA + 0.3 && rc && rc.near.has(ni * 8192 + nj))) || (rimDist(x, z) < 900 && (LEGACY || !inBreach(x, z, 'pass', 230))) || (opts.avoid && opts.avoid(x, z))) continue; // (low ground on a river's floor near its mouth can be crossed: the floors are too wide to step over; the borders are crossed at their passes only)
       const len = Math.hypot(di, dj) * C, gr = Math.abs(nh - hk) / len, rw = rc ? rc.get(ni * 8192 + nj) : 0;
       const c = len * (1 + (gr / 0.075) ** 2 + 0.25 * (1 + vnoise(x / 260, z / 260, seed)) + (rw ? (rw > 4.5 ? 30 : 2.5) : 0) + (rc && rc.near.has(ni * 8192 + nj) ? 1.6 : 0)) * (landZone(x, z) ? 3 : 1) * (siteWeight(x, z) > 0.6 ? 3 : 1) + (nh > 150 ? len * 2 : 0); // easy grades, a little wander, few bridges, out of the city's fields, and not over the tops
       const ng = g.get(k) + c; if (ng < (g.get(nk) ?? Infinity)) { g.set(nk, ng); came.set(nk, k); push(nk, ng + Math.hypot(ti - ni, tj - nj) * C * 2.2); } // greedy enough to stay quick; the grade cost still bends it round the hills
     }
   }
   if (found == null) return null;
-  const out = []; for (let k = found; k !== undefined; k = came.get(k)) { out.push([(Math.floor(k / 8192) - 4096) * C, (k % 8192 - 4096) * C]); if (k === S) break; }
+  const out = []; for (let k = found; k !== undefined; k = came.get(k)) { out.push([(Math.floor(k / 8192) + OI) * C, (k % 8192 + OJ) * C]); if (k === S) break; }
   out.reverse(); out[0] = from.slice(); return { path: out, joined: found !== T };
 }

@@ -145,7 +145,7 @@ const Travel = {
     const site = Sites.update(P.pos.x, P.pos.z); if (site && this.cur) { this.stop(`You come upon ${site.name}.`, 'good'); return; }
     const poi = POI.update(P.pos.x, P.pos.z); if (poi && this.cur && poi.kind !== 'village' && poi.kind !== 'hamlet') { this.stop(`You come upon ${poi.name}.`, 'good'); return; } // (a village or a hamlet on the way goes on the map without stopping you)
     if (rpgUI() && nearbyHostiles(35)) { this.stop('Something stirs nearby. You stop.', 'bad'); return; }
-    if (c.mode === 'ahead' && (rimDist(P.pos.x, P.pos.z) < 300)) { this.stop('The mountains rise sheer ahead of you.', undefined, false); }
+    
   },
   banner() {
     const c = this.cur; if (!c) return; const L = c.cum[c.cum.length - 1], left = Math.max(0, L - c.s);

@@ -84,17 +84,18 @@ class GB {
       this.tri(k, [cx, y, cz], p0, p1, [cx / tw, cz / tw], [p0[0] / tw, p0[2] / tw], [p1[0] / tw, p1[2] / tw], [0, 1, 0]);
     }
   }
-  build(mats) {
+  build(mats, ox = 0, oz = 0) { // (ox, oz: an origin near the geometry, for meshes far from the city: see localize in 03_wild.js)
     const grp = new THREE.Group();
     for (const [k, g] of this.g) {
       if (!g.i.length) continue;
       const m = mats[k]; if (!m) { console.warn('missing material', k); continue; }
+      if (ox || oz) localize(g, ox, oz);
       const geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(g.p, 3));
       geo.setAttribute('uv', new THREE.Float32BufferAttribute(g.u, 2));
       geo.setAttribute('color', new THREE.Float32BufferAttribute(g.c, g.rgba ? 4 : 3));
       geo.setIndex(g.i); geo.computeBoundingSphere();
-      const mesh = new THREE.Mesh(geo, m); mesh.matrixAutoUpdate = false; mesh.updateMatrix(); grp.add(mesh);
+      const mesh = new THREE.Mesh(geo, m); mesh.matrixAutoUpdate = false; if (ox || oz) mesh.position.set(ox, 0, oz); mesh.updateMatrix(); grp.add(mesh);
     }
     return grp;
   }
