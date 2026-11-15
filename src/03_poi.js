@@ -47,9 +47,11 @@ const POI = {
   addHash(p) { const k = Math.floor(p.x / this.HC) * 100003 + Math.floor(p.z / this.HC); let l = this.hash.get(k); if (!l) this.hash.set(k, l = []); l.push(p); },
   near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r - 80) / C); i <= Math.floor((x + r + 80) / C); i++) for (let j = Math.floor((z - r - 80) / C); j <= Math.floor((z + r + 80) / C); j++) { const l = this.hash.get(i * 100003 + j); if (l) for (const p of l) if (Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
   found(p) { return !!(G.flags.poi && G.flags.poi[p.id]); },
+  // every place found so far: those of the countries that are planned, and those found in countries since left behind (kept by name and place)
+  known() { const out = this.list.filter(p => this.found(p)), far = G.flags.far; if (far) { const have = new Set(out.map(p => p.id)); for (const id in far) if (!have.has(id)) { const [name, x, z, kind] = far[id]; out.push({ id, name, x, z, kind, r: 10 }); } } return out; },
   update(x, z) {
     if (!G.player || G.area !== G.city) return null; let hit = null;
-    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; if (p.K && !p.K.home) (G.flags.far || (G.flags.far = {}))[p.id] = [p.name, Math.round(p.x), Math.round(p.z), p.kind]; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
     // the people of the nearest hamlet, about their doors by day
     const H = Settle.list.find(h => Math.hypot(h.x - x, h.z - z) < 380);
     if (this.folk && (this.folk.H !== H || this.folk.list[0].removed)) { for (const e of this.folk.list) if (!e.removed) e.remove(); this.folk = null; }

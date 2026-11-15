@@ -300,12 +300,21 @@ const MapView = {
   },
   close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
-  // the whole country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow
-  worldImage() {
-    if (this._world) return this._world; const N = 300, [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = WORLD.x1 - WORLD.x0, Hd = WORLD.z1 - WORLD.z0, fm = G.city.forestMask;
-    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(WORLD.x0 + (i + 0.5) / N * Wd, WORLD.z0 + (j + 0.5) / N * Hd);
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const wx = WORLD.x0 + (i + 0.5) / N * Wd, wz = WORLD.z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+  // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
+  // first opened; the others at 100 as the last step of their plan, with their rivers and roads drawn in, and kept after the country
+  // itself is forgotten, so the map remembers where you have been
+  worldImage() { if (this._world) return this._world; const g = this.imageGen(World.home, 300); let r; do r = g.next(); while (!r.done); return (this._world = r.value); },
+  imgs: new Map(),
+  *countryImage(K) { const c = yield* this.imageGen(K, 100), x = c.getContext('2d'), s = 100 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.2; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const T of K.ways.tracks) { if (T.lane) continue; for (let q = 8; q < T.length + 7; q += 8) { const a = Math.min(q - 8, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const road = T.cls && T.cls[b] === WAY.road; x.strokeStyle = road ? '#b39c6c' : '#8a7350'; x.lineWidth = road ? 1.3 : 0.8; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); } }
+    this.imgs.set(World.key(K.i, K.j), { c, x0: K.x0, z0: K.z0, x1: K.x1, z1: K.z1 }); },
+  *imageGen(K, N) {
+    const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
+    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (j % 10 === 9) yield; }
+    for (let j = 0; j < N; j++) { if (j % 6 === 5) yield; for (let i = 0; i < N; i++) {
+      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
       if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
       const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
       const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
@@ -314,8 +323,8 @@ const MapView = {
       else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
       else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
       a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
-    }
-    x.putImageData(img, 0, 0); return (this._world = c);
+    } }
+    x.putImageData(img, 0, 0); return c;
   },
   // screen → world on the map as last drawn
   toWorld(px, py) { const t = this.tf; if (!t) return null; return [t.cx + (px * t.dpr - t.W / 2) / t.scale, t.cz + (py * t.dpr - t.H / 2) / t.scale]; },
@@ -342,7 +351,6 @@ const MapView = {
     let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
     if (region || Math.hypot(P.pos.x, P.pos.z) > 900) { cx = P.pos.x; cz = P.pos.z; } // (out in the country, or in another town, the map is about where you are)
     if (this.view) { cx = this.view[0]; cz = this.view[1]; }
-    cx = clamp(cx, WORLD.x0, WORLD.x1); cz = clamp(cz, WORLD.z0, WORLD.z1 + 1000);
     this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
     const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
@@ -351,10 +359,12 @@ const MapView = {
     const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
     if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
     x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
-    if (this.zoom < 1.6) x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+    x.fillStyle = '#2b2a20'; x.fillRect(0, 0, W, Math.max(0, Math.min(H, Z(150)))); // land not yet seen: the sea lies only to the south
+    if (this.zoom < 1.6) { x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+      for (const m of this.imgs.values()) if (X(m.x1) > 0 && X(m.x0) < W && Z(m.z1) > 0 && Z(m.z0) < H) x.drawImage(m.c, X(m.x0), Z(m.z0), (m.x1 - m.x0) * scale, (m.z1 - m.z0) * scale); }
     x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
     // out in the country: rivers, tracks and the roads to the landmarks
-    for (const R of LAND.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const R of Wild.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
     { // the generated country's fields (block by block from afar, strip by strip close to), the houses of its villages and hamlets
       const FC = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' }, vx0 = cx - W / 2 / scale, vx1 = cx + W / 2 / scale, vz0 = cz - H / 2 / scale, vz1 = cz + H / 2 / scale;
       if (scale > 0.05) for (const o of Settle.blocksIn(vx0, vz0, vx1, vz1)) {
@@ -431,7 +441,7 @@ const MapView = {
     for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
-    for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    for (const p of POI.known()) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
     if (Travel.cur || Travel.paused) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
     if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
     x.textAlign = 'center';

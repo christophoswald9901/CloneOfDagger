@@ -31,6 +31,7 @@ Object.assign(World, {
     K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
     K.settle.classifyWays(); yield;
     POI.plan(K);
+    yield* MapView.countryImage(K);
     K.state = 2; K.wall = performance.now() - t0; this.ready.push(K); this.rev++; this.planMs.push(Math.round(K.cpu));
     if (this.onReady) this.onReady(K);
   },

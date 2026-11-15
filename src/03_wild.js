@@ -143,7 +143,7 @@ const WaysProto = {
   },
   // the home country's roads out: from each pass in to the nearest track, laid after everything else so the country's own plan stays as it was
   homePasses() {
-    const S = this.K.settle, avoid = (x, z) => S.near(x, z, 34) || S.builds.some(b => Math.hypot(b.x - x, b.z - z) < 40) || POI.near(x, z, 16).length > 0 || siteZone(x, z, 40), list = [];
+    const S = this.K.settle, avoid = (x, z) => S.near(x, z, 34) || S.builds.some(b => Math.hypot(b.x - x, b.z - z) < 40) || POI.near(x, z, 16).length > 0, list = [];
     this.passes().forEach((P, pi) => {
       let tp = null, bd = 1e9; for (const T of this.tracks) { if (T.lane) continue; for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - P.x, T[q][1] - P.z); if (d < bd) { bd = d; tp = T[q]; } } }
       const t = tp && this.passRoad(P, tp, 1300 + pi * 17 + WSEED * 97, avoid); if (t) list.push(t); else console.warn('no road to the pass at', P.x, P.z); });

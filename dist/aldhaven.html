@@ -2102,9 +2102,11 @@ const POI = {
   addHash(p) { const k = Math.floor(p.x / this.HC) * 100003 + Math.floor(p.z / this.HC); let l = this.hash.get(k); if (!l) this.hash.set(k, l = []); l.push(p); },
   near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r - 80) / C); i <= Math.floor((x + r + 80) / C); i++) for (let j = Math.floor((z - r - 80) / C); j <= Math.floor((z + r + 80) / C); j++) { const l = this.hash.get(i * 100003 + j); if (l) for (const p of l) if (Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
   found(p) { return !!(G.flags.poi && G.flags.poi[p.id]); },
+  // every place found so far: those of the countries that are planned, and those found in countries since left behind (kept by name and place)
+  known() { const out = this.list.filter(p => this.found(p)), far = G.flags.far; if (far) { const have = new Set(out.map(p => p.id)); for (const id in far) if (!have.has(id)) { const [name, x, z, kind] = far[id]; out.push({ id, name, x, z, kind, r: 10 }); } } return out; },
   update(x, z) {
     if (!G.player || G.area !== G.city) return null; let hit = null;
-    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; if (p.K && !p.K.home) (G.flags.far || (G.flags.far = {}))[p.id] = [p.name, Math.round(p.x), Math.round(p.z), p.kind]; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
     // the people of the nearest hamlet, about their doors by day
     const H = Settle.list.find(h => Math.hypot(h.x - x, h.z - z) < 380);
     if (this.folk && (this.folk.H !== H || this.folk.list[0].removed)) { for (const e of this.folk.list) if (!e.removed) e.remove(); this.folk = null; }
@@ -3369,19 +3371,22 @@ function rimDist0(x, z) { return Math.min(x - WORLD.x0, WORLD.x1 - x, z - WORLD.
 // how far outside the home country a point lies (negative inside it; the sea side does not count)
 const homeOut = (x, z) => Math.max(WORLD.x0 - x, x - WORLD.x1, WORLD.z0 - z);
 const HOME_FALL = 2000; // the home mountains stand as they always did over the whole home country, and fall away to nothing this far beyond it
+// how far beyond the home country and its old mountain crest (whichever lies further out) a point lies; negative short of them
+function homeFlank(x, z) { const d = homeOut(x, z); return d <= 0 || d > 7500 ? d : Math.min(d, -rimDist0(x, z)); }
 // how far the middle of a border's high ground lies off its lattice line (towards +x for a line running north-south, +z for one running
 // east-west), so the borders wander
 function lineOff(vert, n, x, z) { return 420 * fbm(x / 3000 + n * 13.7, z / 3000 + (vert ? 0 : 31.1), 2, 393 + WSEED * 7); }
 // how far inside its borders a point of country (i, j) lies (negative beyond one): inside the middles of the border belts, and clear of the
 // home mountains' outer flank. RIM notes the nearest border belt and where along it, and how far inside the belts alone (ug)
-const RIM = { vert: 0, n: 0, s: 0, ug: 0 };
+const RIM = { vert: 0, n: 0, s: 0, ug: 0, us: 0 };
 function rimEval(i, j, x, z) {
-  const X0 = WORLD.x0 + i * TILE, X1 = X0 + TILE, Z0 = WORLD.z0 + j * TILE, Z1 = Z0 + TILE, far = 6000, hj = j === 0 || j === 1, hi = i === 0 || i === 1; let u = 1e9;
-  if (x - X0 < far && !(i === 2 && hj)) { const v = x - X0 - lineOff(1, i, x, z); if (v < u) { u = v; RIM.vert = 1; RIM.n = i; RIM.s = z; } }
-  if (X1 - x < far && !(i === -1 && hj)) { const v = X1 + lineOff(1, i + 1, x, z) - x; if (v < u) { u = v; RIM.vert = 1; RIM.n = i + 1; RIM.s = z; } }
-  if (z - Z0 < far) { const v = z - Z0 - lineOff(0, j, x, z); if (v < u) { u = v; RIM.vert = 0; RIM.n = j; RIM.s = x; } }
-  if (j < 1 && Z1 - z < far && !(j === -1 && hi)) { const v = Z1 + lineOff(0, j + 1, x, z) - z; if (v < u) { u = v; RIM.vert = 0; RIM.n = j + 1; RIM.s = x; } }
-  RIM.ug = u; return Math.min(u, homeOut(x, z) - HOME_FALL + 350);
+  const X0 = WORLD.x0 + i * TILE, X1 = X0 + TILE, Z0 = WORLD.z0 + j * TILE, Z1 = Z0 + TILE, far = 6000, hj = j === 0 || j === 1, hi = i === 0 || i === 1; let u = 1e9, ua = 1e9;
+  // (ua: the distance to the nearest belt's middle whichever side of it, which is the same seen from the country across the border)
+  if (x - X0 < far && !(i === 2 && hj)) { const v = x - X0 - lineOff(1, i, x, z), a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 1; RIM.n = i; RIM.s = z; } }
+  if (X1 - x < far && !(i === -1 && hj)) { const v = X1 + lineOff(1, i + 1, x, z) - x, a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 1; RIM.n = i + 1; RIM.s = z; } }
+  if (z - Z0 < far) { const v = z - Z0 - lineOff(0, j, x, z), a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 0; RIM.n = j; RIM.s = x; } }
+  if (j < 1 && Z1 - z < far && !(j === -1 && hi)) { const v = Z1 + lineOff(0, j + 1, x, z) - z, a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 0; RIM.n = j + 1; RIM.s = x; } }
+  RIM.ug = ua; RIM.us = u; return Math.min(u, homeFlank(x, z) - HOME_FALL + 350);
 }
 // how far inside its country's border crest a point lies (negative on the crest and beyond): no one settles or lays a way near it
 function rimDist(x, z) { return LEGACY || homeOut(x, z) <= 0 ? rimDist0(x, z) : rimEval(tileI(x), tileJ(z), x, z) - 350; }
@@ -3396,18 +3401,21 @@ function edgeFeat(vert, n, m) {
   const s0 = (vert ? WORLD.z0 : WORLD.x0) + m * TILE, at = s => vert ? [WORLD.x0 + n * TILE, s] : [s, WORLD.z0 + n * TILE];
   const lo = s0 + 0.22 * TILE, hi = Math.min(s0 + 0.78 * TILE, vert && m === 1 ? -1500 : 1e12); // (a border that runs down to the sea is crossed inland)
   const leg = LEGACY; LEGACY = 0;
+  const homeEdge = ha || hb, clear = s => homeEdge || homeFlank(...at(s)) > HOME_FALL + 1600; // (a border that runs up to the home mountains is not crossed on their flank)
   const da = drainDir(a[0], a[1]), db = drainDir(b[0], b[1]), flow = vert ? (da === 'E' ? 1 : db === 'W' ? -1 : 0) : (da === 'S' ? 1 : 0);
   if (flow) { // the gap: the lowest ground along the line (as it would lie without the border's own height)
-    let best = 1e9; for (let s = lo; s <= hi; s += 100) { const [x, z] = at(s), g = terrainBase(x, z, true) + 5 * _h2(Math.round(s / 100), n, 5210 + WSEED); if (g < best) { best = g; f.gap = s; } }
+    let best = 1e9; for (let s = lo; s <= hi; s += 100) { if (!clear(s)) continue; const [x, z] = at(s), g = terrainBase(x, z, true) + 5 * _h2(Math.round(s / 100), n, 5210 + WSEED); if (g < best) { best = g; f.gap = s; } }
     const [gx, gz] = at(f.gap); let g = 1e9; for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) g = Math.min(g, terrainBase(gx + q * 60, gz + r * 60, true));
     f.to = flow > 0 ? b : a; f.from = flow > 0 ? a : b;
     // the water's level there: well below the ground (a great river's valley), and never below the level it leaves the next country at
     const d = drainDir(f.to[0], f.to[1]), [ti, tj] = f.to, nx = d === 'S' ? edgeFeat(0, tj + 1, ti) : d === 'W' ? edgeFeat(1, ti, tj) : d === 'E' ? edgeFeat(1, ti + 1, tj) : null;
-    f.wl = Math.max(SEA + 1.5, g - 47.4, nx ? nx.wl + 0.05 : -1e9);
+    f.wl = Math.max(SEA + 1.5, g - 47.4, nx ? nx.wl + 0.6 : -1e9);
   }
   // the pass: one on each side of the home country (west and east near the coast, north beyond Corrinvale), and on most borders elsewhere
-  const homeEdge = ha || hb, has = homeEdge ? (vert ? m === 1 : m === 0) : _h2(n * 2 + vert, m, 5220 + WSEED) < 0.8;
-  if (has) { let s = lerp(lo, hi, _h2(n * 2 + vert, m, 5221 + WSEED)); if (f.gap === f.gap && Math.abs(s - f.gap) < 2600) s = f.gap + (f.gap - s0 > TILE / 2 ? -2800 : 2800); f.pass = clamp(s, s0 + 1400, Math.min(s0 + TILE - 1400, hi + 400)); 
+  const has = homeEdge ? (vert ? m === 1 : m === 0) : _h2(n * 2 + vert, m, 5220 + WSEED) < 0.8;
+  if (has) { let s = lerp(lo, hi, _h2(n * 2 + vert, m, 5221 + WSEED)); if (f.gap === f.gap && Math.abs(s - f.gap) < 2600) s = f.gap + (f.gap - s0 > TILE / 2 ? -2800 : 2800); s = clamp(s, s0 + 1400, Math.min(s0 + TILE - 1400, hi + 400));
+    if (!clear(s)) { let b = NaN, bd = 1e9; for (let t = lo; t <= hi; t += 100) if (clear(t) && !(Math.abs(t - f.gap) < 2600) && Math.abs(t - s) < bd) { bd = Math.abs(t - s); b = t; } s = b; }
+    f.pass = s; 
     f.trade = homeEdge ? (vert ? 9 : 12) : _h2(n * 2 + vert, m, 5222 + WSEED) < 0.55 ? 10 : 4; } // (how much is carried over it: a high road, or a cart track)
   LEGACY = leg; return f;
 }
@@ -3415,7 +3423,7 @@ const edgeAt = () => edgeFeat(RIM.vert, RIM.n, Math.min(RIM.vert ? 1 : 1e9, Math
 // how near a point of the home mountains (or their outer flank) lies to the line of one of the home country's three passes, in metres along the border
 function homePassD(x, z) {
   let d = 1e9;
-  if (z > WORLD.z0 - HOME_FALL) { if (x < WORLD.x0 + 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 0, 1).pass)); if (x > WORLD.x1 - 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 2, 1).pass)); }
+  if (z > WORLD.z0 - HOME_FALL - 2800) { if (x < WORLD.x0 + 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 0, 1).pass)); if (x > WORLD.x1 - 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 2, 1).pass)); }
   if (z < WORLD.z0 + 7500) d = Math.min(d, Math.abs(x - edgeFeat(0, 0, 0).pass));
   return d;
 }
@@ -3425,13 +3433,13 @@ function homeNotch(x, z) {
   const cut = (f, s, t) => { const d = (s - f.pass) / 600; if (d * d >= 12) return; let m = 1; const T = f.rd;
     if (T) { const fi = (s - T.a0) / T.C, fj = (t - T.b0) / T.C, i = Math.floor(fi), j = Math.floor(fj); if (i >= 0 && j >= 0 && i < T.NI - 1 && j < T.NJ - 1) { const u = fi - i, v = fj - j, q = j * T.NI + i, D = T.D; m = smoothstep(130, 430, lerp(lerp(D[q], D[q + 1], u), lerp(D[q + T.NI], D[q + T.NI + 1], u), v)); } }
     k *= 1 - 0.86 * Math.exp(-d * d) * m; };
-  if (z > WORLD.z0 - HOME_FALL) { if (x < WORLD.x0 + 7500) cut(edgeFeat(1, 0, 1), z, x); if (x > WORLD.x1 - 7500) cut(edgeFeat(1, 2, 1), z, x); }
+  if (z > WORLD.z0 - HOME_FALL - 2800) { if (x < WORLD.x0 + 7500) cut(edgeFeat(1, 0, 1), z, x); if (x > WORLD.x1 - 7500) cut(edgeFeat(1, 2, 1), z, x); }
   if (z < WORLD.z0 + 7500) cut(edgeFeat(0, 0, 0), x, z);
   return k;
 }
 // true within w metres of the line a river (kind 'gap') or a road ('pass') crosses a border by: there the high ground is breached
 function inBreach(x, z, kind, w) {
-  const d = homeOut(x, z); if (d < HOME_FALL + 400 && kind === 'pass' && homePassD(x, z) < w) return true; if (d <= 0) return false;
+  const d = homeOut(x, z); if (d < 7500 && kind === 'pass' && homeFlank(x, z) < HOME_FALL + 1000 && homePassD(x, z) < w) return true; if (d <= 0) return false;
   rimEval(tileI(x), tileJ(z), x, z); const f = edgeAt(); return Math.abs(RIM.s - f[kind]) < w;
 }
 // the high ground of the borders: foothills, then a range of separate peaks with cols between them, falling away again on the far side.
@@ -3445,18 +3453,18 @@ function rimHeight0(x, z) {
   return plinth * (0.4 + 0.6 * plinth) * 190 * (0.55 + 0.6 * pk) + wall * (280 + 380 * mass) * (0.4 + 0.8 * pk) + wall * 40 * fine + smoothstep(150, -700, de) * 230;
 }
 function rimHeight(x, z) {
-  let h = 0; const d = homeOut(x, z);
-  if (d < 4600) { // the home mountains: as they were inside the home country (its rivers were planned on them), falling away beyond it, a col at each pass
+  let h = 0; const d = homeOut(x, z), hf = d > 0 && d < 7500 ? Math.min(d, -rimDist0(x, z)) : d;
+  if (hf < 4600) { // the home mountains: as they were inside the home country and out to their old crest (its rivers were planned on them), falling away beyond, a col at each pass
     const notch = homeNotch(x, z);
     if (d <= 0) return rimHeight0(x, z) * notch;
-    if (d < HOME_FALL) h = rimHeight0(x, z) * (1 - smoothstep(500, HOME_FALL, d)) * notch;
-    const P = smoothstep(4600, 1700, d), sd = WSEED * 1.1; h = Math.max(h, P * (0.4 + 0.6 * P) * 190 * (0.55 + 0.6 * ridgedMF(x / 900 + sd, z / 900, 5, 395)) * notch); // and foothills below them
+    if (hf < HOME_FALL) h = rimHeight0(x, z) * (1 - smoothstep(500, HOME_FALL, hf)) * notch;
+    const P = smoothstep(4600, 1700, hf) * smoothstep(0, 500, hf), sd = WSEED * 1.1; if (P > 0) h = Math.max(h, P * (0.4 + 0.6 * P) * 190 * (0.55 + 0.6 * ridgedMF(x / 900 + sd, z / 900, 5, 395)) * notch); // and foothills below them
   }
-  rimEval(tileI(x), tileJ(z), x, z); const u = Math.abs(RIM.ug); if (u > 5500) return h;
+  rimEval(tileI(x), tileJ(z), x, z); const u = RIM.ug; if (u > 5500) return h;
   // a border is a high range in some stretches and a belt of wooded hills in others, broad here and narrow there
   const wf = lerp(0.5, 1.35, smoothstep(-0.3, 0.3, fbm(x / 3300 + 2.2, z / 3300, 2, 396 + WSEED * 7))), de = u / wf - 350; if (de > 3600) return h;
   const f = edgeAt(), s = RIM.s;
-  let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7)));
+  let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7))) * smoothstep(0, 1500, hf); // (a belt that runs up to the home country dies away into its mountains)
   if (f.gap === f.gap) { const q = (s - f.gap) / 520; if (q * q < 12) amp *= 1 - 0.985 * Math.exp(-q * q); }   // the river's gap
   if (f.pass === f.pass) { const q = (s - f.pass) / 600; if (q * q < 12) amp *= 1 - 0.86 * Math.exp(-q * q); }  // the pass: a col between two peaks
   const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
@@ -3948,10 +3956,10 @@ function* planLandGen(K) {
   if (home) { for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); } }
   else for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C;
     // only the land inside the border crests is this country's to drain (and the way through a gap)
-    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.ug < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
+    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.us < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
     H[k] = terrainBase(x, z);
     // (the river will cut its own way through the border at the gap: the ground there is no sill for the country to fill up behind)
-    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.ug < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
+    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.us < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
   const outK = gaps.out ? cellAt(gaps.out.x, gaps.out.z) : -1, inK = gaps.ins.map(g => cellAt(g.x, g.z));
   if (outK >= 0) st[outK] = 0; for (const k of inK) st[k] = 0;
   const tGrid = performance.now();
@@ -4031,11 +4039,13 @@ function* planLandGen(K) {
     for (let q = 1; q < L - 1; q += 2) gb[q] = (gb[q - 1] + gb[q + 1]) / 2;
     // larger rivers have worn deeper valleys into the land
     const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500))); // (a young stream has hardly cut in)
-    const wl = [], drop = R.gin ? 0.0006 : 0.03; // (a great river that has come in through a gap falls little from there on)
+    const wl = [], drop = R.gin ? 0.0003 : 0.03; // (a great river that has come in through a gap falls little from there on)
     for (let q = 0; q < L; q++) { const g = gb[q] - 0.6 - inc[q]; wl.push(q ? Math.min(wl[q - 1] - drop, g) : R.gin ? R.gin.f.wl : g); }
+    // (where two great rivers come into one country they meet at one level: each comes down to a little under the lower of the gaps' levels within its first 600 m)
+    if (R.gin && gaps.ins.length > 1) { const lo = Math.min(...gaps.ins.map(g => g.f.wl)) - 0.25; for (let q = 0; q < L; q++) wl[q] = Math.min(wl[q], lerp(wl[0], lo, smoothstep(0, 600, q * 20))); }
     for (let q = 0; q < L; q++) wl[q] = Math.max(wl[q], SEA);
     if (R.gout) { const E = R.gout.f.wl; for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + 0.08 * (L - 1 - q)); } // it leaves at the gap's own level
-    if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + 0.01); }
+    if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + (R.gin ? drop : 0.01)); }
     // how far the ground must come down where the river runs through higher ground (a gorge through a ridge), and how far round that reaches
     const cut0 = gb.map((g, q) => Math.max(0, g - (wl[q] + 0.5))), cut = cut0.slice();
     for (let q = 0; q < L; q++) for (let k = -3; k <= 3; k++) cut[q] = Math.max(cut[q], cut0[clamp(q + k, 0, L - 1)] * (1 - Math.abs(k) / 4)); // a gorge opens and closes gradually
@@ -4258,7 +4268,7 @@ const WaysProto = {
   },
   // the home country's roads out: from each pass in to the nearest track, laid after everything else so the country's own plan stays as it was
   homePasses() {
-    const S = this.K.settle, avoid = (x, z) => S.near(x, z, 34) || S.builds.some(b => Math.hypot(b.x - x, b.z - z) < 40) || POI.near(x, z, 16).length > 0 || siteZone(x, z, 40), list = [];
+    const S = this.K.settle, avoid = (x, z) => S.near(x, z, 34) || S.builds.some(b => Math.hypot(b.x - x, b.z - z) < 40) || POI.near(x, z, 16).length > 0, list = [];
     this.passes().forEach((P, pi) => {
       let tp = null, bd = 1e9; for (const T of this.tracks) { if (T.lane) continue; for (let q = 0; q < T.length; q += 3) { const d = Math.hypot(T[q][0] - P.x, T[q][1] - P.z); if (d < bd) { bd = d; tp = T[q]; } } }
       const t = tp && this.passRoad(P, tp, 1300 + pi * 17 + WSEED * 97, avoid); if (t) list.push(t); else console.warn('no road to the pass at', P.x, P.z); });
@@ -5225,6 +5235,7 @@ Object.assign(World, {
     K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
     K.settle.classifyWays(); yield;
     POI.plan(K);
+    yield* MapView.countryImage(K);
     K.state = 2; K.wall = performance.now() - t0; this.ready.push(K); this.rev++; this.planMs.push(Math.round(K.cpu));
     if (this.onReady) this.onReady(K);
   },
@@ -8235,13 +8246,13 @@ const Roads = {
     const dir = rnd.chance(0.5) ? 1 : -1, n = K.pair || rnd.chance(0.15) ? 2 : 1;
     for (let m = 0; m < n; m++) {
       const v = rnd.int(0, 11), rr = new RNG(9100 + ki * 53 + v), g = K.g || (rr.chance(0.5) ? 'f' : 'm'), qq = clamp(q - dir * m * 2, 0, T[ti].length - 1), [x, z] = T[ti][qq];
-      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: `trav${ki}_${v}`, data: { trade: K.trade, ti, q: qq, dir, lane: dir * 0.9 } });
+      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: `trav${ki}_${v}`, data: { trade: K.trade, T: T[ti], q: qq, dir, lane: dir * 0.9 } });
       this.list.push(e);
     }
   },
   // a traveller walks the track, keeping to its side of the way, and stops when spoken to or at the end
   step(e, dt) {
-    const D = e.data, T = Wild.tracks[D.ti]; if (!T) { e.moving = false; return; }
+    const D = e.data, T = D.T; if (!T) { e.moving = false; return; }
     if (G.uiOpen && UI.is('dialog')) { e.moving = false; return; }
     const q = clamp(D.q + D.dir * 3, 0, T.length - 1), a = T[Math.max(0, q - 1)], b = T[Math.min(T.length - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     const tx = T[q][0] - (b[1] - a[1]) / l * D.lane, tz = T[q][1] + (b[0] - a[0]) / l * D.lane;
@@ -9465,12 +9476,14 @@ const Travel = {
       const own = new Set(Tn.nodes.map((_, i) => b0 + i)); for (const g of Tn.gates) { const j = near(g.ox, g.oz, 90, own); if (j >= 0) link(b0 + g.node, j); } }
     // a second pass: an end that found nothing (it was laid before its neighbour) tries again
     for (let k = 0; k < X.length; k++) if (A[k].length === 1) { const j = near(X[k], Z[k], 40, new Set([k, A[k][0]])); if (j >= 0 && Math.hypot(X[j] - X[k], Z[j] - Z[k]) < 40) link(k, j); }
-    this.graph = { X, Z, A, near };
+    this.graph = { X, Z, A, near }; this.graphRev = World.rev;
   },
+  // (the network is made again when a country has been planned or forgotten: its ways join on at the passes)
+  fresh() { if (!this.graph || this.graphRev !== World.rev) this.buildGraph(); return this.graph; },
   nearestNode(x, z, r = 600) { const g = this.graph; let k = g.near(x, z, r); if (k < 0) k = g.near(x, z, 4000); return k; },
   // the way by road between two points: off the road to the nearest node, along the network, off it again to the goal
   route(x0, z0, x1, z1) {
-    if (!this.graph) this.buildGraph(); const g = this.graph, N = g.X.length;
+    const g = this.fresh(), N = g.X.length;
     const s = this.nearestNode(x0, z0), t = this.nearestNode(x1, z1); if (s < 0 || t < 0) return null;
     const dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), heap = [[0, s]]; dist[s] = 0;
     const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
@@ -9485,7 +9498,7 @@ const Travel = {
   },
   // the road you stand on, onwards in the direction you face, to the next fork or its end
   roadAhead(x, z, yaw) {
-    if (!this.graph) this.buildGraph(); const g = this.graph, k0 = g.near(x, z, 25); if (k0 < 0) return null;
+    const g = this.fresh(), k0 = g.near(x, z, 25); if (k0 < 0) return null;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw); let best = -1, bs = -0.2;
     for (const j of g.A[k0]) { const dx = g.X[j] - g.X[k0], dz = g.Z[j] - g.Z[k0], l = Math.hypot(dx, dz) || 1, s = (dx * fx + dz * fz) / l; if (s > bs) { bs = s; best = j; } }
     if (best < 0) return null;
@@ -9609,7 +9622,7 @@ const Travel = {
     const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
     if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Aldhaven', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
     for (const S of SITES) if (found[S.id] || heard[S.id] || S.kind === 'town') out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
-    for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
+    for (const p of POI.known()) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
     return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);
   },
 };
@@ -9916,12 +9929,21 @@ const MapView = {
   },
   close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
-  // the whole country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow
-  worldImage() {
-    if (this._world) return this._world; const N = 300, [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = WORLD.x1 - WORLD.x0, Hd = WORLD.z1 - WORLD.z0, fm = G.city.forestMask;
-    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(WORLD.x0 + (i + 0.5) / N * Wd, WORLD.z0 + (j + 0.5) / N * Hd);
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const wx = WORLD.x0 + (i + 0.5) / N * Wd, wz = WORLD.z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+  // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
+  // first opened; the others at 100 as the last step of their plan, with their rivers and roads drawn in, and kept after the country
+  // itself is forgotten, so the map remembers where you have been
+  worldImage() { if (this._world) return this._world; const g = this.imageGen(World.home, 300); let r; do r = g.next(); while (!r.done); return (this._world = r.value); },
+  imgs: new Map(),
+  *countryImage(K) { const c = yield* this.imageGen(K, 100), x = c.getContext('2d'), s = 100 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
+    x.lineCap = 'round'; x.lineJoin = 'round';
+    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.2; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const T of K.ways.tracks) { if (T.lane) continue; for (let q = 8; q < T.length + 7; q += 8) { const a = Math.min(q - 8, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const road = T.cls && T.cls[b] === WAY.road; x.strokeStyle = road ? '#b39c6c' : '#8a7350'; x.lineWidth = road ? 1.3 : 0.8; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); } }
+    this.imgs.set(World.key(K.i, K.j), { c, x0: K.x0, z0: K.z0, x1: K.x1, z1: K.z1 }); },
+  *imageGen(K, N) {
+    const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
+    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (j % 10 === 9) yield; }
+    for (let j = 0; j < N; j++) { if (j % 6 === 5) yield; for (let i = 0; i < N; i++) {
+      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
       if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
       const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
       const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
@@ -9930,8 +9952,8 @@ const MapView = {
       else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
       else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
       a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
-    }
-    x.putImageData(img, 0, 0); return (this._world = c);
+    } }
+    x.putImageData(img, 0, 0); return c;
   },
   // screen → world on the map as last drawn
   toWorld(px, py) { const t = this.tf; if (!t) return null; return [t.cx + (px * t.dpr - t.W / 2) / t.scale, t.cz + (py * t.dpr - t.H / 2) / t.scale]; },
@@ -9958,7 +9980,6 @@ const MapView = {
     let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
     if (region || Math.hypot(P.pos.x, P.pos.z) > 900) { cx = P.pos.x; cz = P.pos.z; } // (out in the country, or in another town, the map is about where you are)
     if (this.view) { cx = this.view[0]; cz = this.view[1]; }
-    cx = clamp(cx, WORLD.x0, WORLD.x1); cz = clamp(cz, WORLD.z0, WORLD.z1 + 1000);
     this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
     const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
@@ -9967,10 +9988,12 @@ const MapView = {
     const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
     if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
     x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
-    if (this.zoom < 1.6) x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+    x.fillStyle = '#2b2a20'; x.fillRect(0, 0, W, Math.max(0, Math.min(H, Z(150)))); // land not yet seen: the sea lies only to the south
+    if (this.zoom < 1.6) { x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
+      for (const m of this.imgs.values()) if (X(m.x1) > 0 && X(m.x0) < W && Z(m.z1) > 0 && Z(m.z0) < H) x.drawImage(m.c, X(m.x0), Z(m.z0), (m.x1 - m.x0) * scale, (m.z1 - m.z0) * scale); }
     x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
     // out in the country: rivers, tracks and the roads to the landmarks
-    for (const R of LAND.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const R of Wild.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
     { // the generated country's fields (block by block from afar, strip by strip close to), the houses of its villages and hamlets
       const FC = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' }, vx0 = cx - W / 2 / scale, vx1 = cx + W / 2 / scale, vz0 = cz - H / 2 / scale, vz1 = cz + H / 2 / scale;
       if (scale > 0.05) for (const o of Settle.blocksIn(vx0, vz0, vx1, vz1)) {
@@ -10047,7 +10070,7 @@ const MapView = {
     for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
-    for (const p of POI.list) if (POI.found(p)) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    for (const p of POI.known()) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
     if (Travel.cur || Travel.paused) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
     if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
     x.textAlign = 'center';
@@ -10747,7 +10770,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { World, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

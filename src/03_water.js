@@ -132,10 +132,10 @@ function* planLandGen(K) {
   if (home) { for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); } }
   else for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C;
     // only the land inside the border crests is this country's to drain (and the way through a gap)
-    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.ug < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
+    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.us < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
     H[k] = terrainBase(x, z);
     // (the river will cut its own way through the border at the gap: the ground there is no sill for the country to fill up behind)
-    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.ug < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
+    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.us < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
   const outK = gaps.out ? cellAt(gaps.out.x, gaps.out.z) : -1, inK = gaps.ins.map(g => cellAt(g.x, g.z));
   if (outK >= 0) st[outK] = 0; for (const k of inK) st[k] = 0;
   const tGrid = performance.now();
@@ -215,11 +215,13 @@ function* planLandGen(K) {
     for (let q = 1; q < L - 1; q += 2) gb[q] = (gb[q - 1] + gb[q + 1]) / 2;
     // larger rivers have worn deeper valleys into the land
     const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500))); // (a young stream has hardly cut in)
-    const wl = [], drop = R.gin ? 0.0006 : 0.03; // (a great river that has come in through a gap falls little from there on)
+    const wl = [], drop = R.gin ? 0.0003 : 0.03; // (a great river that has come in through a gap falls little from there on)
     for (let q = 0; q < L; q++) { const g = gb[q] - 0.6 - inc[q]; wl.push(q ? Math.min(wl[q - 1] - drop, g) : R.gin ? R.gin.f.wl : g); }
+    // (where two great rivers come into one country they meet at one level: each comes down to a little under the lower of the gaps' levels within its first 600 m)
+    if (R.gin && gaps.ins.length > 1) { const lo = Math.min(...gaps.ins.map(g => g.f.wl)) - 0.25; for (let q = 0; q < L; q++) wl[q] = Math.min(wl[q], lerp(wl[0], lo, smoothstep(0, 600, q * 20))); }
     for (let q = 0; q < L; q++) wl[q] = Math.max(wl[q], SEA);
     if (R.gout) { const E = R.gout.f.wl; for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + 0.08 * (L - 1 - q)); } // it leaves at the gap's own level
-    if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + 0.01); }
+    if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + (R.gin ? drop : 0.01)); }
     // how far the ground must come down where the river runs through higher ground (a gorge through a ridge), and how far round that reaches
     const cut0 = gb.map((g, q) => Math.max(0, g - (wl[q] + 0.5))), cut = cut0.slice();
     for (let q = 0; q < L; q++) for (let k = -3; k <= 3; k++) cut[q] = Math.max(cut[q], cut0[clamp(q + k, 0, L - 1)] * (1 - Math.abs(k) / 4)); // a gorge opens and closes gradually
