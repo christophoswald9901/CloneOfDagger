@@ -94,6 +94,24 @@ function riverNearK(L, x, z, r) {
 function planLand() {
   if (LAND.ready) return;
   const K = World.home; LEGACY = 1; World.only = K; try { const g = planLandGen(K); while (!g.next().done); } finally { LEGACY = 0; World.only = null; }
+  placeHomePasses();
+}
+// the home country's three passes are cut where none of its rivers runs across the way through, and the col is not let into the ground
+// a river runs over: a river was planned on the mountain as it stood, and would be left hanging in the air where the ground is taken
+// from under it. (The home country is always planned first, so the countries beyond find the passes here)
+function placeHomePasses() {
+  const pts = []; for (const R of LAND.rivers) for (let q = 0; q < R.P.length; q += 2) { const [x, z] = R.P[q]; if (rimDist0(x, z) < 3800) pts.push([x, z]); }
+  for (const [vert, n, m] of [[1, 0, 1], [1, 2, 1], [0, 0, 0]]) {
+    const f = edgeFeat(vert, n, m); if (f.pass !== f.pass) continue;
+    const line = (vert ? WORLD.x0 : WORLD.z0) + n * TILE, near = pts.filter(p => Math.abs((vert ? p[0] : p[1]) - line) < 7600);
+    const s0 = (vert ? WORLD.z0 : WORLD.x0) + m * TILE, lo = s0 + 1400, hi = vert ? -1500 : s0 + TILE - 1400; let best = f.pass, bc = 1e12;
+    for (let s = lo; s <= hi; s += 100) { let hit = 0; for (const p of near) { const d = Math.abs((vert ? p[1] : p[0]) - s); if (d < 520) hit += 1 - d / 520; } const c = hit * 300 + Math.abs(s - f.pass); if (c < bc) { bc = c; best = s; } }
+    f.pass = best;
+    // how far each place round the pass lies from a river (25 m grid): the col spares the ground within some hundreds of metres of one
+    const C = 25, a0 = best - 2200, b0 = line - (n === 2 ? 7700 : HOME_FALL + 200), NI = Math.round(4400 / C) + 1, NJ = Math.round((7700 + HOME_FALL + 200) / C) + 1, D = new Float32Array(NI * NJ).fill(9999);
+    for (const p of near) { const i = Math.round(((vert ? p[1] : p[0]) - a0) / C), j = Math.round(((vert ? p[0] : p[1]) - b0) / C); if (i >= 0 && j >= 0 && i < NI && j < NJ) D[j * NI + i] = 0; }
+    _chamfer(D, NI, NJ, C); f.rd = { C, a0, b0, NI, NJ, D };
+  }
 }
 // the gaps in a country's border: the one its water leaves by (out), and those a great river comes in by (ins); each with the cell of the
 // planning grid it lies in and the direction into the country
@@ -114,10 +132,10 @@ function* planLandGen(K) {
   if (home) { for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); } }
   else for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C;
     // only the land inside the border crests is this country's to drain (and the way through a gap)
-    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
+    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.ug < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
     H[k] = terrainBase(x, z);
     // (the river will cut its own way through the border at the gap: the ground there is no sill for the country to fill up behind)
-    if (rimEval(K.i, K.j, x, z) - 350 < 700) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
+    if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.ug < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (j % 12 === 11) yield; }
   const outK = gaps.out ? cellAt(gaps.out.x, gaps.out.z) : -1, inK = gaps.ins.map(g => cellAt(g.x, g.z));
   if (outK >= 0) st[outK] = 0; for (const k of inK) st[k] = 0;
   const tGrid = performance.now();
