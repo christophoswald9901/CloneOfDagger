@@ -7,7 +7,7 @@ JS = r"""(()=>{const g=__game,W=g.Wild,S=g.Settle,L=g.LAND;
  const H=()=>{let h=2166136261;return {n:v=>{h^=Math.round(v*100)|0;h=Math.imul(h,16777619);},s:t=>{for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619);}},get v(){return (h>>>0).toString(16);}};};
  const out={};
  const rivers=(g.homeRivers?g.homeRivers():L.rivers), tracks=(g.homeTracks?g.homeTracks():W.tracks);
- {const h=H();for(const R of rivers){for(const p of R.P){h.n(p[0]);h.n(p[1]);}for(const v of R.w)h.n(v);for(const v of R.wl)h.n(v);}out.rivers=[rivers.length,h.v];}
+ {const h=H();for(const R0 of rivers){const R=R0.full||R0;for(const p of R.P){h.n(p[0]);h.n(p[1]);}for(const v of R.w)h.n(v);for(const v of R.wl)h.n(v);}out.rivers=[rivers.length,h.v];}
  {const h=H(),h2=H();let n=0,nl=0;for(const T of tracks){if(T.pass)continue;const hh=T.lane?h2:h;T.lane?nl++:n++;for(const p of T){hh.n(p[0]);hh.n(p[1]);}}out.tracks=[n,h.v];out.lanes=[nl,h2.v];}
  {const B=(g.homeBridges?g.homeBridges():W.bridges).filter(b=>!b.pass),h=H();for(const b of B){h.n(b.x);h.n(b.z);h.n(b.deck);}out.bridges=[B.length,h.v];}
  {const li=(g.homeSettle?g.homeSettle():S);const h=H();for(const v of li.list){h.s(v.name);h.n(v.x);h.n(v.z);h.n((v.houses||[]).length);}out.places=[li.list.length,h.v];out.placeList=li.list.map(v=>v.kind[0]+':'+v.name+'@'+Math.round(v.x)+','+Math.round(v.z));

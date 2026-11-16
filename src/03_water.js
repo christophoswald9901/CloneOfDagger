@@ -113,6 +113,21 @@ function placeHomePasses() {
     _chamfer(D, NI, NJ, C); f.rd = { C, a0, b0, NI, NJ, D };
   }
 }
+// the heads of a few of the old rivers lie beyond the middle of the home mountains, on high ground that now falls away: those reaches are
+// let go, once the plan they were part of is done (so nothing else of it changes; `full` keeps them for the fingerprint tool)
+function trimHomeRivers() {
+  const L = LAND, S = L.segs; let cut = 0;
+  for (const R of L.rivers) { let q0 = 0; while (q0 < R.P.length && rimDist0(R.P[q0][0], R.P[q0][1]) < -330) q0++; if (!q0) continue; cut++;
+    R.full = { P: R.P, w: R.w, wl: R.wl }; q0 = Math.min(q0, R.P.length - 2); R.P = R.P.slice(q0); R.w = R.w.slice(q0); R.wl = R.wl.slice(q0); }
+  for (let o = 0; o < S.length; o += LS) if (rimDist0(S[o], S[o + 1]) < -330 && rimDist0(S[o + 2], S[o + 3]) < -330) { S[o + 6] = 0; S[o + 7] = 0; S[o + 8] = 0; S[o + 9] = 0; } // their valleys with them
+  L.trimmed = cut; if (!cut) return;
+  // the cells the water is looked up by, for the ground (wh) and for the ways (rh)
+  const WH = new Map(), C = 48, rh = new Map();
+  L.rivers.forEach((R, ri) => { for (let q = 1; q < R.P.length; q++) { const [ax, az] = R.P[q - 1], [bx, bz] = R.P[q];
+    for (let i = Math.floor(Math.min(ax, bx) / C); i <= Math.floor(Math.max(ax, bx) / C); i++) for (let j = Math.floor(Math.min(az, bz) / C); j <= Math.floor(Math.max(az, bz) / C); j++) { const k = (i + 4096) * 8192 + j + 4096; let l = WH.get(k); if (!l) WH.set(k, l = []); l.push(ri, q); }
+    const k = Math.floor(bx / 32) * 8192 + Math.floor(bz / 32); let l = rh.get(k); if (!l) rh.set(k, l = []); l.push(ri, q); } });
+  for (const [k, l] of WH) WH.set(k, Int32Array.from(l)); WH.C = C; L.wh = WH; World.home.ways.rh = rh;
+}
 // the gaps in a country's border: the one its water leaves by (out), and those a great river comes in by (ins); each with the cell of the
 // planning grid it lies in and the direction into the country
 function countryGaps(K) {

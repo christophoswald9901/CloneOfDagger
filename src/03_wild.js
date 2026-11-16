@@ -40,7 +40,7 @@ const WILD_KINDS = {
 };
 const FIELD_KEYS = [['fMeadow', 0.3], ['fWheat', 0.3], ['fBarley', 0.18], ['fPlowed', 0.16], ['fGreens', 0.06]];
 // the tree line rises inland with the land itself; the snow lies some way above it
-function wildTreeLine(x, z) { return 150 + 95 * smoothstep(1500, 14000, coastZ(x) - z) + 110 * smoothstep(2200, 500, rimDist(x, z)) + 24 * fbm(x / 260, z / 260, 2, 331); } // (and climbs the flanks of the great mountains at the world's edge)
+function wildTreeLine(x, z) { return 150 + 95 * smoothstep(1500, 14000, coastZ(x) - z) + 110 * smoothstep(2200, 500, rimNear(x, z)) + 24 * fbm(x / 260, z / 260, 2, 331); } // (and climbs the flanks of the great mountains at the world's edge)
 function wildSnowLine(x, z) { return wildTreeLine(x, z) + 210; }
 // how far the land is farmed: the hand-made fields carry on outwards and thin out over a kilometre or so, the city's farmland
 // rings it (but not where woods meet the surveyed square), and a belt runs along the tracks far out into the country
@@ -939,7 +939,7 @@ function segDistObb(segs, o) { const cs = obbCorners(o); return segs.some(s => {
 function wildRockiness(x, z, h, slope, apron = 0) {
   if (Math.hypot(x, z) < 380) return [0, 0];
   const nz = fbm(x / 36, z / 36, 2, 333), TL = wildTreeLine(x, z);
-  const sea = 0.55 * smoothstep(160, 30, coastZ(x) - z) * smoothstep(SEA + 6, SEA + 18, h) + 0.3 * smoothstep(1800, 300, rimDist(x, z)); // (high ground breaks off at the sea in bare cliffs) // the sea keeps its cliffs bare, and the great mountains theirs
+  const sea = 0.55 * smoothstep(160, 30, coastZ(x) - z) * smoothstep(SEA + 6, SEA + 18, h) + 0.3 * smoothstep(1800, 300, rimNear(x, z)); // (high ground breaks off at the sea in bare cliffs) // the sea keeps its cliffs bare, and the great mountains theirs
   const qr = smoothstep(1.12, 1.5, slope + 0.32 * nz + 0.15 * smoothstep(TL, TL + 60, h) + sea); // bare rock in outcrops on the steepest ground; turf and trees hold the rest
   const patch = smoothstep(-0.15, 0.25, fbm(x / 140, z / 140, 2, 334) + 0.35 * nz); // scree lies in tongues and fans, not over whole hills
   const alpine = smoothstep(TL + 90, TL + 190, h + 22 * nz) * smoothstep(0.55, 0.9, slope + 0.12 * nz) * patch; // above the trees alpine grass first, scree higher up on the steeper ground
