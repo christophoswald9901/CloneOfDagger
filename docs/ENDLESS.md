@@ -29,7 +29,8 @@ Branch `claude/endless-world-ce1a5e`, cut from `claude/road-types` (abbce72, PR 
 
 ## Not done or not verified
 - Nothing was tried on a real device or an iPad. Frame figures above are JavaScript work per frame in headless Chrome; drawing was switched off for the long journeys.
-- Fast travel across borders was checked by routing (by road from Pilgrim's Rise to a village two countries west, 33 km through the west pass) and by the journey tool, which imitates its pacing; the real travel code was not driven over a border.
+- The game's own fast travel was driven once by road from Pilgrim's Rise through the west pass to a village two countries west (25 km as the crow flies) at x40: it arrived. It stopped once on the way with "Your way is blocked" at a bridge over a great river near its mouth, and went on when resumed; walking the same bridge afterwards, with its ground built, it crossed without stopping. So that stop was the bridge's ground not being built yet at that speed, which the old country can show too.
+- Found by the way, in the build before this work as well: fast travel by road from Pilgrim's Rise to the westernmost village of the home country (seed 0) is blocked for good at about (222, -762), just north of the Rise. Not looked into.
 - The map was looked at once, west of home. Places found in a country since forgotten are kept by name and position, but this was not exercised.
 - On the plan from above the borders beyond home still read as a rough grid of ranges and hill belts. Warping the lattice would hide it; it costs larger planning grids.
 - `landAt` is not blended across a border (vegetation may change tone along a border line). No towns beyond home: roads run from pass to pass through villages and a meeting place.
