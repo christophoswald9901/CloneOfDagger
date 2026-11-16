@@ -644,6 +644,41 @@ function drawTree(kind, seed) {
     if (B) for (let i = 0; i < 5; i++) { x.fillStyle = rng.chance(0.5) ? '#d8d0b8' : '#7a2a24'; x.fillRect(rng.int(9, 23), rng.int(6, 13), 1, 1); } // blossom or haws
     noiseImg(x, 32, 20, 0.2, rng); outline(c, [14, 22, 10]); return c;
   }
+  if (kind === 'beech') { // a tall smooth grey bole under a broad dome of fresh green
+    const [c, x] = cnv(56, 84);
+    x.fillStyle = '#7c786c'; x.fillRect(25, 40, 6, 44); x.fillStyle = '#96928a'; x.fillRect(28, 40, 2, 44); x.fillStyle = '#7c786c'; x.fillRect(23, 80, 10, 4);
+    pxLine(x, 27, 50, 15, 34, '#7c786c', 2); pxLine(x, 29, 48, 42, 32, '#7c786c', 2); pxLine(x, 28, 44, 28, 24, '#7c786c', 2);
+    for (let i = 0; i < 34; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 28 + Math.cos(a) * r * 20, 27 + Math.sin(a) * r * 17, rng.int(5, 9), '#2f5122'); }
+    for (let i = 0; i < 24; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 26 + Math.cos(a) * r * 17, 23 + Math.sin(a) * r * 14, rng.int(3, 6), '#4a7a2c'); }
+    for (let i = 0; i < 14; i++) pxCircle(x, 24 + rng.range(-12, 9), 17 + rng.range(-8, 7), rng.int(1, 3), '#74a23e');
+    noiseImg(x, 56, 84, 0.15, rng); outline(c, [14, 22, 10]); return c;
+  }
+  if (kind === 'willow') { // a pollard: a short thick bole, a round mop of grey-green withies hanging over
+    const [c, x] = cnv(48, 48);
+    x.fillStyle = '#54442e'; x.fillRect(20, 28, 8, 20); x.fillStyle = '#6a583c'; x.fillRect(24, 28, 3, 20); x.fillStyle = '#54442e'; x.fillRect(18, 26, 12, 4); x.fillRect(18, 45, 12, 3);
+    for (let i = 0; i < 22; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 24 + Math.cos(a) * r * 17, 17 + Math.sin(a) * r * 11, rng.int(4, 7), '#4c683e'); }
+    for (let i = 0; i < 26; i++) { const px = rng.int(5, 43), top = rng.int(8, 22), len = rng.int(7, 15); for (let y = top; y < Math.min(40, top + len); y++) { x.fillStyle = y - top < 3 ? '#8aa66a' : (i % 2 ? '#6a8a52' : '#5a7a48'); x.fillRect(px + Math.round((y - top) * (px < 24 ? -0.12 : 0.12)), y, 1, 1); } }
+    for (let i = 0; i < 12; i++) pxCircle(x, 22 + rng.range(-12, 10), 12 + rng.range(-5, 5), rng.int(1, 3), '#9cb87c');
+    noiseImg(x, 48, 48, 0.14, rng); outline(c, [16, 24, 12]); return c;
+  }
+  if (kind === 'birch') { // a slight white stem, a thin airy head
+    const [c, x] = cnv(36, 76);
+    x.fillStyle = '#d6d2c4'; x.fillRect(17, 30, 3, 46); x.fillStyle = '#b8b4a6'; x.fillRect(19, 30, 1, 46); for (let i = 0; i < 9; i++) { x.fillStyle = '#2a2622'; x.fillRect(17 + rng.int(0, 1), rng.int(34, 74), 2, 1); }
+    pxLine(x, 18, 40, 11, 28, '#8a8478', 1); pxLine(x, 18, 36, 26, 24, '#8a8478', 1);
+    for (let i = 0; i < 20; i++) pxCircle(x, 18 + rng.range(-11, 11), 21 + rng.range(-15, 13), rng.int(3, 5), '#44702e');
+    for (let i = 0; i < 16; i++) pxCircle(x, 17 + rng.range(-9, 8), 17 + rng.range(-12, 9), rng.int(2, 3), '#6c9a3c');
+    for (let i = 0; i < 60; i++) { x.fillStyle = rng.chance(0.5) ? '#8ab44c' : '#3a5e28'; x.fillRect(rng.int(4, 31), rng.int(4, 40), 1, 1); }
+    for (let i = 0; i < 26; i++) x.clearRect(rng.int(5, 30), rng.int(5, 38), 2, 2); // light through it
+    noiseImg(x, 36, 76, 0.14, rng); outline(c, [14, 22, 10]); return c;
+  }
+  if (kind === 'thorn') { // an old hawthorn, bent over by the wind: its head swept to one side
+    const [c, x] = cnv(44, 36);
+    pxLine(x, 12, 35, 15, 24, '#4a3a28', 3); pxLine(x, 15, 24, 22, 16, '#4a3a28', 2); pxLine(x, 22, 16, 32, 13, '#4a3a28', 1);
+    for (let i = 0; i < 16; i++) { const t = rng.next(); pxCircle(x, 16 + t * 20 + rng.range(-3, 3), 14 - t * 3 + rng.range(-4, 3), rng.int(3, 6) * (1 - 0.4 * t), '#2e4020'); }
+    for (let i = 0; i < 12; i++) { const t = rng.next(); pxCircle(x, 17 + t * 19 + rng.range(-3, 3), 11 - t * 3 + rng.range(-3, 2), rng.int(2, 3), '#4a5e2a'); }
+    for (let i = 0; i < 8; i++) { x.fillStyle = '#62763a'; x.fillRect(rng.int(14, 38), rng.int(5, 12), 1, 1); }
+    noiseImg(x, 44, 36, 0.18, rng); outline(c, [14, 20, 10]); return c;
+  }
   // oak
   const [c, x] = cnv(48, 80);
   x.fillStyle = '#4a3220'; x.fillRect(21, 44, 6, 36); x.fillStyle = '#5c4028'; x.fillRect(24, 44, 2, 36); x.fillStyle = '#4a3220'; x.fillRect(19, 76, 10, 4);

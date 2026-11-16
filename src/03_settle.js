@@ -38,7 +38,7 @@ const SettleProto = {
     const { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN } = T, n = NI * NJ, cx = i => X0 + i * C, cz = j => Z0 + j * C;
     const cellOf = (x, z) => { const i = Math.round((x - X0) / C), j = Math.round((z - Z0) / C); return i < 0 || j < 0 || i >= NI || j >= NJ ? -1 : j * NI + i; };
     /* ---- what each 50 m cell of the country is good for ---- */
-    const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n); // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
+    const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n), AR0 = home ? AR : new Float32Array(n); // (AR0: the land as it lies, before the custom of the country is counted) // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
     for (let j = 0; j < NJ; j++) { if (!home && World.due()) yield; for (let i = 0; i < NI; i++) {
       const k = j * NI + i, x = cx(i), z = cz(j), h = H[k];
       if (h < SEA + 2.5 || x < K.x0 || x > K.x1 || z < K.z0 || z > K.z1 || Math.max(Math.abs(x), Math.abs(z)) < TG.R + 30 || coastZ(x) - z < 60 || (home ? rimDist(x, z) : rimEval(K.i, K.j, x, z) - 350) < 1000) { EX[k] = 1; continue; }
@@ -46,6 +46,7 @@ const SettleProto = {
       const TL = wildTreeLine(x, z), sl = SL[k], expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), wet = WET[k];
       AR[k] = (1 - ss(0.06, 0.16, sl)) * (1 - ss(0.42, 0.8, expo)) * (1 - ss(0.5, 0.85, wet)) * (1 - ss(TL - 110, TL - 45, h)); // the plough: gentle, sheltered, drained, low
       PA[k] = (1 - ss(0.15, 0.3, sl)) * (1 - ss(0.6, 0.95, expo)) * (1 - ss(0.72, 0.95, wet)) * (1 - ss(TL - 50, TL - 5, h));     // the grazing: the slopes beyond
+      if (!home) { AR0[k] = AR[k]; const rw = regionW(x, z); if (rw) { AR[k] *= regionMix(rw, RP.plough); PA[k] = Math.min(1, PA[k] * regionMix(rw, RP.graze)); if (rw[RG.fen] > 0.8 && mereAt(x, z) > 0.05) { EX[k] = 1; AR[k] = PA[k] = 0; } } } // the kind of country: sheepwalk on the chalk, little plough on the moor, none in a mere
     } }
     // how far each cell lies from running water (any stream), and which cells a river too wide to wade runs through
     const SD = new Float32Array(n).fill(1e4), WR = new Uint8Array(n);
@@ -71,7 +72,7 @@ const SettleProto = {
     /* ---- the places worth settling, best first ---- */
     const cand = [];
     for (let j = 2; j < NJ - 2; j++) { if (!home && World.due()) yield; for (let i = 2; i < NI - 2; i++) {
-      const k = j * NI + i; if (EX[k] || AR[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
+      const k = j * NI + i; if (EX[k] || AR0[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
       const x = cx(i), z = cz(j), td = W.trackD(x, z); if (cityOut(x, z) < 1150 || townOut(x, z) < 1150) continue;
       const floor = ss(-3, -14, TPI[k]) * (1 - ss(0.06, 0.16, SL[k])), expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), sd = SD[k];
       const s = 1.5 * meanAR(i, j, 8) + 0.4 * AR[k]
@@ -90,6 +91,8 @@ const SettleProto = {
     const wayPt = (x, z, r) => { const w = wayNear(x, z, r); if (!w) return null; const s2 = wayHash.query(w.x - 1, w.z - 1, w.x + 1, w.z + 1).find(s => s[4] === w.ti); const t = W.tracks[w.ti]; return t.lane ? null : { ti: ways.indexOf(t), q: s2 ? s2[5] : 1, d: w.d }; };
     const tiOf = t => W.tracks.indexOf(t);
     const place = (c, kind) => {
+      // (the custom of the country: villages or scattered hamlets, close set or far apart)
+      if (!home) { const rw = regionW(c.x, c.z); if (rw && _h2(Math.round(c.x / 50), Math.round(c.z / 50), 7303 + WSEED) >= regionMix(rw, kind === 'village' ? RP.village : RP.hamlet)) return; }
       const far = kind === 'village' ? 1900 : 1100; if (list.some(o => Math.hypot(o.x - c.x, o.z - c.z) < (o.kind === 'village' && kind === 'village' ? far : 1100))) return;
       let x = c.x, z = c.z, ti = -1, q = -1;
       const wp = wayPt(x, z, kind === 'village' ? 230 : 110);
@@ -153,7 +156,7 @@ const SettleProto = {
       for (let q = list.length - 1; q >= 0; q--) if (list[q].dead) list.splice(q, 1); }
     prof.push(['placeLanes', performance.now()]); if (!home) yield;
     /* ---- each place's territory: the land nearer to it than to any other, in walking effort ---- */
-    const owners = [...list];
+    const owners = [...list]; for (const o of list) o.spread = home ? 1 : regionP(o.x, o.z, RP.spread);
     if (home) { owners.push({ kind: 'city', x: 0, z: 0 }); for (const Tn of TOWNS) owners.push({ kind: 'town', x: Tn.x, z: Tn.z, town: Tn }); }
     const D = new Float32Array(n).fill(Infinity), OWN = new Int16Array(n).fill(-1), hp = new _Heap();
     const src = (k, o) => { if (k < 0 || H[k] < SEA) return; D[k] = 0; OWN[k] = o; hp.push(0, k); };
@@ -170,8 +173,8 @@ const SettleProto = {
     /* ---- what the land is used for: 2 ploughed, 1 grazed, 0 left wild ---- */
     let USE = new Uint8Array(n);
     for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
-      const k = j * NI + i; if (EX[k] || OWN[k] < 0) continue; const o = owners[OWN[k]], [Rf, Rp] = SETTLE_R[o.kind], x = cx(i), z = cz(j);
-      const nz = 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED), d1 = D[k] / Rf + nz, d2 = D[k] / Rp + nz;
+      const k = j * NI + i; if (EX[k] || OWN[k] < 0) continue; const o = owners[OWN[k]], [Rf, Rp] = SETTLE_R[o.kind], x = cx(i), z = cz(j), sp = o.spread || 1;
+      const nz = 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED), d1 = D[k] / (Rf * sp) + nz, d2 = D[k] / (Rp * sp) + nz;
       if (d1 < 1 && AR[k] > 0.3 + 0.5 * ss(0.5, 1, d1)) USE[k] = 2; else if (d2 < 1 && PA[k] > 0.3 + 0.45 * ss(0.55, 1, d2)) USE[k] = 1;
     }
     { const U2 = USE.slice(); for (let j = 1; j < NJ - 1; j++) for (let i = 1; i < NI - 1; i++) { const k = j * NI + i; let f = 0, a = 0; for (let e = 0; e < 8; e++) { const u = USE[k + DJ[e] * NI + DI[e]]; if (u) { f++; if (u === 2) a++; } }
@@ -215,7 +218,8 @@ const SettleProto = {
     { const order = []; for (let k = 0; k < n; k++) if (USE[k] && OWN[k] >= 0) { const i = k % NI, j = (k - i) / NI, td = W.trackD(cx(i), cz(j)); order.push([_h2(i, j, 7350 + WSEED) - (td > 30 && td < 170 ? 0.45 : 0), k]); } // (those beside a way first: walking it, you pass them) order.sort((a, b) => a[0] - b[0]);
       let nf = 0; for (const [hv, k] of order) {
         if (!home && World.due()) yield;
-        const oi = OWN[k], o = owners[oi]; if ((cnt.get(oi) || 0) >= cap[o.kind] || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
+        const oi = OWN[k], o = owners[oi]; if (o.fcap === undefined) o.fcap = home ? cap[o.kind] : Math.round(cap[o.kind] * regionP(o.x, o.z, RP.farms));
+        if ((cnt.get(oi) || 0) >= o.fcap || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
         const i = k % NI, j = (k - i) / NI; let x = cx(i) + (_h2(i, j, 7351) - 0.5) * C * 0.8, z = cz(j) + (_h2(i, j, 7352) - 0.5) * C * 0.8;
         const ci = W.ci(x), cj = W.ci(z), x0 = -TG.R + ci * WC, z0 = -TG.R + cj * WC; x = clamp(x, x0 + 34, x0 + WC - 34); z = clamp(z, z0 + 34, z0 + WC - 34); // well inside one chunk, which builds it
         if (!farmOk(x, z, oi)) continue;
@@ -249,7 +253,7 @@ const SettleProto = {
           if (w && _h2(i, j, 7374) < 0.75) ang = w.ang + (_h2(i, j, 7375) < 0.6 ? Math.PI / 2 : 0); // the strips run off the lane, or along it
           else if (Math.hypot(gx, gz) > 0.03) ang = Math.atan2(gz, -gx);                          // along the contour
           else ang = 1.6 * fbm(x / 1400, z / 1400, 1, 368); }
-        const S = { id: sid++, x, z, ang, owner: OWN[k], grow: smoothstep(120, 900, fd) }; seeds.push(S); seedHash.add(S, [x, z, x, z]); } }
+        const S = { id: sid++, x, z, ang, owner: OWN[k], grow: smoothstep(120, 900, fd), fs: home ? 1 : regionP(x, z, RP.field), openF: home ? 0.45 : regionP(x, z, RP.openF) }; seeds.push(S); seedHash.add(S, [x, z, x, z]); } }
     this.seeds = seeds; this.seedHash = seedHash;
     prof.push(['seeds', performance.now()]);
     // the lattice: columns of blocks (each a few strips wide) side by side, the blocks of a column end to end, the columns staggered
@@ -258,16 +262,18 @@ const SettleProto = {
       if (!home && World.due()) yield;
       const ca = Math.cos(S.ang), sa = Math.sin(S.ang); let u = -RS - _h2(S.id, 0, 7380) * 30, col = 0;
       while (u < RS) {
-        const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = 14 + 8 * _h2(S.id, col, 7382), wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
+        const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = (14 + 8 * _h2(S.id, col, 7382)) * S.fs, wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
         let v = -RS - _h2(S.id, col, 7383) * 80, row = 0;
         while (v < RS) {
-          const pl = 48 + 34 * _h2(S.id * 131 + col, row, 7384), vc = v + pl / 2, x = S.x + uc * ca + vc * sa, z = S.z - uc * sa + vc * ca; v += pl + 2.4; row++;
+          const pl = (48 + 34 * _h2(S.id * 131 + col, row, 7384)) * S.fs, vc = v + pl / 2, x = S.x + uc * ca + vc * sa, z = S.z - uc * sa + vc * ca; v += pl + 2.4; row++;
           if (this.seedAt(x, z) !== S) continue;
           const o = mkObb(x, z, S.ang, (wc - 2.4) / 2, pl / 2); let good = this.ufAt(x, z) > 0.3 ? 1 : 0; for (const [px, pz] of obbCorners(o)) if (this.ufAt(px, pz) > 0.3) good++; if (good < 3) continue;
-          const k = cellOf(x, z); if (k < 0 || OWN[k] < 0) continue; const past = USE[k] !== 2, ow = owners[OWN[k]], Rp = SETTLE_R[ow.kind][1];
+          const k = cellOf(x, z); if (k < 0 || OWN[k] < 0) continue; const past = USE[k] !== 2, ow = owners[OWN[k]], Rp = SETTLE_R[ow.kind][1] * (ow.spread || 1);
           if (past && _h2(S.id * 977 + col, row, 7385) < 0.55 * ss(0.72, 1.02, D[k] / Rp + 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED))) continue; // the pasture thins out at the edge of the territory
-          let nn = nS, pw2 = pw; if (past) { nn = Math.max(1, Math.round(wc / (32 + 12 * _h2(S.id, col, 7386)))); pw2 = wc / nn - 2.4; } // hedged pasture: fewer, wider closes
-          Object.assign(o, { id: blocks.length, st: this, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < 0.45, wall: past && H[k] > 70 });
+          let nn = nS, pw2 = pw; if (past) { nn = Math.max(1, Math.round(wc / ((32 + 12 * _h2(S.id, col, 7386)) * S.fs))); pw2 = wc / nn - 2.4; } // hedged pasture: fewer, wider closes
+          Object.assign(o, { id: blocks.length, st: this, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < S.openF, wall: past && H[k] > 70 });
+          // what bounds the fields is the custom of the country: hedges, dry-stone walls, or nothing that stands (the fen's ditches, the open downland)
+          { const rw = home ? null : regionW(x, z); if (rw) { const bk = RG_BOUND[regionPick(x, z, _h2(S.id * 53 + col, row, 7388))]; o.wall = bk === 'wall'; o.nob = bk === 'none'; o.rk = regionKind(x, z); } }
           blocks.push(o); blockHash.add(o, obbAabb(o));
         }
         u += wc; col++;
@@ -317,7 +323,7 @@ const SettleProto = {
     // the kind of each point of each way, with no stretch of high road shorter than some 150 m
     const ROAD = 9, km = [0, 0, 0, 0]; this.milestones = [];
     TT.forEach((T, ti) => {
-      const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (_h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75);
+      const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (K.home ? _h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75 : _h2(ti, L, 7500 + WSEED) < regionP(T[L >> 1][0], T[L >> 1][1], RP.green));
       for (let q = 0; q < L; q++) { const w = WT[off[ti] + q]; cls[q] = !T.lane ? (w >= ROAD ? WAY.road : WAY.track) : w >= 2.5 ? WAY.track : green ? WAY.green : WAY.lane; }
       for (let q = 0; q < L;) { if (cls[q] !== WAY.road) { q++; continue; } let e = q; while (e < L && cls[e] === WAY.road) e++; if (e - q < 50) for (let k = q; k < e; k++) cls[k] = WAY.track; q = e; }
       T.cls = cls; for (let q = 1; q < L; q++) km[cls[q]] += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]) / 1000;
@@ -336,12 +342,15 @@ const SettleProto = {
     TT.forEach((T, ti) => {
       const L = T.length, H = Wy.trackH[ti]; if (!H || L < 30 || !T.cls) return; let any = false; const sk = new Float32Array(L);
       for (let q = 12; q < L - 12; q++) { const c = T.cls[q]; if (c === WAY.road) continue; const g = Math.abs(H[Math.min(L - 1, q + 5)] - H[Math.max(0, q - 5)]) / 30; if (g < 0.045) continue;
-        sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g); any = true; }
-      if (!any) return;
+        sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g) * (K.home ? 1 : regionP(T[q][0], T[q][1], RP.sunk)); any = true; }
+      // through the fen a way runs on a causeway, raised above the wet (a negative sinking)
+      let cw = null; if (!K.home) for (let q = 0; q < L; q += 4) { const f = regionIs(T[q][0], T[q][1], RG.fen); if (f > 0.55 && !riverNear(T[q][0], T[q][1], 40)) { if (!cw) cw = new Float32Array(L); const v = (c0 => c0 === WAY.road ? 1.1 : c0 === WAY.green ? 0.45 : 0.8)(T.cls[q]) * smoothstep(0.55, 0.85, f); for (let k = q; k < Math.min(L, q + 4); k++) cw[k] = v; } }
+      if (!any && !cw) return;
       for (let q = 0; q < L; q += 3) if (sk[q] > 0 || sk[Math.min(L - 1, q + 1)] > 0 || sk[Math.min(L - 1, q + 2)] > 0) { if (calm(T[q][0], T[q][1])) for (let k = Math.max(0, q - 3); k <= Math.min(L - 1, q + 5); k++) sk[k] = -1; }
       for (let q = 0; q < L; q++) if (sk[q] < 0) sk[q] = 0;
       const out = new Float32Array(L); for (let q = 0; q < L; q++) { let a = 0, n = 0; for (let k = -9; k <= 9; k++) { const v = sk[clamp(q + k, 0, L - 1)]; a += v; n++; } out[q] = a / n * Math.min(1, q / 12, (L - 1 - q) / 12); } // (in and out of it gradually)
-      let m = 0; for (let q = 0; q < L; q++) m = Math.max(m, out[q]); if (m > 0.2) { T.sink = out; for (let q = 1; q < L; q++) if (out[q] > 0.6) sunk += 3; }
+      if (cw) for (let q = 0; q < L; q++) { let a = 0; for (let k = -6; k <= 6; k++) a += cw[clamp(q + k, 0, L - 1)]; if (out[q] < 0.05) out[q] = -a / 13 * Math.min(1, q / 10, (L - 1 - q) / 10); }
+      let m = 0; for (let q = 0; q < L; q++) m = Math.max(m, Math.abs(out[q])); if (m > 0.2) { T.sink = out; for (let q = 1; q < L; q++) if (out[q] > 0.6) sunk += 3; }
     });
     this.wayKm = { road: Math.round(km[1]), track: Math.round(km[0]), lane: Math.round(km[2]), green: Math.round(km[3]), hollow: Math.round(sunk / 1000), ms: Math.round(performance.now() - t0) };
   },
@@ -402,7 +411,7 @@ const SettleProto = {
         if (s <= NS && ok[s]) { if (s0 < 0) s0 = s; continue; }
         if (s0 >= 0) { const a = -o.hz + s0 * dv, b = -o.hz + (s - 1) * dv, len = b - a;
           if (len >= Math.max(2.2 * o.pw, 26)) { const [x, z] = xfP(o, lx, (a + b) / 2), f = mkObb(x, z, o.ang, o.pw / 2, len / 2); let sl = 0; for (let q = s0 + 1; q < s; q++) sl = Math.max(sl, Math.abs(hs[q] - hs[q - 1]) / dv);
-            Object.assign(f, { id: o.id * 64 + k * 8 + Math.min(7, seg++), blk: o.id, k, grow: o.grow, key: sl > 0.14 ? 'fMeadow' : this.cropOf(o, k), nofill: o.past && sl > 0.19, past: o.past || sl > 0.14, wall: o.wall, open: o.open }); out.push(f); } }
+            Object.assign(f, { id: o.id * 64 + k * 8 + Math.min(7, seg++), blk: o.id, k, grow: o.grow, key: sl > 0.14 ? 'fMeadow' : this.cropOf(o, k), nofill: o.past && sl > 0.19, past: o.past || sl > 0.14, wall: o.wall, open: o.open, nob: o.nob, rk: o.rk || 0 }); out.push(f); } }
         s0 = -1;
       }
     }

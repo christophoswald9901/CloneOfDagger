@@ -169,7 +169,7 @@ function edgeFeat(vert, n, m) {
     f.to = flow > 0 ? b : a; f.from = flow > 0 ? a : b;
     // the water's level there: well below the ground (a great river's valley), and never below the level it leaves the next country at
     const d = drainDir(f.to[0], f.to[1]), [ti, tj] = f.to, nx = d === 'S' ? edgeFeat(0, tj + 1, ti) : d === 'W' ? edgeFeat(1, ti, tj) : d === 'E' ? edgeFeat(1, ti + 1, tj) : null;
-    f.wl = Math.max(SEA + 1.5, g - 47.4, nx ? nx.wl + 0.6 : -1e9);
+    f.wl = Math.max(SEA + 1.5, g - 0.6 - 46.8 * regionP(gx, gz, RP.incise), nx ? nx.wl + 0.6 : -1e9); // (a great river's valley is as deep as the country it runs through lets it cut: hardly at all in a fen)
   }
   // the pass: one on each side of the home country (west and east near the coast, north beyond Corrinvale), and on most borders elsewhere
   const has = homeEdge ? (vert ? m === 1 : m === 0) : _h2(n * 2 + vert, m, 5220 + WSEED) < 0.8;
@@ -227,6 +227,7 @@ function rimHeight(x, z) {
   const wf = lerp(0.5, 1.35, smoothstep(-0.3, 0.3, fbm(x / 3300 + 2.2, z / 3300, 2, 396 + WSEED * 7))), de = u / wf - 350; if (de > 3600) return h;
   const f = edgeAt(), s = RIM.s;
   let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7))) * smoothstep(0, 1500, Math.min(hf, d)); // (a belt that runs up to the home country dies away before it)
+  amp *= regionP(x, z, RP.rim);                                                                                  // (low through the fen, high over the moor)
   if (f.gap === f.gap) { const q = (s - f.gap) / 520; if (q * q < 12) amp *= 1 - 0.985 * Math.exp(-q * q); }   // the river's gap
   if (f.pass === f.pass) { const q = (s - f.pass) / 470; if (q * q < 12) amp *= 1 - 0.83 * Math.exp(-q * q); }  // the pass: a col between two peaks
   const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
@@ -238,8 +239,9 @@ function rimHeight(x, z) {
 function terrainBase(x, z, noRim) {
   const dIn = SHORE - z; const r0 = Math.hypot(x, z);
   const wW = smoothstep(800, 1400, r0); const wr = wW > 0 ? wildReliefAt(x, z) : null;
+  const rw = wr ? regionW(x, z) : null;                             // the kind of country this is (null: the home country's own)
   let h = 0.6 + 45 * (1 - Math.exp(-Math.max(0, dIn) / 330));      // the land climbs away from the sea
-  h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21);                     // broad swells
+  h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21) * (rw ? regionMix(rw, RP.swell) : 1); // broad swells
   const inside = pointInPoly(x, z, WALL_PTS) && z < SHORE + 2;
   const wd = inside ? 0 : wallDist(x, z);
   const out = smoothstep(4, 75, wd);
@@ -247,13 +249,13 @@ function terrainBase(x, z, noRim) {
   h += 16 * Math.exp(-(x * x + (z + 128) * (z + 128)) / (42 * 42)); // the castle knoll
   // hills beyond the walls, bigger towards the horizon
   const far = smoothstep(330, 700, Math.hypot(x, z));
-  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)); // out in the country the big shapes carry the relief, the knolls calm down
+  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)) * (rw ? regionMix(rw, RP.knoll) : 1); // out in the country the big shapes carry the relief, the knolls calm down
   if (amp > 0.01) {
     const wx = x + 40 * fbm(x / 300, z / 300, 2, 23), wz = z + 40 * fbm(x / 300 + 5, z / 300, 2, 24);
     const hills = 0.6 * ridgeNoise(wx / 230, wz / 230, 4, 25) + 0.4 * (fbm(wx / 150, wz / 150, 4, 26) * 0.5 + 0.5);
     h += amp * (hills - 0.42) * (wr ? lerp(1, lerp(0.35, 1, wr[1]), wW) : 1);
   }
-  if (wr) h += out * wW * (wr[0] + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior
+  if (wr) h += out * wW * ((rw ? wr[0] * regionMix(rw, RP.relief) + regionMix(rw, RP.lift) + regionShape(x, z, rw) : wr[0]) + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
   if (r0 > 5500 && !noRim) h += LEGACY ? rimHeight0(x, z) : rimHeight(x, z);
   if (Math.abs(x - 205) < 700 && Math.abs(z + 220) < 700) h += out * riseHeight(x, z); // it has faded to nothing long before the box ends
   // western downs framing the other side of the bay
