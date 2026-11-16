@@ -2457,7 +2457,8 @@ const SettleProto = {
   /* ---- the kinds of way: every village and hamlet sends its people to the nearer market town (Aldhaven or a town) along the ways,
      and the two towns trade with each other; a way that carries much of it is a high road, a lane that carries a village's is a cart
      track, the rest stay lanes. Lanes and tracks on a slope wear down into hollow ways. ---- */
-  classifyWays() {
+  classifyWays() { const g = this.classifyGen(); while (!g.next().done); },
+  *classifyGen() {
     const t0 = performance.now(), K = this.K, Wy = K.ways, TT = Wy.tracks, off = []; let N = 0; for (const T of TT) { off.push(N); N += T.length; }
     const X = new Float32Array(N), Z = new Float32Array(N), TI = new Int32Array(N), HC = 32, hash = new Map(), hk = (x, z) => Math.floor(x / HC) * 100003 + Math.floor(z / HC);
     TT.forEach((T, ti) => { for (let q = 0; q < T.length; q++) { const k = off[ti] + q; X[k] = T[q][0]; Z[k] = T[q][1]; TI[k] = ti; const h = hk(X[k], Z[k]); let l = hash.get(h); if (!l) hash.set(h, l = []); l.push(k); } });
@@ -2473,13 +2474,14 @@ const SettleProto = {
     if (K.home) { TT.forEach((T, ti) => { if (!T.lane && Math.max(Math.abs(T[0][0]), Math.abs(T[0][1])) < TG.R + 220) cityS.push(off[ti]); });
       for (const Tn of TOWNS) for (const g of Tn.gates) nearNodes(g.ox, g.oz, 260, k => { if (!TT[TI[k]].lane) townS.push(k); }); }
     else nearNodes(Wy.centre[0], Wy.centre[1], 120, k => { if (!TT[TI[k]].lane) cityS.push(k); }); // (a country's own market is the meeting place at its middle)
-    const C = walk(cityS), Tw = townS.length ? walk(townS) : null, WT = new Float32Array(N);
+    yield; const C = walk(cityS); yield; const Tw = townS.length ? walk(townS) : null, WT = new Float32Array(N);
     const carry = (prev, k, w) => { for (let n = 0; k >= 0 && n < N; k = prev[k], n++) WT[k] += w; };
     for (const S of this.list) { if (S.ti < 0 || !TT[S.ti]) continue; const k = off[S.ti] + clamp(S.q, 0, TT[S.ti].length - 1), dc = C.dist[k], dt = Tw ? Tw.dist[k] : Infinity; if (!isFinite(dc) && !isFinite(dt)) continue;
       carry(dc <= dt ? C.prev : Tw.prev, k, S.kind === 'village' ? 3 : 1); }
     if (K.home) for (const S of SITES) if (S.track >= 0 && TT[S.track] && isFinite(C.dist[off[S.track]])) carry(C.prev, off[S.track], 1); // (the landmarks draw a few visitors from the city)
     TT.forEach((T, ti) => { if (T.pass && isFinite(C.dist[off[ti]])) carry(C.prev, off[ti], T.pass.trade); }); // the trade over each pass with the next country: the same on both sides of it
     if (townS.length) { let bk = -1, bd = Infinity; for (const k of townS) if (C.dist[k] < bd) { bd = C.dist[k]; bk = k; } if (bk >= 0) carry(C.prev, bk, 12); } // the city and the towns trade along one way
+    yield;
     // the kind of each point of each way, with no stretch of high road shorter than some 150 m
     const ROAD = 9, km = [0, 0, 0, 0]; this.milestones = [];
     TT.forEach((T, ti) => {
@@ -2493,6 +2495,7 @@ const SettleProto = {
         if (!riverNear(x, z, 12) && !Wy.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 8)) this.milestones.push({ x, z, ang: Math.atan2(bx - ax, bz - az), seed: ti * 977 + q }); }
     });
     for (const b of Wy.bridges) { const T = TT[b.ti]; if (T.cls && T.cls[clamp(b.q, 0, T.length - 1)] === WAY.road) b.stone = true; } // the high roads cross the rivers on stone
+    yield;
     // hollow ways: where a lane or a track climbs a slope its bed has worn down below the fields, a metre or two, between banks;
     // not at its ends, its meetings, a crossing, a yard or among houses, where it comes up to the level of the ground
     const jh = new SHash(48); for (const p of junc) jh.add(p, [p[0], p[1], p[0], p[1]]);
@@ -5261,7 +5264,7 @@ Object.assign(World, {
     this.stage = 'land'; yield* planLandGen(K);
     this.stage = 'ways'; K.ways = makeWays(K); yield* K.ways.planCountry();
     this.stage = 'settle'; K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
-    this.stage = 'kinds'; K.settle.classifyWays(); yield;
+    this.stage = 'kinds'; yield* K.settle.classifyGen(); yield;
     this.stage = 'places'; POI.plan(K); yield;
     this.stage = 'map'; yield* MapView.countryImage(K);
     K.state = 2; K.wall = performance.now() - t0; this.ready.push(K); this.rev++; this.planMs.push(Math.round(K.cpu));

@@ -30,7 +30,7 @@ Object.assign(World, {
     this.stage = 'land'; yield* planLandGen(K);
     this.stage = 'ways'; K.ways = makeWays(K); yield* K.ways.planCountry();
     this.stage = 'settle'; K.settle = makeSettle(K); yield* K.settle.planGen(); yield;
-    this.stage = 'kinds'; K.settle.classifyWays(); yield;
+    this.stage = 'kinds'; yield* K.settle.classifyGen(); yield;
     this.stage = 'places'; POI.plan(K); yield;
     this.stage = 'map'; yield* MapView.countryImage(K);
     K.state = 2; K.wall = performance.now() - t0; this.ready.push(K); this.rev++; this.planMs.push(Math.round(K.cpu));
