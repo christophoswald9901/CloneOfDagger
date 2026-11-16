@@ -47,7 +47,8 @@ A great river that enters and leaves a country was held to within 0.08 m a point
 - **A country's plan**: mean 1.10 to 1.18 s of CPU over 36 countries with regions, against 1.13 to 1.14 s before (seeds 1 and 2). Longest step 28 to 53 ms, against 50 to 79 ms.
 - **Load**: `check.py` booted in 8.8 s and 10.5 s on two runs; `bench.py` gave 7.9 to 8.0 s before this work. Not measured back to back with `bench.py` afterwards.
 - **Chunk building**: not measured after this work.
-- **`tools/endless.py 0 2`** after the settlement and river changes: no failures (426 and 401 rivers, 29 gaps, 49 and 48 passes).
+- **`tools/endless.py 0 1 2`** on the last code: no failures (429, 477 and 395 rivers; 29 gaps a seed; 49, 42 and 48 passes; ground step at the borders 1.9 to 2.4 m, as before). That run shared the machine with the journey test, so its plan times (1.22 to 1.27 s) are not comparable.
+- **`tools/farwalk.py 0`** on the last code, through leg 9 of the journey: no ground missing under the player; the wild's work per frame mean 20.3 ms, 95th percentile 35 ms, worst 125 ms (before: mean 20 to 21, 95th 36 to 37, worst 90 to 102). Heap out in the countries 246 to 288 MB against 202 to 227 MB before, with up to 12 countries planned at once in this run. The higher heap and the longer worst frame were not looked into; the region tiles hold at most about 9 MB.
 
 ## Judged from renders (seed 0 only, one round, by me)
 - Fen: reads clearly. Level, dark, willows, brick houses with red roofs.
@@ -57,7 +58,6 @@ A great river that enters and leaves a country was held to within 0.08 m a point
 
 ## Not done or not verified
 - **Seeds 1 and 2 were never rendered**, and no view was rendered after the last changes to heath, wood and turf colour. The task asked for ground and air renders of each region for three seeds.
-- **`tools/farwalk.py`** and a last `tools/endless.py 0 1 2` were started after those changes; see the end of this file for whether their results were recorded.
 - **Meres** (`REGION.meres = false`). The hollows, their place on the map, and their exclusion from farming and woods are written, but the chunk builder does not draw their water and the ways are not kept out of them, so they are off.
 - **Drains.** The fen's streams run straighter, but there is no grid of cut drains.
 - **Tors.** The knoll is in the ground; the piled rock on it is not built.
