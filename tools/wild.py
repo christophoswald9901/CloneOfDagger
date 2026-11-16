@@ -2,6 +2,9 @@
 python3 tools/wild.py OUTDIR [seed ...]          -> OUTDIR/s{seed}_{view}.png and OUTDIR/sheet_s{seed}.jpg (labelled contact sheet)
 SET=transition python3 tools/wild.py OUTDIR 0    -> views across the edge of the hand-made country instead
 SET=hall python3 tools/wild.py OUTDIR 0 1 2     -> eighteen views of Halewood House (SET=sites: all landmarks, SET=town: Corrinvale)
+SET=beyond python3 tools/wild.py OUTDIR 0 1 2   -> the world beyond the home country: the west pass from inside, on top and beyond, a great
+                                                    river at the gap it leaves a country by, a village, a meeting place and a border range in
+                                                    the countries round home, and the home mountains from inside and from outside
 VIEWS=a,b                                         -> capture only some views"""
 import asyncio, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
@@ -115,6 +118,23 @@ HALL_V = r"""(()=>{const g=__game,W=g.hallW,look=(x,z,tx,tz)=>Math.atan2(-(tx-x)
  return JSON.stringify(V);})()"""
 
 # how far each view may turn to find an open outlook (radians either side of its planned heading)
+BEYOND = r"""(()=>{const g=__game,W=g.World,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)); const V={}; W.DROP=1e12;
+ W.planBox(-20000,-28000,19999,1999);
+ const pw=g.edgeFeat(1,0,1).pass, hw=W.home.ways.tracks.find(t=>t.pass===g.edgeFeat(1,0,1)), K=W.get(-1,1), kw=K.ways.tracks.find(t=>t.pass===g.edgeFeat(1,0,1));
+ const on=(t,m)=>{const q=Math.min(t.length-4,Math.round(m/3)),p=t[q],n=t[Math.max(0,q-12)];return [p[0],p[1],look(p[0],p[1],n[0],n[1])];};
+ if(hw){const [x,z,y]=on(hw,1500);V.pass_in=[x,z,y,-0.03,null];V.pass_in_air=[x,z,y,-0.3,180];}
+ V.pass_top=[-9990,pw,look(-9990,pw,-11000,pw),-0.08,null];
+ if(kw){const q=Math.min(kw.length-4,500),p=kw[q],n=kw[Math.min(kw.length-1,q+12)];V.beyond_road=[p[0],p[1],look(p[0],p[1],n[0],n[1]),-0.03,null];V.beyond_air=[p[0],p[1],look(p[0],p[1],n[0],n[1]),-0.35,220];
+  V.back_at_home=[p[0],p[1],look(p[0],p[1],-9000,pw),0.03,60];}
+ { const f=[...g.EDGES.values()].find(f=>f.gap===f.gap&&W.get(f.from[0],f.from[1])&&W.get(f.to[0],f.to[1])); if(f){const A=W.get(f.from[0],f.from[1]),R=A.land.rivers.find(r=>r.gout);
+   if(R){const q=R.P.length-90,p=R.P[q],n=R.P[R.P.length-1],dx=n[0]-p[0],dz=n[1]-p[1],l=Math.hypot(dx,dz)||1;V.gap=[p[0]-dz/l*16,p[1]+dx/l*16,look(p[0],p[1],n[0],n[1])+0.25,-0.05,null];V.gap_air=[p[0]-dx/l*250,p[1]-dz/l*250,look(p[0],p[1],n[0],n[1]),-0.4,200];
+    const B=W.get(f.to[0],f.to[1]),R2=B.land.rivers.find(r=>r.gin&&Math.hypot(r.P[0][0]-n[0],r.P[0][1]-n[1])<5); if(R2){const p2=R2.P[60];V.gap_other_side=[p2[0]+18,p2[1]+18,look(p2[0],p2[1],n[0],n[1]),-0.05,null];}}}}
+ { const S=W.get(2,0), v=S.settle.list.find(s=>s.kind==='village'); if(v){V.village=[v.x+34,v.z+26,look(v.x+34,v.z+26,v.x,v.z),-0.04,null];V.village_air=[v.x+160,v.z+160,look(v.x+160,v.z+160,v.x,v.z),-0.5,130];}
+   const c=S.ways.centre;V.centre_air=[c[0]+260,c[1]+260,look(c[0]+260,c[1]+260,c[0],c[1]),-0.45,220]; }
+ { const N=W.get(0,-1), c=N.ways.centre; V.north_country=[c[0],c[1]+300,look(c[0],c[1]+300,c[0],c[1]-2000),-0.2,160]; V.home_from_north=[c[0],c[1],look(c[0],c[1],c[0],-18000),0.02,90]; }
+ V.border_air=[20000,-13000,look(20000,-13000,20000,-9000),-0.3,420]; V.coast_west=[-15000,-900,look(-15000,-900,-17000,-200),-0.2,150];
+ V.home_skyline_n=[-1500,-9000,0,0.05,40]; V.home_skyline_w=[-3000,-6000,1.5708,0.05,40];
+ return JSON.stringify(V);})()"""
 ARC = {'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
 
 PLACE = r"""(()=>{const g=__game,G=g.G,P=G.player; G.time=12*60+G.time-(G.time%1440); G.weather='clear'; G.weatherDay=Math.floor(G.time/1440);
@@ -158,7 +178,7 @@ async def main():
     os.makedirs(OUT, exist_ok=True)
     for seed in SEEDS:
         c = CDP()
-        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}' + (f'&townseed={seed}' if SET == 'town' else '')): print('boot failed', c.errors()[:2]); c.stop(); return
+        if not await c.boot(f'http://127.0.0.1:8765/index.html?seed={seed}' + (f'&townseed={seed}' if SET == 'town' else ''), timeout=240): print('boot failed', c.errors()[:2]); c.stop(); return
         await c.new_game()
         for _ in range(40):  # wait until the game is really in play (a view taken before that shows the title camera)
             if await c.ev("!!(__game.G.player && __game.G.state === 'play')"): break
@@ -166,7 +186,7 @@ async def main():
         else: print('new game never started', c.errors()[:2]); c.stop(); return
         await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
-        views = json.loads(await c.ev(TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else HALL_V if SET == 'hall' else FIND))
+        views = json.loads(await c.ev(BEYOND if SET == 'beyond' else TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else HALL_V if SET == 'hall' else FIND))
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
@@ -178,6 +198,6 @@ async def main():
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
             print(seed, name, where, info)
         allf = [(n, f'{OUT}/s{seed}_{n}.png') for n in views if os.path.exists(f'{OUT}/s{seed}_{n}.png')] # every view taken so far, in order
-        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else "hall" if SET == "hall" else ""}s{seed}.jpg')
+        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else "hall" if SET == "hall" else "b" if SET == "beyond" else ""}s{seed}.jpg')
         print(seed, 'errors:', [e[:300] for e in c.errors()[:3]]); c.stop()
 asyncio.run(main())

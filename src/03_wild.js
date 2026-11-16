@@ -399,8 +399,8 @@ const Wild = {
     this.yawU.value = yaw;
     this.sea.position.set(Math.round(cp.x / 60) * 60, SEA - 0.12, Math.round(cp.z / 60) * 60);
     const x = cp.x, z = cp.z; this.follow(x, z);
-    World.update(x, z, this.fast); // the countries ahead are planned a little each frame
-    const t0 = performance.now();
+    const tw = performance.now(); World.update(x, z, this.fast); // the countries ahead are planned a little each frame
+    const t0 = performance.now(), spent = t0 - tw;
     for (const [k, c] of this.chunks) if (c.done && this.rectDist(c.i, c.j, x, z) > WILD.drop) this.unload(k, c);
     // trees and small plants follow the player at their own distances
     let sig = ''; for (const c of this.chunks.values()) if (c.done) { const d = this.rectDist(c.i, c.j, x, z); sig += d < WILD.small ? 2 : d < WILD.trees ? 1 : 0; }
@@ -410,7 +410,7 @@ const Wild = {
     { const Z = this.HZ; if (!Z.job && (!Z.at || Math.hypot(Z.at[0] - x, Z.at[1] - z) > Z.move)) Z.job = this.genHorizon(x, z);
       if (Z.job) { const t1 = performance.now(); while (Z.job && performance.now() - t1 < 1.5) if (Z.job.next().done) Z.job = null; } }
     for (const L of this.FAR) if (L.job && Math.hypot(L.at ? L.at[0] - x : 1e9, L.at ? L.at[1] - z : 1e9) > L.R * 0.45) { const t1 = performance.now(); while (L.job && performance.now() - t1 < 2) { if (L.job.next().done) L.job = null; } }
-    while (performance.now() - t0 < (this.fast ? 13 : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling)
+    while (performance.now() - t0 < (this.fast ? Math.max(6, 13 - spent) : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling; what the plan of a country took comes off it)
       if (!this.job) {
         const w = this.wanted(x, z);
         if (w.length) { const { i, j } = w[0]; this.jobKey = [i, j]; this.job = this.genChunk(i, j); }

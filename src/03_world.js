@@ -7,7 +7,7 @@
    by the border itself (edgeFeat, in 03_terrain.js).
    ===================================================================== */
 Object.assign(World, {
-  ready: [], rev: 0, _all: {}, job: null, stage: '', worst: {}, NEED: 3700, SOON: 6200, DROP: 15000, planMs: [], onReady: null,
+  ready: [], rev: 0, _all: {}, job: null, stage: '', worst: {}, NEED: 3700, SOON: 9000, DROP: 17000, planMs: [], onReady: null,
   // lists across every planned country (the home country's own while it is the only one)
   pick(K, kind) { return kind === 'tracks' ? (K.ways ? K.ways.tracks : []) : kind === 'bridges' ? (K.ways ? K.ways.bridges : []) : kind === 'rivers' ? K.land.rivers : K.settle ? (kind === 'places' ? K.settle.list : K.settle[kind] || []) : []; },
   all(kind) {
@@ -49,7 +49,7 @@ Object.assign(World, {
   // each frame: plan what the player is coming to (more of the frame when it is already in sight), forget what lies far behind
   update(x, z, fast) {
     if (!this.job) { const m = this.missing(x, z, this.SOON); if (m.length) this.start(m[0].i, m[0].j); }
-    if (this.job) { const K = this.job.K, d = this.boxDist(K.i, K.j, x, z); this.step(d < this.NEED ? 12 : fast ? 8 : 4); }
+    if (this.job) { const K = this.job.K, d = this.boxDist(K.i, K.j, x, z); this.step(d < this.NEED ? 10 : 4); } // (while travelling fast the ground ahead needs the frame more, unless the country is already in sight)
     if (this.ready.length > 4 && !(this.tick = ((this.tick || 0) + 1) % 120)) for (const K of this.ready.slice()) if (this.boxDist(K.i, K.j, x, z) > this.DROP) this.drop(K);
   },
   // everything in sight of a place, at once (a loaded game, a journey's end, the tools)

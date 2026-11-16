@@ -301,22 +301,22 @@ const MapView = {
   close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
   // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
-  // first opened; the others at 100 as the last step of their plan, with their rivers and roads drawn in, and kept after the country
+  // first opened; the others at 150 (the same scale) as the last step of their plan, with their rivers and roads drawn in, and kept after the country
   // itself is forgotten, so the map remembers where you have been
   worldImage() { if (this._world) return this._world; const g = this.imageGen(World.home, 300); let r; do r = g.next(); while (!r.done); return (this._world = r.value); },
   imgs: new Map(),
-  *countryImage(K) { const c = yield* this.imageGen(K, 100), x = c.getContext('2d'), s = 100 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
+  *countryImage(K) { const c = yield* this.imageGen(K, 150), x = c.getContext('2d'), s = 150 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
     x.lineCap = 'round'; x.lineJoin = 'round';
-    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.2; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.5; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
     for (const T of K.ways.tracks) { if (T.lane) continue; for (let q = 8; q < T.length + 7; q += 8) { const a = Math.min(q - 8, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const road = T.cls && T.cls[b] === WAY.road; x.strokeStyle = road ? '#b39c6c' : '#8a7350'; x.lineWidth = road ? 1.3 : 0.8; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); } }
     this.imgs.set(World.key(K.i, K.j), { c, x0: K.x0, z0: K.z0, x1: K.x1, z1: K.z1 }); },
   *imageGen(K, N) {
     const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
-    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; }
+    const M = N + 2, hh = new Float32Array(M * M); for (let j = -1; j <= N; j++) { for (let i = -1; i <= N; i++) hh[(j + 1) * M + i + 1] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; } // (a pixel beyond each edge, so the shading runs on into the next country's picture)
     for (let j = 0; j < N; j++) { if (World.due()) yield; for (let i = 0; i < N; i++) {
-      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, q = (j + 1) * M + i + 1, h = hh[q], k = (j * N + i) * 4;
       if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
-      const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
+      const gx = hh[q + 1] - hh[q - 1], gz = hh[q + M] - hh[q - M], sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
       const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
       if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
       if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }

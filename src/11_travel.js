@@ -96,6 +96,7 @@ const Travel = {
   k() {
     const c = this.cur; if (!c) return 1; const P = G.player; let k = this.rate();
     const w = Wild.wanted(P.pos.x, P.pos.z); if (w.length) { const d = w[0].d; if (d < 100) k = Math.min(k, 3); else if (d < 200) k = Math.min(k, k * 0.5); }
+    const m = World.missing(P.pos.x, P.pos.z, 1600); if (m.length) k = Math.min(k, m[0].d < 500 ? 2 : k * 0.4); // (the country ahead is still being planned: its ground cannot be laid yet)
     return Math.max(1, k);
   },
   // one frame of travel: dt is real seconds; returns the game seconds that passed

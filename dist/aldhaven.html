@@ -3375,7 +3375,7 @@ const HOME_FALL = 2000; // the home mountains stand as they always did over the 
 function homeFlank(x, z) { const d = homeOut(x, z); return d <= 0 || d > 7500 ? d : Math.min(d, -rimDist0(x, z)); }
 // how far the middle of a border's high ground lies off its lattice line (towards +x for a line running north-south, +z for one running
 // east-west), so the borders wander
-function lineOff(vert, n, x, z) { return 420 * fbm(x / 3000 + n * 13.7, z / 3000 + (vert ? 0 : 31.1), 2, 393 + WSEED * 7); }
+function lineOff(vert, n, x, z) { return 750 * fbm(x / 3800 + n * 13.7, z / 3800 + (vert ? 0 : 31.1), 2, 393 + WSEED * 7); }
 // how far inside its borders a point of country (i, j) lies (negative beyond one): inside the middles of the border belts, and clear of the
 // home mountains' outer flank. RIM notes the nearest border belt and where along it, and how far inside the belts alone (ug)
 const RIM = { vert: 0, n: 0, s: 0, ug: 0, us: 0 };
@@ -3430,9 +3430,9 @@ function homePassD(x, z) {
 // how much of the home mountains' height is left at a point: less in the col of a pass (but not where one of the home rivers runs)
 function homeNotch(x, z) {
   let k = 1;
-  const cut = (f, s, t) => { const d = (s - f.pass) / 600; if (d * d >= 12) return; let m = 1; const T = f.rd;
+  const cut = (f, s, t) => { const d = (s - f.pass) / 470; if (d * d >= 12) return; let m = 1; const T = f.rd;
     if (T) { const fi = (s - T.a0) / T.C, fj = (t - T.b0) / T.C, i = Math.floor(fi), j = Math.floor(fj); if (i >= 0 && j >= 0 && i < T.NI - 1 && j < T.NJ - 1) { const u = fi - i, v = fj - j, q = j * T.NI + i, D = T.D; m = smoothstep(130, 430, lerp(lerp(D[q], D[q + 1], u), lerp(D[q + T.NI], D[q + T.NI + 1], u), v)); } }
-    k *= 1 - 0.86 * Math.exp(-d * d) * m; };
+    k *= 1 - 0.83 * Math.exp(-d * d) * m; };
   if (z > WORLD.z0 - HOME_FALL - 2800) { if (x < WORLD.x0 + 7500) cut(edgeFeat(1, 0, 1), z, x); if (x > WORLD.x1 - 7500) cut(edgeFeat(1, 2, 1), z, x); }
   if (z < WORLD.z0 + 7500) cut(edgeFeat(0, 0, 0), x, z);
   return k;
@@ -3457,7 +3457,8 @@ function rimHeight(x, z) {
   if (hf < 4600) { // the home mountains: as they were inside the home country and out to their old crest (its rivers were planned on them), falling away beyond, a col at each pass
     const notch = homeNotch(x, z);
     if (d <= 0) return rimHeight0(x, z) * notch;
-    if (hf < HOME_FALL) h = rimHeight0(x, z) * (1 - smoothstep(500, HOME_FALL, hf)) * notch;
+    const fr = hf + 520 * fbm(x / 1500 + 5.1, z / 1500, 3, 399 + WSEED * 7) * smoothstep(0, 400, hf); // (their outer foot runs in and out, not along a ruled line)
+    if (fr < HOME_FALL) h = rimHeight0(x, z) * (1 - smoothstep(400, HOME_FALL - 100, fr)) * notch;
     const P = smoothstep(4600, 1700, hf) * smoothstep(0, 500, hf), sd = WSEED * 1.1; if (P > 0) h = Math.max(h, P * (0.4 + 0.6 * P) * 190 * (0.55 + 0.6 * ridgedMF(x / 900 + sd, z / 900, 5, 395)) * notch); // and foothills below them
   }
   rimEval(tileI(x), tileJ(z), x, z); const u = RIM.ug; if (u > 5500) return h;
@@ -3466,7 +3467,7 @@ function rimHeight(x, z) {
   const f = edgeAt(), s = RIM.s;
   let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7))) * smoothstep(0, 1500, hf); // (a belt that runs up to the home country dies away into its mountains)
   if (f.gap === f.gap) { const q = (s - f.gap) / 520; if (q * q < 12) amp *= 1 - 0.985 * Math.exp(-q * q); }   // the river's gap
-  if (f.pass === f.pass) { const q = (s - f.pass) / 600; if (q * q < 12) amp *= 1 - 0.86 * Math.exp(-q * q); }  // the pass: a col between two peaks
+  if (f.pass === f.pass) { const q = (s - f.pass) / 470; if (q * q < 12) amp *= 1 - 0.83 * Math.exp(-q * q); }  // the pass: a col between two peaks
   const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
   const mass = smoothstep(0.2, 0.8, 0.5 + 0.9 * fbm(x / 1800 + sd, z / 1800, 2, 397));
   const plinth = smoothstep(3600, 300, de), wall = smoothstep(950, -250, de);
@@ -3949,14 +3950,14 @@ function countryGaps(K) {
 }
 function* planLandGen(K) {
   const L = K.land, home = K.home;
-  const t0 = performance.now(), C = LAND_C, M = 480, X0 = K.x0 - M, Z0 = K.z0 - M;
+  const t0 = performance.now(), C = LAND_C, M = home ? 480 : 800, X0 = K.x0 - M, Z0 = K.z0 - M; // (a border wanders up to 750 m off its line, and a country drains to its crest)
   const NI = Math.round((K.x1 - K.x0 + 2 * M) / C) + 1, NJ = Math.round((K.z1 - K.z0 + 2 * M) / C) + 1, n = NI * NJ;
   const H = new Float32Array(n), F = new Float32Array(n), rec = new Int32Array(n).fill(-1), st = new Uint8Array(n); // st: 0 unseen, 1 reached, 2 kept out
   const gaps = countryGaps(K), cellAt = (x, z) => clamp(Math.round((z - Z0) / C), 0, NJ - 1) * NI + clamp(Math.round((x - X0) / C), 0, NI - 1);
   if (home) { for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C; if (landZone(x, z) || siteZone(x, z, 60)) st[k] = 2; else H[k] = terrainBase(x, z); } }
   else for (let j = 0; j < NJ; j++) { for (let i = 0; i < NI; i++) { const k = j * NI + i, x = X0 + i * C, z = Z0 + j * C;
     // only the land inside the border crests is this country's to drain (and the way through a gap)
-    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.us < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
+    if (rimEval(K.i, K.j, x, z) - 350 < 0) { const f = edgeAt(); if (!(RIM.us < 1100 && Math.abs(RIM.s - f.gap) < 160 && x > K.x0 - 60 && x < K.x1 + 60 && z > K.z0 - 60 && z < K.z1 + 60 && RIM.us > -1000 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f)))) { st[k] = 2; continue; } }
     H[k] = terrainBase(x, z);
     // (the river will cut its own way through the border at the gap: the ground there is no sill for the country to fill up behind)
     if (rimEval(K.i, K.j, x, z) - 350 < 700 && RIM.us < 1100) { const f = edgeAt(), d = Math.abs(RIM.s - f.gap); if (d < 160 && ((gaps.out && gaps.out.f === f) || gaps.ins.some(g => g.f === f))) H[k] = Math.min(H[k], f.wl + 3); } } if (World.due()) yield; }
@@ -4524,8 +4525,8 @@ const Wild = {
     this.yawU.value = yaw;
     this.sea.position.set(Math.round(cp.x / 60) * 60, SEA - 0.12, Math.round(cp.z / 60) * 60);
     const x = cp.x, z = cp.z; this.follow(x, z);
-    World.update(x, z, this.fast); // the countries ahead are planned a little each frame
-    const t0 = performance.now();
+    const tw = performance.now(); World.update(x, z, this.fast); // the countries ahead are planned a little each frame
+    const t0 = performance.now(), spent = t0 - tw;
     for (const [k, c] of this.chunks) if (c.done && this.rectDist(c.i, c.j, x, z) > WILD.drop) this.unload(k, c);
     // trees and small plants follow the player at their own distances
     let sig = ''; for (const c of this.chunks.values()) if (c.done) { const d = this.rectDist(c.i, c.j, x, z); sig += d < WILD.small ? 2 : d < WILD.trees ? 1 : 0; }
@@ -4535,7 +4536,7 @@ const Wild = {
     { const Z = this.HZ; if (!Z.job && (!Z.at || Math.hypot(Z.at[0] - x, Z.at[1] - z) > Z.move)) Z.job = this.genHorizon(x, z);
       if (Z.job) { const t1 = performance.now(); while (Z.job && performance.now() - t1 < 1.5) if (Z.job.next().done) Z.job = null; } }
     for (const L of this.FAR) if (L.job && Math.hypot(L.at ? L.at[0] - x : 1e9, L.at ? L.at[1] - z : 1e9) > L.R * 0.45) { const t1 = performance.now(); while (L.job && performance.now() - t1 < 2) { if (L.job.next().done) L.job = null; } }
-    while (performance.now() - t0 < (this.fast ? 13 : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling)
+    while (performance.now() - t0 < (this.fast ? Math.max(6, 13 - spent) : WILD.budget)) { // (more of each frame goes to the ground ahead while travelling; what the plan of a country took comes off it)
       if (!this.job) {
         const w = this.wanted(x, z);
         if (w.length) { const { i, j } = w[0]; this.jobKey = [i, j]; this.job = this.genChunk(i, j); }
@@ -5218,7 +5219,7 @@ function* routeWildGen(from, to, seed, used, rc = null, C = TRC, opts = {}) {
    by the border itself (edgeFeat, in 03_terrain.js).
    ===================================================================== */
 Object.assign(World, {
-  ready: [], rev: 0, _all: {}, job: null, stage: '', worst: {}, NEED: 3700, SOON: 6200, DROP: 15000, planMs: [], onReady: null,
+  ready: [], rev: 0, _all: {}, job: null, stage: '', worst: {}, NEED: 3700, SOON: 9000, DROP: 17000, planMs: [], onReady: null,
   // lists across every planned country (the home country's own while it is the only one)
   pick(K, kind) { return kind === 'tracks' ? (K.ways ? K.ways.tracks : []) : kind === 'bridges' ? (K.ways ? K.ways.bridges : []) : kind === 'rivers' ? K.land.rivers : K.settle ? (kind === 'places' ? K.settle.list : K.settle[kind] || []) : []; },
   all(kind) {
@@ -5260,7 +5261,7 @@ Object.assign(World, {
   // each frame: plan what the player is coming to (more of the frame when it is already in sight), forget what lies far behind
   update(x, z, fast) {
     if (!this.job) { const m = this.missing(x, z, this.SOON); if (m.length) this.start(m[0].i, m[0].j); }
-    if (this.job) { const K = this.job.K, d = this.boxDist(K.i, K.j, x, z); this.step(d < this.NEED ? 12 : fast ? 8 : 4); }
+    if (this.job) { const K = this.job.K, d = this.boxDist(K.i, K.j, x, z); this.step(d < this.NEED ? 10 : 4); } // (while travelling fast the ground ahead needs the frame more, unless the country is already in sight)
     if (this.ready.length > 4 && !(this.tick = ((this.tick || 0) + 1) % 120)) for (const K of this.ready.slice()) if (this.boxDist(K.i, K.j, x, z) > this.DROP) this.drop(K);
   },
   // everything in sight of a place, at once (a loaded game, a journey's end, the tools)
@@ -9541,6 +9542,7 @@ const Travel = {
   k() {
     const c = this.cur; if (!c) return 1; const P = G.player; let k = this.rate();
     const w = Wild.wanted(P.pos.x, P.pos.z); if (w.length) { const d = w[0].d; if (d < 100) k = Math.min(k, 3); else if (d < 200) k = Math.min(k, k * 0.5); }
+    const m = World.missing(P.pos.x, P.pos.z, 1600); if (m.length) k = Math.min(k, m[0].d < 500 ? 2 : k * 0.4); // (the country ahead is still being planned: its ground cannot be laid yet)
     return Math.max(1, k);
   },
   // one frame of travel: dt is real seconds; returns the game seconds that passed
@@ -9938,22 +9940,22 @@ const MapView = {
   close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
   // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
-  // first opened; the others at 100 as the last step of their plan, with their rivers and roads drawn in, and kept after the country
+  // first opened; the others at 150 (the same scale) as the last step of their plan, with their rivers and roads drawn in, and kept after the country
   // itself is forgotten, so the map remembers where you have been
   worldImage() { if (this._world) return this._world; const g = this.imageGen(World.home, 300); let r; do r = g.next(); while (!r.done); return (this._world = r.value); },
   imgs: new Map(),
-  *countryImage(K) { const c = yield* this.imageGen(K, 100), x = c.getContext('2d'), s = 100 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
+  *countryImage(K) { const c = yield* this.imageGen(K, 150), x = c.getContext('2d'), s = 150 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
     x.lineCap = 'round'; x.lineJoin = 'round';
-    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.2; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    for (const R of K.land.rivers) { if (Math.max(...R.w) < 4) continue; x.strokeStyle = '#2e5a78'; x.lineWidth = 1.5; x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 8 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
     for (const T of K.ways.tracks) { if (T.lane) continue; for (let q = 8; q < T.length + 7; q += 8) { const a = Math.min(q - 8, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const road = T.cls && T.cls[b] === WAY.road; x.strokeStyle = road ? '#b39c6c' : '#8a7350'; x.lineWidth = road ? 1.3 : 0.8; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); } }
     this.imgs.set(World.key(K.i, K.j), { c, x0: K.x0, z0: K.z0, x1: K.x1, z1: K.z1 }); },
   *imageGen(K, N) {
     const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
-    const hh = new Float32Array(N * N); for (let j = 0; j < N; j++) { for (let i = 0; i < N; i++) hh[j * N + i] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; }
+    const M = N + 2, hh = new Float32Array(M * M); for (let j = -1; j <= N; j++) { for (let i = -1; i <= N; i++) hh[(j + 1) * M + i + 1] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; } // (a pixel beyond each edge, so the shading runs on into the next country's picture)
     for (let j = 0; j < N; j++) { if (World.due()) yield; for (let i = 0; i < N; i++) {
-      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, h = hh[j * N + i], k = (j * N + i) * 4;
+      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, q = (j + 1) * M + i + 1, h = hh[q], k = (j * N + i) * 4;
       if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
-      const gx = (hh[j * N + Math.min(N - 1, i + 1)] - hh[j * N + Math.max(0, i - 1)]), gz = (hh[Math.min(N - 1, j + 1) * N + i] - hh[Math.max(0, j - 1) * N + i]), sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
+      const gx = hh[q + 1] - hh[q - 1], gz = hh[q + M] - hh[q - M], sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
       const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
       if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
       if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }
