@@ -2234,6 +2234,7 @@ const REGION = {
   edge: [1500, 620, 380, 1700, 1400],      // how broad the change into each kind is (metres): the fen and the downs have an edge, the others shade off
   fade: 1500,                              // beyond the home country's box the regions come in over this distance
   home: 0,                                 // the home country's own kind
+  meres: false,                            // open water in the fen's hollows: the hollows and their place in the plan are written, the water is not drawn yet, so they are off
 };
 // what each kind does, in the order of RG (heart, downs, fen, moor, weald)
 const RP = {
@@ -2246,8 +2247,8 @@ const RP = {
   incise:  [1,    1,     0.06,  0.75,  1],     // how deep a river has cut its valley
   meander: [1,    1,     0.22,  1,     1],     // how far its line wanders
   wetK:    [0,    -0.3,  0.75,  0.32,  0],     // wet ground added (on the flat) or taken away
-  wood:    [0,    -0.34, -0.3,  -0.6,  0.3],   // more or less woodland
-  heath:   [0,    -0.3,  -1,    0.5,   -0.08], // more or less heath
+  wood:    [0,    -0.4,  -0.3,  -0.75, 0.3],   // more or less woodland
+  heath:   [0,    -1,    -1,    0.9,   -0.08], // more or less heath
   conif:   [0,    -0.8,  -0.9,  0.3,   -0.55], // pine against broadleaf
   plough:  [1,    0.95,  0.9,   0.15,  0.72],  // how much of the good land is ploughed
   graze:   [1,    1.2,   1,     0.7,   1],     // and grazed
@@ -2260,7 +2261,7 @@ const RP = {
   green:   [0.5,  0.85,  0.3,   0.85,  0.3],   // how many of the farm lanes are green lanes
   sunk:    [1,    1.1,   0,     0.6,   1.6],   // how deep the ways have worn into the slopes
   // the colour of the open turf (multipliers on the colour it would have in the heartland)
-  tr: [1, 1.13, 0.8, 1.12, 0.84], tg: [1, 1.05, 0.95, 0.91, 1.02], tb: [1, 0.9, 0.76, 0.8, 0.8],
+  tr: [1, 1.22, 0.8, 1.12, 0.84], tg: [1, 1.1, 0.95, 0.91, 1.02], tb: [1, 0.84, 0.76, 0.8, 0.8],
 };
 // what bounds a field in each kind: a hedge, a dry-stone wall, or nothing that stands (a ditch, a baulk of grass)
 const RG_BOUND = ['hedge', 'none', 'none', 'wall', 'hedge'];
@@ -2335,7 +2336,7 @@ function torNear(x, z) {
 // the level a fen lies at (its ground is within a metre of it): the plain's own level, let down to that of the valley floors
 function fenBase(x, z) { return 0.6 + 45 * (1 - Math.exp(-Math.max(0, SHORE - z) / 330)) + 70 * smoothstep(1500, 14000, coastZ(x) - z) + RP.lift[RG.fen]; }
 // a mere: a sheet of shallow open water in a hollow of the fen, 0 (none) .. 1 (its middle). Only well inland, where the fen is level
-function mereAt(x, z) { const w = regionW(x, z); if (!w || w[RG.fen] < 0.86 || coastZ(x) - z < 14200) return 0; return smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, w[RG.fen]); }
+function mereAt(x, z) { if (!REGION.meres) return 0; const w = regionW(x, z); if (!w || w[RG.fen] < 0.86 || coastZ(x) - z < 14200) return 0; return smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, w[RG.fen]); }
 const MERE_DEPTH = 1.9, MERE_LEVEL = -0.75; // the bed of a mere below the fen's level, and its water
 function regionShape(x, z, w) {
   let h = 0; const s = WSEED * 57;
@@ -2346,7 +2347,7 @@ function regionShape(x, z, w) {
     h += lerp(k, smoothstep(0.36, 0.6, k), sc) * (d + 14); } }
   { const k = w[RG.fen]; if (k > 0.004) { // fen: level, with low islands of firm ground and shallow meres
     let f = 6.5 * smoothstep(0.26, 0.5, fbm(x / 820 + s, z / 820, 2, 570)) + 0.3 * fbm(x / 85, z / 85, 2, 572);
-    if (k > 0.86 && coastZ(x) - z > 14200) f -= (MERE_DEPTH + 0.3) * smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, k);
+    if (REGION.meres && k > 0.86 && coastZ(x) - z > 14200) f -= (MERE_DEPTH + 0.3) * smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, k);
     h += k * f; } }
   { const k = w[RG.moor]; if (k > 0.004) { // moor: high, broad-backed, rough underfoot; tors on its tops
     let m = 17 * fbm(x / 880 + s, z / 880, 3, 565) + 4.5 * fbm(x / 170, z / 170, 2, 566) + 1.3 * fbm(x / 36, z / 36, 2, 567);
