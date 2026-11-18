@@ -165,6 +165,32 @@ At twice the pixel density (3136×1600), the ruler takes 7–9 ms and a pan step
 - The full drawing of the map at its farthest zooms takes 0.1–0.35 s headless (mostly the thousands of fields). It happens when the map opens and when a drag or zoom comes to rest.
 - If the map is opened within a few seconds of loading the page, it finishes the pictures of the land then, up to some 1.6 s headless.
 
+## Asked for next (2026-11-18): flags in the world, symbols on the map
+
+The user asked for three things. The plan below is not built yet, and the session stopped at 84% of the five-hour limit before starting.
+- A flag you plant where you stand.
+- A flag symbol you put on the map.
+- A wide range of symbols to put on the map, among them hilltop, village, bridge, crossroads and tower.
+
+Flags come in several colours.
+
+- **Flags in the world**, part of the kit (K):
+  - **B** plants a flag of the chosen colour a step ahead of you: a survey pole about 4 m tall with a pennant, so it can be made out through the spyglass from a few km off. **B** beside one of your flags pulls it up again. **C** (with the kit out) changes the colour.
+  - Colours: red, yellow, blue, white, black and green (dyes of the period: madder, weld, woad).
+  - Flags are kept with the game (`G.flags.survey.flags`: position, height, colour) and rebuilt in the open country's scene on load.
+  - A planted flag is not put on the map by itself: you fix where it stands and draw it yourself. This is the "signals" step below, done by hand.
+- **Symbols on the map**: a Symbols section in the field book panel (it folds), with the colours for the flag symbol.
+  - Proposed symbols: flag, hilltop, pass, village, farm, church, tower, castle, ruin, mill, inn, bridge, ford, crossroads, wood, spring, and standing stone or cairn. They are drawn as small ink pictograms in the manner of 17th-century maps (a molehill for a hill, a church with its spire, a post mill).
+  - Pick a symbol and tap the map to place it. It stays picked until it is tapped again or Esc. A symbol can be dragged to move it, an eraser removes the ones tapped, and Undo takes off the last.
+  - Symbols are kept as sheet items like the lines and marks, are shown on the ordinary map too, and the ruler's pin settles on them. A flag symbol can then serve as a landmark for later lines.
+- **Touch**: while sighting, Flag and a colour swatch join Bearing, +, − and Sheet. Palette buttons are at least 40 px.
+- **Tests** (`tools/survey.py`):
+  - plant a flag and pull it up;
+  - see the flag through the spyglass from 1–3 km;
+  - place, move and erase symbols by mouse and by touch;
+  - the pin settling on a symbol;
+  - a save and load keeping both.
+
 ## Next steps, in the order they would make sense
 
 1. **Mapping new landmarks (intersection).** From two places you have fixed, sight the same new thing and draw a line from each; where they cross, it goes on your map under a name you give it. This is what carries the map beyond the border, where the known landmarks are hidden.
