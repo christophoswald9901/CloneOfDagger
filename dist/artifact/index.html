@@ -28,6 +28,8 @@
   #travelinfo { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 22; font-size: 19px; padding: 6px 12px; white-space: nowrap; max-width: max(220px, calc(100vw - 400px)); overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* out of the way: bottom left, clear of the compass */
   #mapdest { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(52px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; max-width: calc(100vw - 32px); background: rgba(20,16,12,.85); padding: 8px 12px; border: 2px solid #5a4a36; }
   #mapdest .nm { color: #efe2b8; font-size: 22px; margin-right: 6px; }
+  #survinfo { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--hudb, 60px) * 1.3 + 6px + env(safe-area-inset-bottom, 0px)); z-index: 5; pointer-events: none; text-align: center; text-shadow: 2px 2px 0 #000; width: calc(100% - 32px); }
+  #survinfo .a { font-size: 22px; color: #efe2b8; } #survinfo .a.new { color: #ffe39a; } #survinfo .b { font-size: 18px; color: #cbbd98; }
   #restinfo { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; font-size: 26px; white-space: nowrap; }
   #resume { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .35); z-index: 15; cursor: pointer; padding: 16px; }
   #resume p { margin: 4px 0 0; color: var(--dim); }
@@ -110,10 +112,31 @@
   .menu .db { font-size: 27px; padding: 6px 14px; }
   .foot { margin: 18px auto 0; color: #cbbd98; font-size: 19px; text-align: center; max-width: 60ch; text-shadow: 2px 2px 0 #000; }
   #mapview { position: fixed; inset: 0; z-index: 25; background: #1b1712; }
-  #mapc { width: 100%; height: 100%; display: block; }
+  #mapc { width: 100%; height: 100%; display: block; touch-action: none; } /* (two fingers twist the ruler; the browser must not take them for a pinch) */
   #maplegend { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: 140px; color: var(--dim); font-size: 20px; text-shadow: 2px 2px 0 #000; }
   #mapbtns { position: absolute; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; }
   #mapbtns .db { min-width: 44px; }
+  /* the survey sheet: the field book and the ruler's tools on the left, the debug panel at the right edge */
+  #mapsurvey { position: absolute; left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); width: min(316px, calc(100vw - 24px)); max-height: calc(100% - 96px); display: flex; flex-direction: column; gap: 5px; box-sizing: border-box; padding: 8px 10px; background: rgba(20,16,12,.88); border: 2px solid #5a4a36; font-size: 19px; }
+  #mapsurvey h4 { margin: 2px 0 0; font-family: 'IM Fell English SC', Georgia, serif; font-weight: 400; font-size: 21px; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #mapsurvey h4 .rb { font-family: 'VT323', monospace; color: #f0d890; font-size: 20px; }
+  #mapsurvey.fold { width: auto; padding: 4px; }
+  body.touch #mapsurvey .rd .db.xs { min-height: 32px; min-width: 34px; } body.touch #mapsurvey .tools .db.xs { min-width: 0; padding: 4px 8px; }
+  #mapsurvey .book { overflow-y: auto; min-height: 0; flex: 0 1 auto; max-height: 26vh; display: flex; flex-direction: column; gap: 2px; scrollbar-color: #6a5c44 #1a1510; }
+  #mapsurvey .book p { margin: 0; }
+  #mapsurvey .rd { display: flex; align-items: center; gap: 8px; padding: 0 4px; background: rgba(0,0,0,.25); }
+  #mapsurvey .rd .st { color: var(--dim); font-size: 17px; flex: 1; }
+  #mapsurvey .rd b { font-weight: 400; color: #efe2b8; font-size: 22px; font-variant-numeric: tabular-nums; }
+  #mapsurvey .rd small { color: #ff9a7a; font-size: 16px; }
+  #mapsurvey .tools { display: flex; flex-wrap: wrap; gap: 5px; }
+  #mapsurvey #svpin { font-size: 17px; margin-top: -3px; }
+  #mapdebug { position: absolute; right: 16px; top: calc(68px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100vw - 32px); }
+  #mapdbg { box-sizing: border-box; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 170px); overflow-y: auto; padding: 8px 10px; background: rgba(20,16,12,.92); border: 2px solid #5a4a36; font-size: 18px; }
+  #mapdbg .opt { margin: 0 0 8px; } #mapdbg .opt b { display: block; font-weight: 400; color: var(--dim); margin-bottom: 2px; }
+  #mapdbg .opt .db { margin: 2px 4px 0 0; } #mapdbg p { margin: 4px 0 0; font-size: 16px; }
+  #panel .db.start { text-align: left; padding: 8px 14px; }
+  #panel .db.start b { display: block; font-weight: 400; font-size: 26px; color: var(--gold); }
+  #panel .db.start small { display: block; color: var(--dim); font-size: 18px; line-height: 1.15; margin-top: 2px; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 30px; color: var(--gold); background: var(--bg); z-index: 40; font-family: 'IM Fell English SC', Georgia, serif; padding: 16px; text-align: center; }
   /* touch controls */
   html { -webkit-text-size-adjust: 100%; }
@@ -141,6 +164,10 @@
   #touch .tb.pill, #touch .tb.sq { position: static; width: auto; min-width: calc(76px * var(--ts)); height: calc(42px * var(--ts)); border-radius: 8px; padding: 0 calc(10px * var(--ts)); font-size: calc(19px * var(--ts)); white-space: nowrap; pointer-events: auto; }
   #touch .tbar { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(40px + env(safe-area-inset-top, 0px)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: calc(100% - 24px); }
   #touch .tbar .tb.sq { min-width: calc(64px * var(--ts)); }
+  #touch [data-k="svTake"] { right: 0; bottom: 0; width: calc(104px * var(--ts)); height: calc(104px * var(--ts)); font-size: calc(22px * var(--ts)); }
+  #touch [data-k="svIn"] { right: calc(118px * var(--ts)); bottom: calc(56px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(30px * var(--ts)); }
+  #touch [data-k="svOut"] { right: calc(118px * var(--ts)); bottom: calc(-6px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(30px * var(--ts)); }
+  #touch [data-k="svMap"] { right: calc(10px * var(--ts)); bottom: calc(118px * var(--ts)); width: calc(84px * var(--ts)); height: calc(50px * var(--ts)); border-radius: 8px; }
   #touch.min [data-k="use"] { right: 0; bottom: 0; width: calc(96px * var(--ts)); height: calc(96px * var(--ts)); font-size: calc(23px * var(--ts)); }
   #touch.min .tb.jump { right: calc(112px * var(--ts)); bottom: calc(8px * var(--ts)); }
   #touch.min .tb.down { right: calc(112px * var(--ts)); bottom: calc(92px * var(--ts)); }
@@ -172,10 +199,11 @@
 <div id="status"></div>
 <div id="restinfo" class="panel" hidden></div>
 <div id="travelinfo" class="panel" hidden></div>
+<div id="survinfo" hidden></div>
 <div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Aldhaven</p></div></div>
 <div id="backdrop" hidden></div>
 <div id="panel" class="panel" hidden role="dialog" aria-modal="true"></div>
-<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
+<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapsurvey" hidden></div><div id="mapdebug"><button id="mapdbgbtn" class="db sm" data-sv="dbg">Debug</button><div id="mapdbg" hidden></div></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
 <div id="touch" aria-hidden="true"></div>
 <div id="title" hidden>
   <div class="title-wrap">

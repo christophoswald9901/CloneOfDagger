@@ -9079,16 +9079,17 @@ function playerDies(src) {
 function updatePlayer(dt) {
   const p = G.player;
   if (p.dead) { camera.position.y = lerp(camera.position.y, p.pos.y + 0.3, dt * 3); camera.rotation.z = lerp(camera.rotation.z, 0.6, dt * 3); return; }
-  const sens = 0.0022 * settings.sens;
+  const lk = Survey.lookK(), sens = 0.0022 * settings.sens * lk; // (through the spyglass the view turns more finely)
   p.yaw -= Input.mdx * sens; p.pitch -= Input.mdy * sens * (settings.invertY ? -1 : 1); Input.mdx = Input.mdy = 0;
-  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt;
-  if (keyDown('PageUp')) p.pitch += 1.5 * dt; if (keyDown('PageDown')) p.pitch -= 1.5 * dt;
+  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt * lk; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt * lk;
+  if (keyDown('PageUp')) p.pitch += 1.5 * dt * lk; if (keyDown('PageDown')) p.pitch -= 1.5 * dt * lk;
   p.pitch = clamp(p.pitch, -1.35, 1.35);
   let f = ((keyDown('KeyW') || keyDown('ArrowUp')) ? 1 : 0) - ((keyDown('KeyS') || keyDown('ArrowDown')) ? 1 : 0);
   let s = (keyDown('KeyD') ? 1 : 0) - (keyDown('KeyA') ? 1 : 0);
   const st = Input.stick; let analog = 1; // touch stick: partial pushes walk slower
   if (!f && !s && (st.x || st.y)) { f = -st.y; s = st.x; analog = clamp(Math.hypot(st.x, st.y), 0.3, 1); }
   const moving = f !== 0 || s !== 0;
+  if (moving && Survey.on) Survey.close('You put the compass away and walk on.');
   if (G.flying && !settings.dbgFly) setFlying(false);
   const fly = G.flying;
   const running = (keyDown('ShiftLeft') || keyDown('ShiftRight') || st.run) && (p.fat > 1 || fly) && moving;
@@ -9109,7 +9110,7 @@ function updatePlayer(dt) {
     p.pos.x += (-sn * f + cs * s) * spd * dt; p.pos.z += (-cs * f - sn * s) * spd * dt;
     collide(G.area, p.pos, 0.38, p.pos.y, 1.75); keepAshore(G.area, p.pos, ox, oz, 0.38, p.pos.y);
     if (G.area.kind === 'city' && Math.max(Math.abs(p.pos.x), Math.abs(p.pos.z)) > TG.R) wildFooting(p, ox, oz);
-    if (keyDown('Space') && p.onGround && p.fat > 3) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
+    if (keyDown('Space') && p.onGround && p.fat > 3 && !Survey.on) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
     p.vy -= 18 * dt; p.pos.y += p.vy * dt;
     const g = groundAt(G.area, p.pos.x, p.pos.z, 0.38, p.pos.y);
     if (p.pos.y <= g) { if (!p.onGround && p.vy < -11 && !p.safeFall && !settings.dbgNoFall) damagePlayer(Math.round((-p.vy - 11) * 3), { name: 'the fall' }); p.pos.y = g; p.vy = 0; p.onGround = true; p.safeFall = false; }
@@ -9551,6 +9552,324 @@ function dialogFor(npc) {
 }
 
 /* =====================================================================
+   Surveying (notes in docs/CARTOGRAPHY.md). K takes out a sighting
+   compass with a small spyglass: aim at a landmark and note its bearing
+   in the field book. On the map, now a survey sheet, lay the ruler with
+   its pin in that landmark, turn it by hand to the bearing and draw the
+   line: you stood somewhere on it. Two lines cross where you stood; a
+   third shows by the little triangle it leaves how good the fix is.
+   A new game starts in Aldhaven, in Corrinvale, or at the edge of the
+   known map, where the map does not show where you are. The debug panel
+   at the edge of the map switches what the map gives away.
+   ===================================================================== */
+const SURVEY_STARTS = [
+  { id: 'aldhaven', name: 'Aldhaven', sub: "On Pilgrim's Rise, above the walled port and the bay." },
+  { id: 'corrinvale', name: 'Corrinvale', sub: 'In the Grand Square of the canal town, under its belfry.' },
+  { id: 'edge', name: 'The edge of the known map', sub: 'High on the western mountains: the known country below you, the unknown beyond the range behind. Your map does not show where you are; find it with the compass and the ruler.' },
+];
+// the edge start: a flat shoulder of the western home mountains, 1.2 km inside the border, in sight of seven landmarks
+// (the Spindle 1.1 km, Harrow Fell 2.3 km, Mirrormere 4.5 km, Halewood 5 km, Corrinvale 8 km, Greywatch 9 km, the Ninefold Stones 13 km)
+const SURVEY_EDGE = { x: -8800, z: -9000, bearing: 78, map: [-7400, -9800] };
+// where each landmark is sighted: its tower, steeple or keep, not the middle of the place
+const SIGHT_AT = {
+  greywatch: S => [S.x - 10, S.z - 12], stones: S => [S.x, S.z], mirrormere: S => [S.x + 274, S.z - 34.6], kestrel: S => [S.x - 24, S.z + 6],
+  gullscar: () => [GULL.x, gullCoast(GULL.x) - 34], halewood: () => hallW(0, 0), // (the house itself, at the middle of its own frame)
+};
+// two summits of the western home mountains, known by name and on every map: the Spindle, the sharp horn 1.1 km west-north-west of the edge
+// start, and Harrow Fell, where the ridge north of it ends in a point (stand-in names until the story returns). Each is taken as the top of
+// the ground near where it is given here
+const PEAKS = [{ id: 'spindle', name: 'the Spindle', x: -9821, z: -9452 }, { id: 'harrow', name: 'Harrow Fell', x: -9032, z: -11277 }];
+const fmtBearing = b => { const w = Math.floor(b + 1e-6); return (b - w > 0.25 ? w + '½' : String(w)) + '°'; };
+const wrap360 = a => ((a % 360) + 360) % 360;
+
+const Survey = {
+  on: false, sheet: false, zoom: 3, ZMAX: 10, n: 0, v: 0, flash: 0, arm: null, grab: null, twist: null, ptrs: new Map(), pending: null, dbgOpen: false, sure: 0, told: false,
+
+  /* ---------- what is kept with the game ---------- */
+  fresh(start) { const edge = start === 'edge'; return { start, opts: { pos: edge ? 'never' : 'always', unknown: edge ? 'blank' : 'drawn', truth: false, needle: 'swing' }, reads: [], items: [], ruler: null, view: null, home: null }; },
+  st() { return G.flags.survey || (G.flags.survey = this.fresh('aldhaven')); }, // (games saved before surveying came in start as Aldhaven's)
+  opt(k) { return this.st().opts[k]; },
+  // the known map: the home country and all of its mountains, out to their outer foot (their middle runs some 350 m beyond the old crest
+  // line and they fall away to nothing within 2.4 km of it, homeFlank and rimHeight in 03_terrain.js)
+  EDGE_FLANK: 2600,
+  known(x, z) { return homeOut(x, z) <= 0 || homeFlank(x, z) < this.EDGE_FLANK; },
+  // its edge, out of the home country's box to the west, north and east, as a line of points (worked out once): far south on the west,
+  // up the west side, round the north-west corner, along the north, round the north-east corner, down the east side, far south again
+  edge() {
+    if (this._edge) return this._edge;
+    const out = (px, pz, dx, dz) => { let t = 0; while (t < 12000 && this.known(px + dx * (t + 100), pz + dz * (t + 100))) t += 100;
+      let a = t, b = t + 100; for (let k = 0; k < 7; k++) { const m = (a + b) / 2; if (this.known(px + dx * m, pz + dz * m)) a = m; else b = m; } return [Math.round(px + dx * a), Math.round(pz + dz * a)]; };
+    const { x0, x1, z0, z1 } = WORLD, P = [], st = 200, far = z1 + 60000, fan = (cx, a0) => { for (let a = a0; a <= a0 + 90; a += 5) { const r = a * Math.PI / 180; P.push(out(cx, z0, Math.cos(r), Math.sin(r))); } };
+    for (let z = z1; z > z0; z -= st) P.push(out(x0, z, -1, 0)); P.unshift([P[0][0], far]); fan(x0, 180);
+    for (let x = x0 + st; x < x1; x += st) P.push(out(x, z0, 0, -1)); fan(x1, 270);
+    for (let z = z0 + st; z <= z1; z += st) P.push(out(x1, z, 1, 0)); P.push([P[P.length - 1][0], far]);
+    return (this._edge = P);
+  },
+  // the named summits, each at the top of its ground
+  peaks() {
+    return this._peaks || (this._peaks = PEAKS.map(p => { let x = p.x, z = p.z, h = terrainRaw(x, z);
+      for (let st = 32; st >= 2; st /= 2) for (let moved = true, n = 0; moved && n < 30; n++) { moved = false; for (const [a, b] of [[st, 0], [-st, 0], [0, st], [0, -st], [st, st], [st, -st], [-st, st], [-st, -st]]) { const v = terrainRaw(x + a, z + b); if (v > h) { h = v; x += a; z += b; moved = true; } } }
+      return { ...p, x: Math.round(x), z: Math.round(z), h: Math.round(h) }; }));
+  },
+  // whether the map shows where you are (and the travel panel how far things are)
+  showPos() { const o = this.opt('pos'), P = G.player; return o === 'always' || (o === 'known' && !!P && this.known(P.pos.x, P.pos.z)); },
+  blank() { return this.opt('unknown') === 'blank'; },
+  // the landmarks on the map that can be sighted: Aldhaven's and Corrinvale's towers, and the landmarks you know of
+  points() {
+    const found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
+    for (const l of G.city.landmarks) if (l.id === 'bell' || l.id === 'lighthouse') out.push({ name: 'Aldhaven, ' + l.name.replace(/^the /, 'the '), x: l.x, z: l.z });
+    for (const T of TOWNS) for (const l of T.landmarks) if (l.id === 'belfry' || l.id === 'cathedral') out.push({ name: T.name + ', ' + l.name, x: l.x, z: l.z });
+    for (const S of SITES) if (SIGHT_AT[S.id] && (found[S.id] || heard[S.id])) { const [x, z] = SIGHT_AT[S.id](S); out.push({ name: S.name.replace(/^the /, 'the '), x, z }); }
+    for (const p of this.peaks()) out.push({ name: p.name, x: p.x, z: p.z });
+    return out;
+  },
+  // where the map opens when it does not show you: where you last marked yourself, else the ruler, else where you began
+  anchor() { const s = this.st(); for (let i = s.items.length - 1; i >= 0; i--) if (s.items[i].k === 'mark') return [s.items[i].x, s.items[i].z]; if (s.ruler) return [s.ruler.x, s.ruler.z]; return s.home || [0, -30]; },
+
+  /* ---------- a new game: where it begins ---------- */
+  chooseStart(go) {
+    $('title').hidden = true; const back = () => { UI.close(true); $('title').hidden = false; };
+    UI.open('start', () => `<h2>Where does your journey begin?</h2><div class="btns col">${SURVEY_STARTS.map(o => `<button class="db start" data-a="s:${o.id}"><b>${esc(o.name)}</b><small>${esc(o.sub)}</small></button>`).join('')}</div><div class="btns"><button class="db" data-a="back">Back</button></div>`,
+      { cls: 'mid', leave: back, onAct: a => { if (a === 'back') { back(); return; } if (a.startsWith('s:')) { this.pending = a.slice(2); UI.close(true); go(); } } });
+  },
+  // put the new player at the start chosen (beginNewGame), with the map that goes with it
+  place() {
+    const start = SURVEY_STARTS.some(o => o.id === this.pending) ? this.pending : 'aldhaven'; this.pending = null; this.close();
+    const s = G.flags.survey = this.fresh(start), found = G.flags.found || (G.flags.found = {}), day = dayOf(G.time) + 1, P = G.player;
+    if (start === 'corrinvale') {
+      const T = TOWNS[0], sq = T.landmarks.find(l => l.id === 'square'), bf = T.landmarks.find(l => l.id === 'belfry');
+      found[T.id] = day; setArea(G.city, sq.x, sq.z, Math.atan2(-(bf.x - sq.x), -(bf.z - sq.z))); P.pitch = 0.12; G.lastDistrict = null; s.home = [sq.x, sq.z];
+    } else if (start === 'edge') {
+      for (const S of SITES) found[S.id] = day; // the known map shows the country's landmarks
+      const E = SURVEY_EDGE; setArea(G.city, E.x, E.z, -E.bearing * Math.PI / 180); P.pitch = -0.05; G.lastDistrict = 'outside'; s.home = E.map; MapView.zoom = 0.06; // (the map opens over the west of the country and its mountains, not on you)
+    } else { const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); P.pitch = S.pitch || 0; if (S.y != null) P.pos.y = S.y; G.lastDistrict = 'outside'; s.home = [S.x, S.z]; }
+    return start;
+  },
+  welcome(start) {
+    const t = Input.touch;
+    if (start === 'edge') return [`You stand at the edge of the known map. To the east the known country lies below you; beyond the mountains to the west the land is unknown. Your map (${t ? 'Map' : 'M'}) shows the country, but not where you are. The peaks of the range behind you are on it too: the Spindle, the sharp horn, and Harrow Fell to the north.`,
+      `${t ? 'Tap Survey' : 'Press K'} for the compass. Sight a landmark you can find on the map, note its bearing, then lay the ruler through that landmark on the map at that bearing and draw the line. Where two lines cross, you are.`];
+    if (start === 'corrinvale') return [`Welcome to Corrinvale. ${t ? 'The buttons at the top open the map and your journal.' : 'M opens the map, J your journal.'}`, `${t ? 'Survey' : 'K'} takes out a compass and a ruler, to find where you are from the landmarks you can see.`];
+    return null;
+  },
+
+  /* ---------- the compass in hand ---------- */
+  heading() { return wrap360(-G.player.yaw * 180 / Math.PI); },
+  toggle() { if (this.on || this.sheet) this.close('You put the compass and the ruler away.'); else this.open(); },
+  open() {
+    const P = G.player; if (!P || P.dead || G.state !== 'play') return;
+    if (G.area !== G.city) { msg('You need open sky to take a bearing.'); return; }
+    if (Travel.cur) Travel.stop('You stop.');
+    this.on = true; this.n = this.heading(); this.v = 0; SFX.play('click');
+    if (!this.told) { this.told = true; msg(Input.touch ? 'Compass out. Drag to aim at a landmark and tap Bearing to note it; + and − work the spyglass, Sheet opens the map with the ruler. Walking puts it away.'
+      : 'Compass out. Aim at a landmark and click (or Enter) to note its bearing. The wheel or + / − works the spyglass, M opens the map with the ruler, K puts it all away; walking does too.'); }
+  },
+  close(text) {
+    if (!this.on && !this.sheet) return;
+    this.on = false; $('survinfo').hidden = true; this._info = ''; this.arm = null; this.grab = this.twist = null;
+    if (this.sheet) { this.sheet = false; if (G.mapOpen) MapView.close(); }
+    this.applyFov(); if (text) msg(text);
+  },
+  // keys while the compass is out (true: taken)
+  key(c) {
+    if (c === 'KeyK' || c === 'Escape') { this.close('You put the compass away.'); return true; }
+    if (c === 'Enter' || c === 'NumpadEnter' || c === 'Space') { this.take(); return true; }
+    if (c === 'KeyM') { this.openSheet(); return true; }
+    if (c === 'Equal' || c === 'NumpadAdd') { this.zoomBy(1.25); return true; }
+    if (c === 'Minus' || c === 'NumpadSubtract') { this.zoomBy(0.8); return true; }
+    if (c === 'KeyE' || c === 'KeyF') this.close(); // (and then talk, or open the door)
+    return false;
+  },
+  update(dt) {
+    if (!this.on) return;
+    const P = G.player; if (G.area !== G.city || Travel.cur || G.resting || !P || P.dead) { this.close(); return; }
+    const t = this.heading();
+    if (this.opt('needle') === 'steady') { this.n = t; this.v = 0; }
+    else for (let k = 0; k < 3; k++) { const h = dt / 3, d = ((t - this.n + 540) % 360) - 180; this.v += (d * 24 - this.v * 4.4) * h; this.n = wrap360(this.n + this.v * h); } // the needle lags as you turn, swings past and settles
+    this.flash = Math.max(0, this.flash - dt * 3);
+    this.applyFov(); this.info();
+  },
+  info() {
+    const el = $('survinfo'), show = this.on && !G.mapOpen && !G.uiOpen && G.state === 'play'; if (el.hidden !== !show) el.hidden = !show; if (!show) return;
+    const r = this.st().reads, last = r[r.length - 1], a = `${this.zoom > 1.05 ? 'spyglass ×' + this.zoom.toFixed(1) : 'compass sights'}${last ? ` · last bearing ${fmtBearing(last.b)}, station ${last.st}` : ''}${this.opt('truth') ? ` · (true ${this.heading().toFixed(1)}°)` : ''}`,
+      b = Input.touch ? 'drag to aim · Bearing notes it · + − spyglass · Sheet: map and ruler' : 'click or Enter: note the bearing · wheel or + −: spyglass · M: map and ruler · K: put away', t = a + '\n' + b;
+    if (t !== this._info) { this._info = t; el.innerHTML = `<div class="a${this.flash > 0 ? ' new' : ''}">${esc(a)}</div><div class="b">${esc(b)}</div>`; }
+  },
+  // the spyglass: a narrower view, aimed more finely, and far things clear of the haze in proportion
+  applyFov() { if (typeof camera === 'undefined' || !camera) return; const f = this.on && !this.sheet ? settings.fov / this.zoom : settings.fov; if (Math.abs(camera.fov - f) > 1e-3) { camera.fov = f; camera.updateProjectionMatrix(); } },
+  lookK() { return this.on && !this.sheet ? 1 / this.zoom : 1; },
+  fogK() { return this.on && !this.sheet ? this.zoom : 1; },
+  zoomBy(k) { if (this.on) this.zoom = clamp(this.zoom * k, 1, this.ZMAX); },
+  // what the card reads now: the needle, and the tremble of the hand that holds it
+  reading() { if (this.opt('needle') === 'steady') return this.heading(); const c = G.clock; return wrap360(this.n + 0.32 * Math.sin(c * 1.9) + 0.22 * Math.sin(c * 3.3 + 1.3)); },
+  take() {
+    if (!this.on) return; const s = this.st(), P = G.player, b = wrap360(Math.round(this.reading() * 2) / 2), last = s.reads[s.reads.length - 1];
+    const st = !last ? 1 : Math.hypot(last.x - P.pos.x, last.z - P.pos.z) < 30 ? last.st : last.st + 1; // a new station once you have walked on
+    s.reads.push({ b, tb: Math.round(this.heading() * 10) / 10, st, t: Math.round(G.time), x: Math.round(P.pos.x * 10) / 10, z: Math.round(P.pos.z * 10) / 10 }); while (s.reads.length > 40) s.reads.shift();
+    SFX.play('click'); this.flash = 1; msg(`Bearing ${fmtBearing(b)} noted (station ${st}).`);
+  },
+  // the view through the sights: the spyglass's round field, the hair, the compass card under it
+  hud(x, W, H, s) {
+    const cx = Math.round(W / 2), cy = Math.round(H / 2);
+    if (this.zoom > 1.05) { const R = Math.round(Math.min(W, H) * 0.48); x.save(); x.fillStyle = 'rgba(8,6,4,0.92)'; x.beginPath(); x.rect(0, 0, W, H); x.arc(cx, cy, R, 0, Math.PI * 2, true); x.fill('evenodd');
+      x.strokeStyle = this.flash > 0 ? `rgba(240,210,120,${0.5 + this.flash * 0.5})` : '#6a5228'; x.lineWidth = 2 * s; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.stroke(); x.restore(); }
+    const hair = (col, w) => { x.fillStyle = col; x.fillRect(cx - (w - s) / 2, cy - 44 * s, w, 37 * s); x.fillRect(cx - (w - s) / 2, cy + 7 * s, w, 37 * s); x.fillRect(cx - 26 * s, cy - (w - s) / 2, 19 * s, w); x.fillRect(cx + 7 * s, cy - (w - s) / 2, 19 * s, w); };
+    hair('rgba(255,240,200,0.35)', 3 * s); hair('rgba(24,16,8,0.9)', s);
+    const cw = Math.min(W - 24 * s, 170 * s), ch = 15 * s, x0 = Math.round(cx - cw / 2), y0 = H - ch - 8 * s, span = 12, rd = this.reading();
+    x.fillStyle = '#120e0a'; x.fillRect(x0 - s, y0 - s, cw + 2 * s, ch + 2 * s); x.fillStyle = '#e6dab4'; x.fillRect(x0, y0, cw, ch);
+    x.save(); x.beginPath(); x.rect(x0, y0, cw, ch); x.clip(); x.textAlign = 'center'; x.textBaseline = 'bottom'; x.font = `${8 * s}px VT323, monospace`;
+    for (let a = Math.floor(rd - span - 1); a <= rd + span + 1; a++) { const X0 = Math.round(cx + (a - rd) / span * cw / 2), aa = wrap360(a), big = aa % 10 === 0;
+      x.fillStyle = '#2a1e10'; x.fillRect(X0, y0, s, big ? 6 * s : aa % 5 === 0 ? 4 * s : 2 * s);
+      if (big) { x.fillStyle = aa === 0 ? '#b0301a' : '#2a1e10'; x.fillText({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[aa] || String(aa), X0 + s / 2, y0 + ch); } }
+    x.restore(); x.fillStyle = '#b0301a'; x.fillRect(cx - s, y0 - 3 * s, 2 * s, ch + 3 * s); // the lubber line: read the card here
+    // (what the spyglass is set to and the last bearing are page text, #survinfo: crisp where the HUD is pixelated)
+  },
+
+  /* ---------- the sheet: the map with the ruler and the field book ---------- */
+  openSheet() {
+    if (G.area.kind !== 'city') return;
+    this.sheet = true; this.arm = null; this.applyFov(); MapView.open();
+    if (!G.mapOpen) this.sheet = false;
+  },
+  onMapOpen() { $('mapdebug').hidden = G.area.kind !== 'city'; this.panel(); this.debugPanel(); },
+  onMapClose() { if (!this.showPos() && MapView.view) this.st().view = MapView.view.slice(); this.sheet = false; this.arm = null; this.grab = this.twist = null; this.ptrs.clear(); $('mapsurvey').hidden = true; this.applyFov(); },
+  sheetKey(c) {
+    if (c === 'KeyK') { this.close('You put the compass and the ruler away.'); return true; }
+    if (c === 'KeyM' || c === 'Escape') { MapView.close(); return true; } // back to the compass
+    const k = keyDown('ShiftLeft') || keyDown('ShiftRight') ? 1 : 0.1;
+    if (c === 'BracketLeft' || c === 'Comma') { this.turn(-k); return true; }
+    if (c === 'BracketRight' || c === 'Period') { this.turn(k); return true; }
+    if (c === 'Enter' || c === 'NumpadEnter') { this.line(); return true; }
+    if (c === 'Backspace') { this.undo(); return true; }
+    return false;
+  },
+  legend() { return Input.touch ? 'The survey sheet. Drag the ruler to move it: its pin settles on a landmark. Turn it by its knobs, or twist it with two fingers, to the bearing in your field book, then Draw line. Where the lines cross is where you stood.'
+    : 'The survey sheet. Drag the ruler to move it: its pin settles on a landmark. Turn it by the knobs at its ends ([ and ] or Shift+wheel turn it finely, Shift+[ ] by degrees) to the bearing in your field book, then Draw line (Enter). Where the lines cross is where you stood. M goes back to the compass.'; },
+  // the ruler on screen (CSS pixels): its pin, the way it points, its length and width
+  geo(t) { const R = this.st().ruler, d = t.dpr, a = R.a * Math.PI / 180, ux = Math.sin(a), uy = -Math.cos(a);
+    return { cx: (t.W / 2 + (R.x - t.cx) * t.scale) / d, cy: (t.H / 2 + (R.z - t.cz) * t.scale) / d, ux, uy, nx: -uy, ny: ux, half: Math.min(440, 0.42 * Math.min(innerWidth, innerHeight)), w: 30 }; },
+  brg(ax, ay, bx, by) { return wrap360(Math.atan2(bx - ax, -(by - ay)) * 180 / Math.PI); },
+  turn(d) { const R = this.st().ruler; if (!R) return; R.a = wrap360(Math.round((R.a + d) * 10) / 10); MapView.draw(true); this.panelRuler(); },
+  // the line along the ruler's edge, carried on across the whole sheet (as with a long straight-edge: the landmarks stand kilometres off)
+  line() { const t = MapView.tf, R = this.st().ruler; if (!t || !R) return; const L = Math.max(this.geo(t).half * t.dpr / t.scale, 26000), a = R.a * Math.PI / 180, dx = Math.sin(a) * L, dz = -Math.cos(a) * L, r = v => Math.round(v * 10) / 10;
+    this.st().items.push({ k: 'line', ax: r(R.x - dx), az: r(R.z - dz), bx: r(R.x + dx), bz: r(R.z + dz), a: R.a }); SFX.play('click'); MapView.draw(true); this.panel(); },
+  undo() { const s = this.st(); if (!s.items.length) return; s.items.pop(); MapView.draw(true); this.panel(); },
+  // a tap on the sheet: marks where you are, when Mark is armed
+  tap(px, py) { if (this.arm !== 'mark') return; const w = MapView.toWorld(px, py), P = G.player; if (!w) return; const r = v => Math.round(v * 10) / 10;
+    this.st().items.push({ k: 'mark', x: r(w[0]), z: r(w[1]), tx: r(P.pos.x), tz: r(P.pos.z), t: Math.round(G.time) }); this.arm = null; SFX.play('click'); MapView.draw(true); this.panel(); },
+  hit(px, py) { const t = MapView.tf; if (!t || !this.st().ruler) return null; const g = this.geo(t), dx = px - g.cx, dy = py - g.cy, al = dx * g.ux + dy * g.uy, ac = dx * g.nx + dy * g.ny;
+    if (Math.abs(al) > g.half + 8 || ac < -12 || ac > g.w + 12) return null; return Math.abs(al) > g.half - 44 ? 'turn' : 'move'; },
+  // pointers on the sheet (true: the ruler took it, the map does not pan)
+  pdown(e) {
+    this.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (this.grab && this.grab.id !== e.pointerId && !this.twist) { const p1 = this.ptrs.get(this.grab.id); if (p1) { this.twist = { id: e.pointerId, b0: this.brg(p1[0], p1[1], e.clientX, e.clientY), a0: this.st().ruler.a }; return true; } } // a second finger twists the ruler
+    const h = this.hit(e.clientX, e.clientY); if (!h) return false;
+    const R = this.st().ruler, g = this.geo(MapView.tf);
+    this.grab = h === 'turn' ? { id: e.pointerId, kind: 'turn', off: this.brg(g.cx, g.cy, e.clientX, e.clientY) - R.a } : { id: e.pointerId, kind: 'move', sx: e.clientX, sy: e.clientY, x0: R.x, z0: R.z };
+    return true;
+  },
+  pmove(e) {
+    if (!this.ptrs.has(e.pointerId)) return false; this.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    const g0 = this.grab; if (!g0) return false; const R = this.st().ruler, t = MapView.tf;
+    if (this.twist) { const p1 = this.ptrs.get(g0.id), p2 = this.ptrs.get(this.twist.id); if (p1 && p2) R.a = wrap360(Math.round((this.twist.a0 + this.brg(p1[0], p1[1], p2[0], p2[1]) - this.twist.b0) * 10) / 10); }
+    else if (g0.id === e.pointerId) { if (g0.kind === 'move') { R.x = g0.x0 + (e.clientX - g0.sx) * t.dpr / t.scale; R.z = g0.z0 + (e.clientY - g0.sy) * t.dpr / t.scale; }
+      else { const g = this.geo(t); R.a = wrap360(Math.round((this.brg(g.cx, g.cy, e.clientX, e.clientY) - g0.off) * 10) / 10); } }
+    else return false;
+    MapView.draw(true); this.panelRuler(); return true;
+  },
+  pup(e) {
+    this.ptrs.delete(e.pointerId); const g0 = this.grab; if (!g0) return false;
+    if (this.twist && e.pointerId === this.twist.id) { this.twist = null; return true; }
+    if (e.pointerId !== g0.id) return false;
+    this.twist = null; this.grab = null; if (g0.kind === 'move') this.snap(); MapView.draw(true); this.panelRuler(); return true;
+  },
+  // the pin settles into a landmark dropped near it
+  snap() { const R = this.st().ruler, t = MapView.tf; let best = null, bd = 20 * t.dpr; for (const p of this.points()) { const d = Math.hypot(p.x - R.x, p.z - R.z) * t.scale; if (d < bd) { bd = d; best = p; } } if (best) { R.x = best.x; R.z = best.z; } },
+  pinned() { const R = this.st().ruler; return R && this.points().find(p => Math.hypot(p.x - R.x, p.z - R.z) < 0.5); },
+  rulerText() { const R = this.st().ruler; if (!R) return ''; const a = wrap360(R.a) % 180, f = v => v.toFixed(1).padStart(5, '0') + '°'; return `${f(a)} · ${f(a + 180)}`; },
+  panelRuler() { const e = $('svrb'); if (e) e.textContent = this.rulerText(); const p = $('svpin'); if (p) { const q = this.pinned(); p.textContent = q ? 'pinned in ' + q.name : 'pin not in a landmark'; } },
+  panel() {
+    const el = $('mapsurvey'); if (!this.sheet) { el.hidden = true; return; } el.hidden = false;
+    const s = this.st(), truth = s.opts.truth, sure = performance.now() - this.sure < 3000, pin = this.pinned();
+    const rows = s.reads.map((r, i) => [r, i]).reverse().map(([r, i]) => `<div class="rd"><span class="st">station ${r.st}</span><b>${fmtBearing(r.b)}</b>${truth ? `<small>true ${r.tb.toFixed(1)}°</small>` : ''}<button class="db xs" data-sv="del:${i}" aria-label="Strike out">✕</button></div>`).join('');
+    if (this.fold) { el.classList.add('fold'); el.innerHTML = `<button class="db sm" data-sv="fold">Field book and ruler ▸</button>`; return; } el.classList.remove('fold'); // (folded away, so a small screen shows the map)
+    el.innerHTML = `<h4>Field book <button class="db xs" data-sv="fold" aria-label="Fold the field book away">◂</button></h4><div class="book">${rows || '<p class="dim">No bearings yet: take them with the compass (Sight).</p>'}</div>
+      <h4>Ruler <span id="svrb" class="rb">${this.rulerText()}</span></h4><div id="svpin" class="dim">${pin ? 'pinned in ' + esc(pin.name) : 'pin not in a landmark'}</div>
+      <div class="tools"><button class="db xs" data-sv="t:-1">↺1°</button><button class="db xs" data-sv="t:-0.1">↺0.1°</button><button class="db xs" data-sv="t:0.1">0.1°↻</button><button class="db xs" data-sv="t:1">1°↻</button></div>
+      <div class="tools"><button class="db sm" data-sv="line">Draw line</button><button class="db sm${this.arm === 'mark' ? ' on' : ''}" data-sv="mark">${this.arm === 'mark' ? 'Tap where you are' : 'Mark my position'}</button></div>
+      <div class="tools"><button class="db sm" data-sv="undo" ${s.items.length ? '' : 'disabled'}>Undo</button><button class="db sm" data-sv="clear" ${s.items.length ? '' : 'disabled'}>${sure ? 'Clear: sure?' : 'Clear sheet'}</button><button class="db sm" data-sv="mid">Ruler here</button></div>
+      <div class="tools"><button class="db sm primary" data-sv="sight">Sight</button><button class="db sm" data-sv="away">Put away</button></div>`;
+  },
+  debugPanel() {
+    const el = $('mapdbg'), o = this.st().opts; $('mapdbgbtn').classList.toggle('on', this.dbgOpen); el.hidden = !this.dbgOpen; if (!this.dbgOpen) return;
+    const ch = (k, v, l) => `<button class="db xs${o[k] === v ? ' on' : ''}" data-sv="o:${k}:${v}">${l}</button>`, start = SURVEY_STARTS.find(q => q.id === this.st().start);
+    el.innerHTML = `<div class="opt"><b>Your position on the map</b>${ch('pos', 'always', 'Always')}${ch('pos', 'known', 'In the known land')}${ch('pos', 'never', 'Never')}</div>
+      <div class="opt"><b>Land beyond the known map</b>${ch('unknown', 'drawn', 'Drawn as you go')}${ch('unknown', 'blank', 'Left blank')}</div>
+      <div class="opt"><b>Compass needle</b>${ch('needle', 'swing', 'Swings and settles')}${ch('needle', 'steady', 'Steady and exact')}</div>
+      <div class="opt"><b>Check your fixes</b>${ch('truth', true, 'Show where you are')}${ch('truth', false, 'Hide')}</div>
+      <p class="dim">Started: ${esc(start ? start.name : 'Aldhaven')}. These belong to this game and are saved with it.</p>`;
+  },
+  act(a) {
+    const s = this.st();
+    if (a === 'dbg') { this.dbgOpen = !this.dbgOpen; this.debugPanel(); return; }
+    if (a.startsWith('o:')) { const [, k, v] = a.split(':'); const was = this.showPos(); s.opts[k] = v === 'true' ? true : v === 'false' ? false : v;
+      if (was && !this.showPos() && !MapView.view && MapView.tf) MapView.view = [MapView.tf.cx, MapView.tf.cz]; // (the map stops following you)
+      this.debugPanel(); this.panel(); MapView.draw(); return; }
+    if (a.startsWith('t:')) { this.turn(+a.slice(2)); return; }
+    if (a.startsWith('del:')) { s.reads.splice(+a.slice(4), 1); this.panel(); return; }
+    if (a === 'fold') { this.fold = !this.fold; this.panel(); return; }
+    if (a === 'line') this.line();
+    else if (a === 'mark') { this.arm = this.arm === 'mark' ? null : 'mark'; this.panel(); }
+    else if (a === 'undo') this.undo();
+    else if (a === 'clear') { if (performance.now() - this.sure < 3000) { s.items = []; this.sure = 0; MapView.draw(true); } else this.sure = performance.now(); this.panel(); }
+    else if (a === 'mid') { const t = MapView.tf; if (t && s.ruler) { s.ruler.x = t.cx; s.ruler.z = t.cz; MapView.draw(true); this.panelRuler(); } }
+    else if (a === 'sight') MapView.close();
+    else if (a === 'away') this.close('You put the compass and the ruler away.');
+  },
+  // the unknown land, left blank: paper beyond the edge of the known map, which is drawn dashed
+  blankOut(x, X, Z, W, H) {
+    const E = this.edge(), path = () => { x.beginPath(); E.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); };
+    x.save(); x.fillStyle = '#2b2a20'; path(); x.closePath(); x.rect(0, 0, W, H); x.fill('evenodd');
+    x.strokeStyle = 'rgba(200,180,130,0.45)'; x.lineWidth = 2; x.setLineDash([10, 6]); x.lineJoin = 'round'; path(); x.stroke(); x.restore();
+  },
+  // pencil lines and your marks (under the map's labels), and the landmarks you can sight while the kit is out
+  drawMap(x, X, Z, t) {
+    const s = this.st(), d = t.dpr; x.save(); x.lineCap = 'round';
+    for (const it of s.items) if (it.k === 'line') { x.strokeStyle = 'rgba(0,0,0,0.5)'; x.lineWidth = Math.max(2, 2.6 * d); x.beginPath(); x.moveTo(X(it.ax), Z(it.az)); x.lineTo(X(it.bx), Z(it.bz)); x.stroke();
+      x.strokeStyle = 'rgba(232,224,204,0.92)'; x.lineWidth = Math.max(1, 1.2 * d); x.stroke(); }
+    if (this.on || this.sheet) for (const p of this.points()) { const px = X(p.x), pz = Z(p.z); x.strokeStyle = '#1b1712'; x.lineWidth = 3 * d; x.beginPath(); x.arc(px, pz, 4.5 * d, 0, 7); x.stroke(); x.strokeStyle = '#f0d27a'; x.lineWidth = 1.4 * d; x.stroke(); x.fillStyle = '#f0d27a'; x.fillRect(px - d, pz - d, 2 * d, 2 * d); }
+    let n = 0; x.font = `${Math.round(13 * d)}px VT323, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
+    for (const it of s.items) if (it.k === 'mark') { n++; const px = X(it.x), pz = Z(it.z), r = 6 * d;
+      x.strokeStyle = '#1b1712'; x.lineWidth = 3.5 * d; x.beginPath(); x.arc(px, pz, r, 0, 7); x.stroke(); x.strokeStyle = '#e8573a'; x.lineWidth = 1.8 * d; x.stroke(); x.fillStyle = '#e8573a'; x.beginPath(); x.arc(px, pz, 1.6 * d, 0, 7); x.fill();
+      x.fillStyle = '#000'; x.fillText(String(n), px + r + 3 * d + 1, pz + 1); x.fillStyle = '#ffb49a'; x.fillText(String(n), px + r + 3 * d, pz); }
+    x.restore();
+  },
+  // over everything: the ruler, and (to check your work) where you really are
+  drawTop(x, X, Z, t) {
+    const s = this.st(), d = t.dpr, P = G.player;
+    if (s.opts.truth && P) { x.save(); x.font = `${Math.round(13 * d)}px VT323, monospace`; x.textBaseline = 'middle'; let n = 0;
+      for (const it of s.items) if (it.k === 'mark') { n++; const a = [X(it.x), Z(it.z)], b = [X(it.tx), Z(it.tz)], m = Math.hypot(it.x - it.tx, it.z - it.tz);
+        x.strokeStyle = '#ff6a4a'; x.lineWidth = 1.2 * d; x.setLineDash([4 * d, 3 * d]); x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); x.setLineDash([]);
+        const txt = `${n}: ${m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'} off`; x.textAlign = 'left'; x.fillStyle = '#000'; x.fillText(txt, a[0] + 10 * d + 1, a[1] + 12 * d + 1); x.fillStyle = '#ff9a7a'; x.fillText(txt, a[0] + 10 * d, a[1] + 12 * d); }
+      const px = X(P.pos.x), pz = Z(P.pos.z), k = 7 * d; x.strokeStyle = '#000'; x.lineWidth = 4 * d; x.beginPath(); x.moveTo(px - k, pz - k); x.lineTo(px + k, pz + k); x.moveTo(px + k, pz - k); x.lineTo(px - k, pz + k); x.stroke(); x.strokeStyle = '#ff4a3a'; x.lineWidth = 2 * d; x.stroke();
+      x.textAlign = 'left'; x.fillStyle = '#000'; x.fillText('you are here', px + k + 4 * d + 1, pz + 1); x.fillStyle = '#ff9a7a'; x.fillText('you are here', px + k + 4 * d, pz); x.restore(); }
+    if (!this.sheet) return;
+    if (!s.ruler) s.ruler = { x: t.cx, z: t.cz, a: 0 }; // (first laid in the middle of the sheet)
+    const g = this.geo(t), Q = (al, ac) => [(g.cx + g.ux * al + g.nx * ac) * d, (g.cy + g.uy * al + g.ny * ac) * d];
+    x.save(); x.beginPath(); [[-g.half, 0], [g.half, 0], [g.half, g.w], [-g.half, g.w]].forEach(([al, ac], i) => { const [px, py] = Q(al, ac); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath();
+    x.fillStyle = 'rgba(214,190,130,0.6)'; x.fill(); x.strokeStyle = 'rgba(50,34,16,0.9)'; x.lineWidth = 1.5 * d; x.stroke();
+    x.strokeStyle = 'rgba(46,30,14,0.95)'; x.lineWidth = d; for (let k = -40; k <= 40; k++) { const al = k / 40 * g.half, L = k % 10 === 0 ? 13 : k % 5 === 0 ? 9 : 5; const [ax, ay] = Q(al, 0), [bx, by] = Q(al, L); x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); }
+    { const [ax, ay] = Q(-g.half, 0), [bx, by] = Q(g.half, 0); x.strokeStyle = '#1e1408'; x.lineWidth = 1.6 * d; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); } // the drawing edge, through the pin
+    for (const sg of [-1, 1]) { const [kx, ky] = Q(sg * (g.half - 20), g.w / 2 + 2); x.fillStyle = 'rgba(110,76,36,0.95)'; x.strokeStyle = '#1e1408'; x.lineWidth = 1.5 * d; x.beginPath(); x.arc(kx, ky, 10 * d, 0, 7); x.fill(); x.stroke();
+      x.strokeStyle = '#e8d29a'; x.lineWidth = 1.4 * d; x.beginPath(); x.arc(kx, ky, 5.5 * d, -2.4, 1.6); x.stroke(); } // the knobs to turn it by
+    const [pX, pY] = Q(0, 0); x.fillStyle = '#e8c860'; x.strokeStyle = '#1e1408'; x.lineWidth = 1.6 * d; x.beginPath(); x.arc(pX, pY, 4.5 * d, 0, 7); x.fill(); x.stroke(); // the pin
+    const [lx, ly] = Q(0, g.w + 16), txt = this.rulerText(); x.font = `${Math.round(17 * d)}px VT323, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle'; const tw = x.measureText(txt).width + 12 * d;
+    x.fillStyle = 'rgba(20,16,12,0.85)'; x.fillRect(lx - tw / 2, ly - 10 * d, tw, 20 * d); x.fillStyle = '#f0d890'; x.fillText(txt, lx, ly + d);
+    x.restore();
+  },
+};
+
+/* =====================================================================
    Touch controls for tablets: a floating stick under the left thumb,
    drag anywhere else to look, and stone buttons that stand in for keys.
    They switch on with the first touch (or always / never, in Settings);
@@ -9564,8 +9883,8 @@ const Touch = {
     const el = this.el = $('touch');
     const b = (k, label, cls = '') => `<button class="tb ${cls}" data-k="${k}">${label}</button>`;
     el.innerHTML = `<div class="stk" hidden><i></i></div>
-      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
-      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}
+      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyK', 'Survey', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
+      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}${b('svTake', 'Bearing')}${b('svIn', '+')}${b('svOut', '−')}${b('svMap', 'Sheet')}
         <div class="tside">${b('KeyH', 'Potion', 'pill')}${b('KeyZ', 'Draw', 'pill')}${b('spell', 'Spell', 'pill')}${b('KeyG', 'Fly', 'pill')}</div></div>`;
     this.btn = {}; for (const e of el.querySelectorAll('[data-k]')) this.btn[e.dataset.k] = e;
     if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) this.btn.full.remove();
@@ -9599,14 +9918,17 @@ const Touch = {
     if (show !== this.shown) { this.shown = show; this.el.classList.toggle('live', show); if (!show) this.release(); }
     if (!show) return;
     const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal');
-    const sig = [rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
+    const sv = Survey.on, sig = [sv, rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
     if (sig === this.sig) return; this.sig = sig;
     const B = this.btn;
     B.use.classList.toggle('ready', !!G.focus);
-    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying;
-    B.KeyG.hidden = !settings.dbgFly; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
-    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = B.KeyI.hidden = !rpg;
-    B.cast.hidden = !rpg || !P.spells.length; B.spell.hidden = !rpg || P.spells.length < 2;
+    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying || sv;
+    B.KeyG.hidden = !settings.dbgFly || sv; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
+    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = !rpg || sv; B.KeyI.hidden = !rpg;
+    B.cast.hidden = !rpg || !P.spells.length || sv; B.spell.hidden = !rpg || P.spells.length < 2 || sv;
+    // the compass in hand: note a bearing, work the spyglass, open the sheet
+    B.use.hidden = B.Space.hidden = sv; for (const k of ['svTake', 'svIn', 'svOut', 'svMap']) B[k].hidden = !sv;
+    B.KeyK.textContent = sv ? 'Put away' : 'Survey'; B.KeyK.classList.toggle('ready', sv);
     this.el.classList.toggle('min', !rpg);
     B.KeyZ.textContent = P.sheathed ? 'Draw' : 'Sheathe';
     B.KeyH.textContent = pots ? `Potion ×${pots.qty}` : 'Potion'; B.KeyH.classList.toggle('off', !pots);
@@ -9676,6 +9998,9 @@ const Touch = {
     if (k === 'use') { if (G.focus) interact(); else msg('There is nothing within reach to use.'); return; }
     if (k === 'spell') { if (P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; msg(`Spell selected: ${SPELLS[P.spells[P.spell]].name}.`); } return; }
     if (k === 'full') { this.fullscreen(); return; }
+    if (k === 'svTake') { Survey.take(); return; }
+    if (k === 'svIn' || k === 'svOut') { Survey.zoomBy(k === 'svIn' ? 1.4 : 1 / 1.4); return; }
+    if (k === 'svMap') { Survey.openSheet(); return; }
     onKey({ code: k, preventDefault() {} });
   },
   unpress(k) { if (k === 'Space' || k === 'KeyX') Input.vkeys[k] = false; },
@@ -10078,8 +10403,8 @@ const UI = {
     });
   },
   openControls(back) {
-    const rows = [['W A S D', 'Move'], ['Mouse', 'Look (click the view to capture the mouse)'], ['Shift', 'Run'], ['Space', 'Jump'], ['Left click', 'Attack with your weapon (draws it first if sheathed)'], ['Z', 'Draw or sheathe your weapon'], ['Right click / Q', 'Cast selected spell'], ['1 – 3', 'Select spell'], ['E or F', 'Talk, open doors, search corpses and chests'], ['H', 'Drink a healing potion'], ['I or C', 'Character sheet and inventory'], ['J', 'Journal'], ['M', 'Map (mouse wheel zooms)'], ['R', 'Rest or wait'], ['T', 'Hire a carriage (at a stop, or find the nearest one)'], ['G', 'Fly on / off (debug; enable it in Settings). Space rises, X sinks, you fly where you look'], ['F5 / F9', 'Quick save / quick load'], ['N', 'Toggle music'], ['Arrow keys', 'Turn and move without a mouse'], ['Esc', 'Pause menu']];
-    const touch = [['Left side', 'Put a thumb down anywhere and push to walk; push to the edge to run'], ['Right side', 'Drag to look around; tap to talk or open what you are facing'], ['Attack', 'Swing your weapon (the first tap draws it). Keep your thumb down and drag to aim'], ['Use', 'Talk, open doors, search corpses and chests (lights up when something is in reach)'], ['Cast', 'Cast the selected spell; Spell switches between spells'], ['Jump', 'Jump, or rise while flying (Down sinks)'], ['Top row', 'Pause menu, map, journal, character sheet, rest and carriages'], ['Rest screen', 'Tap it to stop resting'], ['Menus', 'Tap outside a menu to close it and return to the game']];
+    const rows = [['W A S D', 'Move'], ['Mouse', 'Look (click the view to capture the mouse)'], ['Shift', 'Run'], ['Space', 'Jump'], ['Left click', 'Attack with your weapon (draws it first if sheathed)'], ['Z', 'Draw or sheathe your weapon'], ['Right click / Q', 'Cast selected spell'], ['1 – 3', 'Select spell'], ['E or F', 'Talk, open doors, search corpses and chests'], ['H', 'Drink a healing potion'], ['I or C', 'Character sheet and inventory'], ['J', 'Journal'], ['M', 'Map (mouse wheel zooms)'], ['R', 'Rest or wait'], ['K', 'Survey: take out the compass (click notes a bearing, wheel works the spyglass, M opens the map with the ruler), K again puts it away'], ['T', 'Hire a carriage (at a stop, or find the nearest one)'], ['G', 'Fly on / off (debug; enable it in Settings). Space rises, X sinks, you fly where you look'], ['F5 / F9', 'Quick save / quick load'], ['N', 'Toggle music'], ['Arrow keys', 'Turn and move without a mouse'], ['Esc', 'Pause menu']];
+    const touch = [['Left side', 'Put a thumb down anywhere and push to walk; push to the edge to run'], ['Right side', 'Drag to look around; tap to talk or open what you are facing'], ['Attack', 'Swing your weapon (the first tap draws it). Keep your thumb down and drag to aim'], ['Use', 'Talk, open doors, search corpses and chests (lights up when something is in reach)'], ['Cast', 'Cast the selected spell; Spell switches between spells'], ['Jump', 'Jump, or rise while flying (Down sinks)'], ['Top row', 'Pause menu, map, journal, character sheet, rest, survey and travel'], ['Survey', 'The compass: drag to aim, Bearing notes it, + and − work the spyglass, Sheet opens the map with the ruler (move it, turn it by its knobs or with two fingers)'], ['Rest screen', 'Tap it to stop resting'], ['Menus', 'Tap outside a menu to close it and return to the game']];
     const table = (r) => `<div class="keys">${r.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>`;
     this.open('controls', () => `<h2>Controls</h2><div class="scroll" style="max-height:64vh">${Input.touch ? `<h3>Touch</h3>${table(touch)}<h3>Keyboard and mouse</h3>` : ''}${table(rows)}${Input.touch ? '' : `<h3>Touch screens</h3>${table(touch)}`}</div><div class="btns"><button class="db" data-a="back">Back</button>${this.resumeBtn()}</div>`,
       { cls: 'mid', leave: this.subLeave(back), onAct: (a) => { if (a === 'resume') this.close(true); else if (a === 'back') back ? back() : this.close(); }, onClose: null });
@@ -10127,7 +10452,7 @@ const UI = {
     const s = nearestStop(P.pos.x, P.pos.z), km = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m';
     const render = () => `<h2>Travel on foot</h2><p class="dim">The world runs faster while you travel. Any key, or a tap on the banner, stops you; so does anything worth stopping for.</p>
       <div class="btns col">${Travel.paused ? `<button class="db primary" data-a="resume" autofocus>${Travel.paused.c.mode === 'ahead' ? 'Go on the way you were going' : `Go on to ${esc(Travel.paused.c.name)}`}</button>` : ''}<button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
-      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)} · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
+      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)}${Survey.showPos() ? ` · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}` : ''}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
       <div class="btns"><span class="dim">Speed</span>${Travel.SPEEDS.map(v => `<button class="db sm${Travel.rate() === v ? ' primary' : ''}" data-a="v${v}">×${v}</button>`).join('')}</div>
       ${s && insideCity(P.pos.x, P.pos.z, -40) ? `<p class="note">Inside the walls the carriages are quicker: the nearest stop is at ${esc(s.name)}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}.</p>` : ''}
       <div class="btns"><button class="db" data-a="close">Stay here</button></div>`;
@@ -10172,22 +10497,53 @@ const UI = {
 function isEquipped(it) { const e = G.player.equip; return e.weapon === it || e.body === it || e.head === it || e.shield === it; }
 
 /* ---------------- map ---------------- */
+// a way's bounds, worked out once ([x0, z0, x1, z1]; again should the way grow)
+const _trackBox = new WeakMap();
+function trackBox(T) { let b = _trackBox.get(T); if (b && b[4] === T.length) return b; b = [1e9, 1e9, -1e9, -1e9, T.length]; for (const [px, pz] of T) { if (px < b[0]) b[0] = px; if (pz < b[1]) b[1] = pz; if (px > b[2]) b[2] = px; if (pz > b[3]) b[3] = pz; } _trackBox.set(T, b); return b; }
 const MapView = {
   zoom: 1, view: null, dest: null, ZMIN: 0.035, ZMAX: 6,
   // pick: opened to choose where to travel (starts zoomed out over the country)
   open(pick = false) {
     if (G.area.kind === 'interior') { msg(`You are inside ${G.area.name}. There is no need for a map here.`); return; }
-    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = null; this.dest = null; $('mapdest').hidden = true;
+    G.mapOpen = true; G.uiOpen = true; this.moving = false; exitLock(); $('mapview').hidden = false; this.view = Survey.showPos() ? null : Survey.st().view || Survey.anchor(); this.dest = null; $('mapdest').hidden = true; // (a map that does not show you stays where you left it)
     const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
-    this.draw();
+    this.draw(); Survey.onMapOpen();
     if (Travel.paused && G.area === G.city) { const c = Travel.paused.c, el = $('mapdest'); el.innerHTML = `<span class="nm">${esc(c.mode === 'ahead' ? 'Your walk, paused' : `Your journey to ${c.name}, paused`)}</span><button class="db sm" data-m="resume">Go on</button><button class="db sm" data-m="clear">✕</button>`; el.hidden = false; } // (a paused journey can be taken up from the map too)
   },
-  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
-  setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
+  close() { Survey.onMapClose(); G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
+  setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.later(); },
+  // while the map is dragged or zoomed: drawn at the next frame, once however often it is asked for (a drag or a trackpad sends more than the
+  // screen shows), the kept layer slid and stretched; once the gesture has rested a moment, drawn anew if the view has moved far or zoomed
+  later() {
+    if (!this._later) this._later = requestAnimationFrame(() => { this._later = 0; if (G.mapOpen) this.draw('slide'); });
+    this.moving = true; clearTimeout(this._settle); this._settle = setTimeout(() => { this.moving = false; const B = this._base, t = this.tf; if (G.mapOpen && B && t && (B.scale !== t.scale || Math.abs(t.cx - B.cx) * t.scale > t.W * 0.1 || Math.abs(t.cz - B.cz) * t.scale > t.H * 0.1)) this.draw(); }, 250);
+  },
   // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
   // first opened; the others at 150 (the same scale) as the last step of their plan, with their rivers and roads drawn in, and kept after the country
   // itself is forgotten, so the map remembers where you have been
-  worldImage() { if (this._world) return this._world; const g = this.imageGen(World.home, 300); let r; do r = g.next(); while (!r.done); return (this._world = r.value); },
+  worldImage() { return this.finish('_world'); },
+  // the home mountains beyond the home country's box, out to the edge of the known map (Survey.known), so the whole range is on the map
+  // whether or not the countries beyond are planned yet: at the home country's scale and on its pixels, and a little way into its box,
+  // under its own picture, so no seam shows. Countries planned later are drawn over it, with their rivers and roads
+  ringImage() { return this.finish('_ring'); },
+  *ringGen() {
+    const s = (WORLD.x1 - WORLD.x0) / 300, m = 105, NX = 300 + 2 * m, NZ = Math.round((WORLD.z1 - WORLD.z0) / s) + m, X0 = WORLD.x0 - m * s, Z0 = WORLD.z0 - m * s, M = NX + 2;
+    const [c, x] = cnv(NX, NZ), img = x.createImageData(NX, NZ), a = img.data, fm = G.city.forestMask, hh = new Float32Array(M * (NZ + 2)).fill(NaN);
+    const H = (i, j) => { const q = (j + 1) * M + i + 1; let v = hh[q]; if (v !== v) v = hh[q] = terrainRaw(X0 + (i + 0.5) * s, Z0 + (j + 0.5) * s); return v; };
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { if ((i & 31) === 0) yield;
+      const wx = X0 + (i + 0.5) * s, wz = Z0 + (j + 0.5) * s; if (homeOut(wx, wz) < -2 * s || !Survey.known(wx, wz)) continue;
+      this.tint(a, (j * NX + i) * 4, wx, wz, H(i, j), H(i + 1, j) - H(i - 1, j), H(i, j + 1) - H(i, j - 1), fm); }
+    x.putImageData(img, 0, 0); return { c, x0: X0, z0: Z0, x1: X0 + NX * s, z1: Z0 + NZ * s };
+  },
+  // the home country's picture and the ring of its mountains are made a little each frame from the start (work), so the map opens at
+  // once; should it open before they are done, the rest is made then (finish)
+  _gens: {},
+  gen(k) { return this._gens[k] || (this._gens[k] = k === '_world' ? this.imageGen(World.home, 300) : this.ringGen()); },
+  finish(k) { if (this[k]) return this[k]; const g = this.gen(k); let r; do r = g.next(); while (!r.done); return (this[k] = r.value); },
+  work(ms) {
+    if (this._ring || !G.city || !World.home) return; const t0 = performance.now();
+    for (const k of ['_world', '_ring']) { if (this[k]) continue; const g = this.gen(k); for (;;) { const r = g.next(); if (r.done) { this[k] = r.value; break; } if (performance.now() - t0 > ms) return; } }
+  },
   imgs: new Map(),
   *countryImage(K) { const c = yield* this.imageGen(K, 150), x = c.getContext('2d'), s = 150 / (K.x1 - K.x0), X = v => (v - K.x0) * s, Z = v => (v - K.z0) * s;
     x.lineCap = 'round'; x.lineJoin = 'round';
@@ -10198,17 +10554,20 @@ const MapView = {
     const [c, x] = cnv(N, N), img = x.createImageData(N, N), a = img.data, Wd = K.x1 - K.x0, Hd = K.z1 - K.z0, fm = G.city.forestMask, X0 = K.x0, Z0 = K.z0;
     const M = N + 2, hh = new Float32Array(M * M); for (let j = -1; j <= N; j++) { for (let i = -1; i <= N; i++) hh[(j + 1) * M + i + 1] = terrainRaw(X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd); if (World.due()) yield; } // (a pixel beyond each edge, so the shading runs on into the next country's picture)
     for (let j = 0; j < N; j++) { if (World.due()) yield; for (let i = 0; i < N; i++) {
-      const wx = X0 + (i + 0.5) / N * Wd, wz = Z0 + (j + 0.5) / N * Hd, q = (j + 1) * M + i + 1, h = hh[q], k = (j * N + i) * 4;
-      if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; continue; }
-      const gx = hh[q + 1] - hh[q - 1], gz = hh[q + M] - hh[q - M], sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35);
-      const TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
-      if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
-      if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }
-      else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
-      else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
-      a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
+      const q = (j + 1) * M + i + 1; this.tint(a, (j * N + i) * 4, X0 + (i + 0.5) / N * Wd, Z0 + (j + 0.5) / N * Hd, hh[q], hh[q + 1] - hh[q - 1], hh[q + M] - hh[q - M], fm);
     } }
     x.putImageData(img, 0, 0); return c;
+  },
+  // one pixel of the land's picture at (wx, wz), of height h, rising by gx and gz across the pixels either side of it: sea, lowland,
+  // upland, woods, bare rock and snow, lit from the north-west
+  tint(a, k, wx, wz, h, gx, gz, fm) {
+    if (h < SEA) { a[k] = 29; a[k + 1] = 52; a[k + 2] = 70; a[k + 3] = 255; return; }
+    const sh = clamp(1 - (gx + gz) * 0.012, 0.6, 1.35), TL = wildTreeLine(wx, wz); let r = 74, g = 92, b = 50;
+    if (h > TL + 40) { const t = smoothstep(TL + 40, TL + 200, h); r = lerp(96, 120, t); g = lerp(98, 116, t); b = lerp(70, 104, t); }
+    if (h > wildSnowLine(wx, wz) + 60) { r = 214; g = 218; b = 224; }
+    else if (fm && h < TL && fm(wx, wz, h) > 0.45) { r = 40; g = 62; b = 34; }
+    else if (wildCult(wx, wz) > 0.4) { r = 104; g = 104; b = 56; }
+    a[k] = r * sh; a[k + 1] = g * sh; a[k + 2] = b * sh; a[k + 3] = 255;
   },
   // screen → world on the map as last drawn
   toWorld(px, py) { const t = this.tf; if (!t) return null; return [t.cx + (px * t.dpr - t.W / 2) / t.scale, t.cz + (py * t.dpr - t.H / 2) / t.scale]; },
@@ -10218,80 +10577,46 @@ const MapView = {
     for (const S of SITES) { const d = Math.hypot((S.x - w[0]) * t.scale, (S.z - w[1]) * t.scale); if (d < bd && ((G.flags.found || {})[S.id] || (G.flags.heard || {})[S.id])) { bd = d; best = { name: S.name, x: S.road[0][0], z: S.road[0][1] }; } }
     this.dest = best ? { ...best } : { name: 'the place you marked', x: w[0], z: w[1] };
     const d = Math.hypot(this.dest.x - P.pos.x, this.dest.z - P.pos.z), el = $('mapdest');
-    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))} · ${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
-    el.hidden = false; this.draw();
+    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))}${Survey.showPos() ? ' · ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m') : ''}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
+    el.hidden = false; this.draw(true);
   },
   go(how) {
     if (how === 'resume') { this.close(); Travel.resume(); return; }
-    const D = this.dest; if (how === 'clear' || !D) { this.dest = null; $('mapdest').hidden = true; this.draw(); return; }
+    const D = this.dest; if (how === 'clear' || !D) { this.dest = null; $('mapdest').hidden = true; this.draw(true); return; }
     this.close(); Travel.toward(D.x, D.z, D.name, how === 'road');
   },
-  draw() {
-    const c = $('mapc'); const dpr = Math.min(devicePixelRatio, 2), W = c.width = Math.floor(innerWidth * dpr), H = c.height = Math.floor(innerHeight * dpr);
+  // the map is drawn in two layers. The land and all that stands on it is drawn once and kept until the view moves or something on it
+  // changes; over it, each time, what changes from moment to moment: the objectives, the way you are going, the pencil lines and the ruler,
+  // the labels and you. how: nothing, all of it anew; true, only the top layer (the kept layer as it is, if it still covers the view);
+  // 'slide', while the map is dragged or zoomed: the kept layer slid and stretched to the view, drawn anew once the gesture rests (later)
+  draw(how = false) {
+    const c = $('mapc'); const dpr = Math.min(devicePixelRatio, 2), W = Math.floor(innerWidth * dpr), H = Math.floor(innerHeight * dpr);
+    if (c.width !== W || c.height !== H) { c.width = W; c.height = H; } // (setting a canvas's size clears it and makes it anew, so only when it changes)
     const x = c.getContext('2d'); x.fillStyle = '#1b1712'; x.fillRect(0, 0, W, H); const P = G.player;
     const legend = $('maplegend');
     if (G.area.kind === 'dungeon') { this.drawDungeon(x, W, H); legend.textContent = 'The Catacombs — explored passages. The door marks the way out. (M or Esc to close)'; return; }
-    const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
-    let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
-    if (region || Math.hypot(P.pos.x, P.pos.z) > 900) { cx = P.pos.x; cz = P.pos.z; } // (out in the country, or in another town, the map is about where you are)
+    const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
+    const [ax, az] = Survey.showPos() ? [P.pos.x, P.pos.z] : Survey.anchor(); // (where you are, or where the map was left when it does not show you)
+    let cx = this.zoom > 1.05 ? clamp(ax, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(az, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    if (region || Math.hypot(ax, az) > 900) { cx = ax; cz = az; } // (out in the country, or in another town, the map is about where you are)
     if (this.view) { cx = this.view[0]; cz = this.view[1]; }
     this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
-    const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
-    const poly = (pts, col, stroke) => { x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.closePath(); if (col) { x.fillStyle = col; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.stroke(); } };
-    const circ = (px, pz, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(X(px), Z(pz), Math.max(1, r * scale), 0, 7); x.fill(); };
-    const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
-    if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
-    x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
-    x.fillStyle = '#2b2a20'; x.fillRect(0, 0, W, Math.max(0, Math.min(H, Z(150)))); // land not yet seen: the sea lies only to the south
-    if (this.zoom < 1.6) { x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale);
-      for (const m of this.imgs.values()) if (X(m.x1) > 0 && X(m.x0) < W && Z(m.z1) > 0 && Z(m.z0) < H) x.drawImage(m.c, X(m.x0), Z(m.z0), (m.x1 - m.x0) * scale, (m.z1 - m.z0) * scale); }
-    x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
-    // out in the country: rivers, tracks and the roads to the landmarks
-    for (const R of Wild.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
-    { // the generated country's fields (block by block from afar, strip by strip close to), the houses of its villages and hamlets
-      const FC = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' }, vx0 = cx - W / 2 / scale, vx1 = cx + W / 2 / scale, vz0 = cz - H / 2 / scale, vz1 = cz + H / 2 / scale;
-      if (scale > 0.05) for (const o of Settle.blocksIn(vx0, vz0, vx1, vz1)) {
-        if (scale < 0.35) { poly(obbCorners(o), FC[Settle.cropOf(o, 0)]); continue; }
-        for (let k = 0; k < o.n; k++) { const lx = -o.hx + o.pw / 2 + k * (o.pw + 2.4); poly(obbCorners({ ...o, x: xfP(o, lx, 0)[0], z: xfP(o, lx, 0)[1], hx: o.pw / 2 }), FC[Settle.cropOf(o, k)]); }
-      }
-      if (scale > 0.12) { for (const h of Settle.housesIn(vx0, vz0, vx1, vz1)) poly(obbCorners(mkObb(h.x, h.z, h.ang, 4.5, 3.5)), '#6e5a44'); for (const b of Settle.builds) if (b.x > vx0 && b.x < vx1 && b.z > vz0 && b.z < vz1) poly(obbCorners(mkObb(b.x, b.z, b.ang, 7.5, 4.6)), '#8a8478');
-        for (const f of Settle.farms) if (f.x > vx0 && f.x < vx1 && f.z > vz0 && f.z < vz1) { const FX = makeXf(f.x, f.z, f.ang); for (const [lx, lz, hx, hz, a] of [[-4, 3, 5, 3.5, 0], [6, -5, 6, 4.5, Math.PI / 2]]) { const [px, pz] = xfP(FX, lx, lz); poly(obbCorners(mkObb(px, pz, f.ang + a, hx, hz)), '#6e5a44'); } } }
+    // the kept layer reaches a fifth of the screen beyond each edge, so a short drag only slides it
+    const fs = Math.round(Math.max(15, Math.min(W, H) / 42)), mx = Math.round(W * 0.2), mz = Math.round(H * 0.2);
+    if (how === true && this.moving) how = 'slide'; // (the top layer drawn again in the middle of a gesture)
+    let B = this._base; const same = B && B.W === W && B.H === H && B.rev === World.rev, k = B ? scale / B.scale : 1; // (a country planned while the map is open adds its picture)
+    const off = B ? Math.max(Math.abs(cx - B.cx) * scale / mx, Math.abs(cz - B.cz) * scale / mz) : 9;
+    if (!(how && same && ((k === 1 && off <= 1) || (how === 'slide' && k > 0.4 && k < 2.5 && off <= 2.5)))) {
+      const BW = W + 2 * mx, BH = H + 2 * mz, BX = v => BW / 2 + (v - cx) * scale, BZ = v => BH / 2 + (v - cz) * scale;
+      if (!B || B.c.width !== BW || B.c.height !== BH) { const bc = document.createElement('canvas'); bc.width = BW; bc.height = BH; B = this._base = { c: bc }; }
+      Object.assign(B, { W, H, rev: World.rev, scale, cx, cz }); B.labels = this.drawBase(B.c.getContext('2d'), BW, BH, BX, BZ, scale, region, dpr, fs, cx, cz);
     }
-    for (const T of Wild.tracks) { if (T.cls && (T.lane || T.cls.includes(WAY.road))) { // by kind of way: the high roads broad and pale, the lanes thin (a lane carrying a village's traffic is drawn as a track)
-        const sty = [['#8a7350', 4, 1.5], ['#b39c6c', 6.5, 2.4], ['#7d6a4a', 2.6, 1], ['#6f7448', 2.2, 1]];
-        for (let q = 3; q < T.length + 2; q += 3) { const a = Math.min(q - 3, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const k = T.cls[b], [col, w, mw] = sty[k]; if (k >= 2 && scale < 0.08) continue;
-          x.strokeStyle = col; x.lineWidth = Math.max(mw, w * scale); x.lineCap = 'round'; x.beginPath(); x.moveTo(X(T[a][0]), Z(T[a][1])); x.lineTo(X(T[b][0]), Z(T[b][1])); x.stroke(); }
-        continue; }
-      x.strokeStyle = '#8a7350'; x.lineWidth = Math.max(1.5, 4 * scale); x.setLineDash(region ? [] : [6, 4]); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); x.setLineDash([]); }
-    const FCOL = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' };
-    for (const f of M.fields) poly(f.poly, FCOL[f.key] || '#5a5a30');
-    poly(WALL_PTS, 'rgba(74,69,60,0.86)');
-    for (const pts of M.outside) line(pts, 6, '#6a5a40');
-    for (const pts of M.lanes) line(pts, 3, '#6a5a40');
-    line(M.hillPath, 2, '#7a6a4a');
-    poly(G.city.marketPoly, '#6e675a'); circ(MEMORIAL[0], MEMORIAL[1], 13, '#6e675a'); circ(-120, 14, 10, '#625c50'); circ(M.bell[0], M.bell[1], 12, '#6e675a'); circ(M.well[0], M.well[1], 8, '#5e584c'); circ(M.fish[0], M.fish[1], 8.5, '#5e584c');
-    circ(M.garden[0], M.garden[1], 20, '#3d5a2c'); circ(M.garden[0], M.garden[1], 5, '#1d3446');
-    const gy = G.city.graveyard; rect(gy.x0, gy.z0, gy.x1, gy.z1, '#3d4a2c'); poly(G.city.fightersYard, '#5a4a36');
-    const roads = M.roads.slice().sort((a, b) => b[5] - a[5]);
-    for (const [ax, az, bx, bz, w, lvl] of roads) line([[ax, az], [bx, bz]], w, lvl === 0 ? '#9a917e' : lvl === 1 ? '#857c6a' : '#716a5c');
-    for (const px of M.piers) rect(px - 2, SHORE, px + 2, M.pierEnd, '#7a5634'); rect(M.breakwater - 2, SHORE, M.breakwater + 2, 206, '#6e675a'); circ(M.breakwater, 210, 4.5, '#c8c0a8');
-    poly(G.city.castleWalls, '#4e4a44', '#8a8070');
-    const COL = { tavern: '#d88a3a', general: '#d8c050', weaponsmith: '#c0c4cc', armorer: '#8aa0c0', alchemist: '#6ac070', temple: '#f0f0e0', mages: '#6a8ae8', fighters: '#d85a4a', castle: '#b070d0', mausoleum: '#909090', hospice: '#e8e8c8', warehouse: '#8a7050' };
-    const labels = []; const fs = Math.round(Math.max(15, Math.min(W, H) / 42));
-    for (const b of G.buildings) {
-      if (!b.poly) continue; const known = (G.bState[b.id] || {}).known; const special = b.type !== 'house' && b.type !== 'warehouse';
-      poly(b.poly, special && known ? COL[b.type] : b.type === 'warehouse' ? '#45382a' : '#3a3128');
-      if (special && known) { const c = b.poly.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]); labels.push([b.name, X(c[0]), Z(c[1]) - 6, null, fs]); }
-    }
-    for (const [tx, tz] of G.city.castleTowers) { x.fillStyle = (G.bState.castle || {}).known ? COL.castle : '#3a3128'; x.beginPath(); x.arc(X(tx), Z(tz), 4.5 * scale, 0, 7); x.fill(); }
-    x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(2, 3 * scale); x.lineCap = 'butt'; x.beginPath(); WALL_PTS.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke();
-    { const xs = [WALL_PTS[0][0], ...M.piers.flatMap(p => [p - 4.5, p + 4.5]), WALL_PTS[WALL_PTS.length - 1][0]]; x.beginPath(); for (let i = 0; i < xs.length; i += 2) { x.moveTo(X(xs[i]), Z(SHORE + 0.5)); x.lineTo(X(xs[i + 1]), Z(SHORE + 0.5)); } x.stroke(); } // the sea wall, open at each pier
-    for (const [px, pz] of WALL_PTS) circ(px, pz, 4.6, '#8a8070');
-    if (this.zoom >= 0.45) for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
-    if (this.zoom >= 0.45) for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
-    for (const d of M.labels) labels.push([d.name.toUpperCase(), X(d.x), Z(d.z), 'rgba(232,216,168,0.55)', Math.round(fs * 1.25)]);
-    for (const l of G.city.landmarks) if (!l.id.endsWith('gate') || this.zoom >= 1.5) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 8, '#d8cca8', Math.round(fs * 0.9)]);
+    // where the kept layer lies on the screen (slid, and stretched while zooming)
+    const q = scale / B.scale, sx = W / 2 + (B.cx - cx) * scale - B.c.width / 2 * q, sz = H / 2 + (B.cz - cz) * scale - B.c.height / 2 * q;
+    const rx = q === 1 ? Math.round(sx) : sx, rz = q === 1 ? Math.round(sz) : sz;
+    if (q === 1) x.drawImage(B.c, rx, rz); else { x.imageSmoothingEnabled = true; x.drawImage(B.c, rx, rz, B.c.width * q, B.c.height * q); }
+    const labels = B.labels.map(([l, lx, lz, col, size]) => [l, lx * q + rx, lz * q + rz, col, size]);
     // quest markers
     const markers = [];
     const mq = Quests.mq();
@@ -10307,6 +10632,85 @@ const MapView = {
     }
     const t = performance.now() / 300;
     if (this.zoom >= 0.45) for (const [p, l] of markers) { x.fillStyle = '#ffd24a'; x.beginPath(); x.arc(X(p.x), Z(p.z), 5 + Math.sin(t) * 1.5, 0, 7); x.fill(); x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.stroke(); labels.push([l, X(p.x), Z(p.z) - 10, '#ffd24a', fs]); }
+    if ((Travel.cur || Travel.paused) && Survey.showPos()) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
+    if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
+    Survey.drawMap(x, X, Z, this.tf); // pencil lines and marks
+    x.textAlign = 'center';
+    for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
+    Survey.drawTop(x, X, Z, this.tf); // the ruler, and where you really are when checking
+    if (Survey.showPos()) this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
+    legend.textContent = G.area.kind !== 'city' ? '' : Survey.sheet ? Survey.legend() : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+      : 'Aldhaven — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
+  },
+  // the kept layer: the land, the ways, the fields and houses, the towns, the landmarks. Returns the labels, drawn later over the pencil lines
+  drawBase(x, W, H, X, Z, scale, region, dpr, fs, cx, cz) {
+    const M = G.city.map;
+    const rect = (x0, z0, x1, z1, col) => { x.fillStyle = col; x.fillRect(X(x0), Z(z0), (x1 - x0) * scale, (z1 - z0) * scale); };
+    const poly = (pts, col, stroke) => { x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.closePath(); if (col) { x.fillStyle = col; x.fill(); } if (stroke) { x.strokeStyle = stroke; x.stroke(); } };
+    const circ = (px, pz, r, col) => { x.fillStyle = col; x.beginPath(); x.arc(X(px), Z(pz), Math.max(1, r * scale), 0, 7); x.fill(); };
+    const line = (pts, w, col) => { x.strokeStyle = col; x.lineWidth = Math.max(1, w * scale); x.lineCap = 'round'; x.lineJoin = 'round'; x.beginPath(); pts.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); };
+    if (!M.relief) M.relief = terrainMapImage(420, (wx, wz) => G.city.forestMask && G.city.forestMask(wx, wz) > 0.45 ? [38, 56, 32] : null);
+    x.fillStyle = '#1d3446'; x.fillRect(0, 0, W, H); x.imageSmoothingEnabled = true;
+    x.fillStyle = '#2b2a20'; x.fillRect(0, 0, W, Math.max(0, Math.min(H, Z(150)))); // land not yet seen: the sea lies only to the south
+    if (this.zoom < 1.6) { const R = this.ringImage(); x.drawImage(R.c, X(R.x0), Z(R.z0), (R.x1 - R.x0) * scale, (R.z1 - R.z0) * scale); // (the home mountains beyond the box, under the countries' own pictures)
+      for (const m of this.imgs.values()) if (X(m.x1) > 0 && X(m.x0) < W && Z(m.z1) > 0 && Z(m.z0) < H) x.drawImage(m.c, X(m.x0), Z(m.z0), (m.x1 - m.x0) * scale, (m.z1 - m.z0) * scale);
+      x.drawImage(this.worldImage(), X(WORLD.x0), Z(WORLD.z0), (WORLD.x1 - WORLD.x0) * scale, (WORLD.z1 - WORLD.z0) * scale); }
+    x.drawImage(M.relief, X(-TG.R), Z(-TG.R), TG.R * 2 * scale, TG.R * 2 * scale);
+    // out in the country: rivers, tracks and the roads to the landmarks
+    for (const R of Wild.rivers) { if (Math.max(...R.w) < (region ? 4 : 2)) continue; x.strokeStyle = '#2e5a78'; x.lineCap = 'round'; x.lineJoin = 'round'; x.lineWidth = Math.max(1, (region ? 2.4 : 1) * Math.max(1, R.w[R.w.length - 1] * scale)); x.beginPath(); R.P.forEach(([px, pz], q) => { if (q % 4 && q !== R.P.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); }
+    { // the generated country's fields (block by block from afar, strip by strip close to), the houses of its villages and hamlets; each colour
+      // gathered into one path and filled once (thousands of fields and houses are in view from afar)
+      const FC = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' }, vx0 = cx - W / 2 / scale, vx1 = cx + W / 2 / scale, vz0 = cz - H / 2 / scale, vz1 = cz + H / 2 / scale;
+      const paths = new Map(), quad = (o, col) => { if (!col) return; let p = paths.get(col); if (!p) paths.set(col, p = new Path2D()); const q = obbCorners(o); p.moveTo(X(q[0][0]), Z(q[0][1])); p.lineTo(X(q[1][0]), Z(q[1][1])); p.lineTo(X(q[2][0]), Z(q[2][1])); p.lineTo(X(q[3][0]), Z(q[3][1])); }; // (a fill closes each field itself; closing them by hand grows slow on a path of thousands)
+      if (scale > 0.05) for (const o of Settle.blocksIn(vx0, vz0, vx1, vz1)) {
+        if (scale < 0.35) { quad(o, FC[Settle.cropOf(o, 0)]); continue; }
+        for (let k = 0; k < o.n; k++) { const lx = -o.hx + o.pw / 2 + k * (o.pw + 2.4); quad({ ...o, x: xfP(o, lx, 0)[0], z: xfP(o, lx, 0)[1], hx: o.pw / 2 }, FC[Settle.cropOf(o, k)]); }
+      }
+      if (scale > 0.12) { for (const h of Settle.housesIn(vx0, vz0, vx1, vz1)) quad(mkObb(h.x, h.z, h.ang, 4.5, 3.5), '#6e5a44');
+        for (const f of Settle.farms) if (f.x > vx0 && f.x < vx1 && f.z > vz0 && f.z < vz1) { const FX = makeXf(f.x, f.z, f.ang); for (const [lx, lz, hx, hz, a] of [[-4, 3, 5, 3.5, 0], [6, -5, 6, 4.5, Math.PI / 2]]) { const [px, pz] = xfP(FX, lx, lz); quad(mkObb(px, pz, f.ang + a, hx, hz), '#6e5a44'); } }
+        for (const b of Settle.builds) if (b.x > vx0 && b.x < vx1 && b.z > vz0 && b.z < vz1) quad(mkObb(b.x, b.z, b.ang, 7.5, 4.6), '#8a8478'); }
+      for (const [col, p] of paths) { x.fillStyle = col; x.fill(p); }
+    }
+    { // the ways by kind, each kind in one stroke: the lanes, then the tracks, then the high roads broad and pale over them (a lane carrying a
+      // village's traffic is drawn as a track)
+      const sty = [['#8a7350', 4, 1.5], ['#b39c6c', 6.5, 2.4], ['#7d6a4a', 2.6, 1], ['#6f7448', 2.2, 1]], paths = sty.map(() => new Path2D());
+      const e = 20 / scale, vx0 = cx - W / 2 / scale - e, vx1 = cx + W / 2 / scale + e, vz0 = cz - H / 2 / scale - e, vz1 = cz + H / 2 / scale + e; // (only what is in view, and only the ways that pass through it)
+      for (const T of Wild.tracks) { if (!(T.cls && (T.lane || T.cls.includes(WAY.road)))) continue; const bb = trackBox(T); if (bb[2] < vx0 || bb[0] > vx1 || bb[3] < vz0 || bb[1] > vz1) continue; let last = -1;
+        for (let q = 3; q < T.length + 2; q += 3) { const a = Math.min(q - 3, T.length - 1), b = Math.min(q, T.length - 1); if (a === b) break; const k = T.cls[b]; if (k >= 2 && scale < 0.08) { last = -1; continue; }
+          const [ax, az] = T[a], [bx, bz] = T[b]; if ((ax < vx0 && bx < vx0) || (ax > vx1 && bx > vx1) || (az < vz0 && bz < vz0) || (az > vz1 && bz > vz1)) { last = -1; continue; }
+          const p = paths[k]; if (k !== last) p.moveTo(X(ax), Z(az)); p.lineTo(X(bx), Z(bz)); last = k; } }
+      x.lineCap = 'round'; x.lineJoin = 'round'; for (const k of [3, 2, 0, 1]) { const [col, w, mw] = sty[k]; x.strokeStyle = col; x.lineWidth = Math.max(mw, w * scale); x.stroke(paths[k]); }
+    }
+    for (const T of Wild.tracks) { if (T.cls && (T.lane || T.cls.includes(WAY.road))) continue;
+      x.strokeStyle = '#8a7350'; x.lineWidth = Math.max(1.5, 4 * scale); x.setLineDash(region ? [] : [6, 4]); x.beginPath(); T.forEach(([px, pz], q) => { if (q % 3 && q !== T.length - 1) return; q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz)); }); x.stroke(); x.setLineDash([]); }
+    const FCOL = { fWheat: '#8a7a3a', fBarley: '#76783e', fPlowed: '#5a4630', fGreens: '#3e5a2c', fMeadow: '#4e6630' };
+    for (const f of M.fields) poly(f.poly, FCOL[f.key] || '#5a5a30');
+    poly(WALL_PTS, 'rgba(74,69,60,0.86)');
+    for (const pts of M.outside) line(pts, 6, '#6a5a40');
+    for (const pts of M.lanes) line(pts, 3, '#6a5a40');
+    line(M.hillPath, 2, '#7a6a4a');
+    poly(G.city.marketPoly, '#6e675a'); circ(MEMORIAL[0], MEMORIAL[1], 13, '#6e675a'); circ(-120, 14, 10, '#625c50'); circ(M.bell[0], M.bell[1], 12, '#6e675a'); circ(M.well[0], M.well[1], 8, '#5e584c'); circ(M.fish[0], M.fish[1], 8.5, '#5e584c');
+    circ(M.garden[0], M.garden[1], 20, '#3d5a2c'); circ(M.garden[0], M.garden[1], 5, '#1d3446');
+    const gy = G.city.graveyard; rect(gy.x0, gy.z0, gy.x1, gy.z1, '#3d4a2c'); poly(G.city.fightersYard, '#5a4a36');
+    const roads = M.roads.slice().sort((a, b) => b[5] - a[5]);
+    for (const [ax, az, bx, bz, w, lvl] of roads) line([[ax, az], [bx, bz]], w, lvl === 0 ? '#9a917e' : lvl === 1 ? '#857c6a' : '#716a5c');
+    for (const px of M.piers) rect(px - 2, SHORE, px + 2, M.pierEnd, '#7a5634'); rect(M.breakwater - 2, SHORE, M.breakwater + 2, 206, '#6e675a'); circ(M.breakwater, 210, 4.5, '#c8c0a8');
+    poly(G.city.castleWalls, '#4e4a44', '#8a8070');
+    const COL = { tavern: '#d88a3a', general: '#d8c050', weaponsmith: '#c0c4cc', armorer: '#8aa0c0', alchemist: '#6ac070', temple: '#f0f0e0', mages: '#6a8ae8', fighters: '#d85a4a', castle: '#b070d0', mausoleum: '#909090', hospice: '#e8e8c8', warehouse: '#8a7050' };
+    const labels = [];
+    for (const b of G.buildings) {
+      if (!b.poly) continue; const known = (G.bState[b.id] || {}).known; const special = b.type !== 'house' && b.type !== 'warehouse';
+      poly(b.poly, special && known ? COL[b.type] : b.type === 'warehouse' ? '#45382a' : '#3a3128');
+      if (special && known) { const c = b.poly.reduce((a, p) => [a[0] + p[0] / 4, a[1] + p[1] / 4], [0, 0]); labels.push([b.name, X(c[0]), Z(c[1]) - 6, null, fs]); }
+    }
+    for (const [tx, tz] of G.city.castleTowers) { x.fillStyle = (G.bState.castle || {}).known ? COL.castle : '#3a3128'; x.beginPath(); x.arc(X(tx), Z(tz), 4.5 * scale, 0, 7); x.fill(); }
+    x.strokeStyle = '#8a8070'; x.lineWidth = Math.max(2, 3 * scale); x.lineCap = 'butt'; x.beginPath(); WALL_PTS.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke();
+    { const xs = [WALL_PTS[0][0], ...M.piers.flatMap(p => [p - 4.5, p + 4.5]), WALL_PTS[WALL_PTS.length - 1][0]]; x.beginPath(); for (let i = 0; i < xs.length; i += 2) { x.moveTo(X(xs[i]), Z(SHORE + 0.5)); x.lineTo(X(xs[i + 1]), Z(SHORE + 0.5)); } x.stroke(); } // the sea wall, open at each pier
+    for (const [px, pz] of WALL_PTS) circ(px, pz, 4.6, '#8a8070');
+    if (this.zoom >= 0.45) for (const g of G.city.gates) circ(g.x, g.z, 3, '#c8a860');
+    if (this.zoom >= 0.45) for (const st of G.city.stops) { x.fillStyle = '#e8c860'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.arc(X(st.x), Z(st.z), Math.max(4, 2.2 * scale), 0, 7); x.fill(); x.stroke(); if (this.zoom >= 2) labels.push(['Carriage: ' + capFirst(st.name), X(st.x), Z(st.z) + fs, '#e8c860', Math.round(fs * 0.8)]); }
+    for (const d of M.labels) labels.push([d.name.toUpperCase(), X(d.x), Z(d.z), 'rgba(232,216,168,0.55)', Math.round(fs * 1.25)]);
+    for (const l of G.city.landmarks) if (!l.id.endsWith('gate') || this.zoom >= 1.5) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 8, '#d8cca8', Math.round(fs * 0.9)]);
     if (this.zoom < 0.45) { labels.length = 0; labels.push(['Aldhaven', X(0), Z(-10), '#efe2b8', Math.round(fs * 1.2)]); }
     // the towns: moat, walls, canal, streets and squares, their great buildings named once the town is found
     for (const T of TOWNS) { const C = T.cfg, f = (G.flags.found || {})[T.id], P2 = (u, v) => { const [wx, wz] = T.w(u, v); return [X(wx), Z(wz)]; };
@@ -10320,19 +10724,17 @@ const MapView = {
       if (f) { if (this.zoom >= 0.3) for (const l of T.landmarks) if (!l.gate || this.zoom >= 1) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 6, '#d8cca8', Math.round(fs * 0.85)]);
  }
       if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } // (the big towns are known by name from the start)
+    if (Survey.blank()) Survey.blankOut(x, X, Z, W, H); // the land beyond the known map, left blank
     // the landmarks you know of, the places you have come upon, the way you are going
     const found = G.flags.found || {}, heard = G.flags.heard || {};
     for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
-    for (const p of POI.known()) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
-    if (Travel.cur || Travel.paused) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
-    if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
-    x.textAlign = 'center';
-    for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
-    this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
-      : 'Aldhaven — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
+    for (const p of Survey.peaks()) { const px = X(p.x), pz = Z(p.z), r = Math.max(6, 8 * dpr); // the named summits of the home mountains
+      x.fillStyle = '#d8ccae'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.lineJoin = 'miter'; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r * 0.95, pz + r * 0.62); x.lineTo(px - r * 0.95, pz + r * 0.62); x.closePath(); x.fill(); x.stroke();
+      labels.push([capFirst(p.name), px, pz - r - 6, '#efe2b8', Math.round(fs * 0.95)]); }
+    for (const p of POI.known()) { if (Survey.blank() && !Survey.known(p.x, p.z)) continue; circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    return labels;
   },
   drawDungeon(x, W, H) {
     const D = G.area.dg; const cell = Math.floor(Math.min(W, H) * 0.9 / D.N); const ox = (W - cell * D.N) / 2, oz = (H - cell * D.N) / 2; const P = G.player;
@@ -10382,7 +10784,7 @@ function drawHUD() {
   const P = G.player; const s = Math.max(1, Math.round(H / 190));
   // weapon / casting hands
   const rpg = rpgUI();
-  if (rpg && !P.dead && (!P.sheathed || P.castT >= 0)) {
+  if (rpg && !P.dead && !Survey.on && (!P.sheathed || P.castT >= 0)) {
     const bobX = Math.sin(P.bob) * 3 * s, bobY = Math.abs(Math.cos(P.bob)) * 3 * s + (1 - (P.drawT ?? 1)) * 70 * s;
     const art = weaponArt(P.equip.weapon); const ws = s * 1.25;
     let ox = W * 0.47 + bobX, oy = H - 76 * ws + bobY + 6 * s, rot = 0;
@@ -10400,7 +10802,7 @@ function drawHUD() {
     x.save(); x.imageSmoothingEnabled = false; x.translate(ox + 56 * ws, oy + 60 * ws); x.rotate(rot); x.drawImage(art, -56 * ws, -60 * ws, 80 * ws, 80 * ws); x.restore();
   }
   // crosshair
-  x.fillStyle = 'rgba(255,236,190,0.75)'; x.fillRect(Math.round(W / 2) - s, Math.round(H / 2), 3 * s, s); x.fillRect(Math.round(W / 2), Math.round(H / 2) - s, s, 3 * s);
+  if (!Survey.on) { x.fillStyle = 'rgba(255,236,190,0.75)'; x.fillRect(Math.round(W / 2) - s, Math.round(H / 2), 3 * s, s); x.fillRect(Math.round(W / 2), Math.round(H / 2) - s, s, 3 * s); }
   // vitals
   if (rpg) {
   const bw = 4 * s, bh = 42 * s, bx = 6 * s, by = H - 6 * s - bh;
@@ -10412,7 +10814,8 @@ function drawHUD() {
   const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal'); label(`${P.gold}g${pots ? '  ' + pots.qty + '♥' : ''}`, bx + 3 * (bw + 2 * s) + 2 * s, H - 15 * s);
   if (G.wanted && G.area.kind === 'city') label('WANTED', bx, by - 3 * s, Math.floor(performance.now() / 400) % 2 ? '#ff5a4a' : '#a02a20');
   }
-  // compass
+  // compass: the sighting card while surveying
+  if (Survey.on) { Survey.hud(x, W, H, s); return; }
   const cw = 76 * s, ch = 11 * s, cx0 = W - cw - 6 * s, cy0 = H - ch - 6 * s;
   x.fillStyle = '#120e0a'; x.fillRect(cx0 - s, cy0 - s, cw + 2 * s, ch + 2 * s); x.fillStyle = '#3a3028'; x.fillRect(cx0, cy0, cw, ch);
   const heading = ((-P.yaw * 180 / Math.PI) % 360 + 360) % 360;
@@ -10523,6 +10926,7 @@ function updateSky(area, dt) {
   const hi = Math.max(cp.y - 2, above), lift = 1 + clamp((hi - 4) / 22, 0, 2.6) + 3.2 * smoothstep(70, 260, hi); // and from the peaks, or on the wing, across the country
   const open = 1 + 0.55 * smoothstep(420, 1000, Math.max(Math.abs(cp.x), Math.abs(cp.z))); // out in the open country the air is clearer than over the smoky town
   area.scene.fog.near = lerp(18, 60, L) * fogMul * (1 + (lift - 1) * 0.18) * open; area.scene.fog.far = lerp(115, 260, L) * fogMul * lift * open;
+  { const k = Survey.fogK(); area.scene.fog.near *= k; area.scene.fog.far *= k; } // (through the spyglass far things stand clear of the haze)
   S.sky.position.copy(cp); S.stars.position.copy(cp); S.mountains.position.set(cp.x, 38, cp.z); S.mountains.visible = false; // real ground now reaches the horizon; the painted range would only fight it
   S.clouds.position.set(cp.x, Math.max(170, cp.y + 90), cp.z); // the cloud deck stays overhead, even on the peaks
   S.starMat.opacity = clamp((0.55 - L) * 2.6, 0, 1) * (wx === 'clear' ? 1 : 0.2);
@@ -10770,7 +11174,7 @@ function saveGame() {
 }
 function loadGame(data) {
   data = data || readSave(); if (!data || !data.player) { msg('No saved game found.'); return; }
-  if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
+  Survey.close(); if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
   leaveCurrentArea(); G.area = G.city;
   G.time = data.time; G.flags = data.flags || {}; G.quests = data.quests || []; G.wanted = data.wanted; G.bState = data.bState || {}; G.weather = data.weather || 'clear'; G.weatherDay = data.weatherDay ?? -1;
   const sp = data.player; const P = { ...sp, pos: new THREE.Vector3(...sp.pos), vy: 0, onGround: true, swingT: -1, castT: -1, dead: false, hurtT: 0, equip: { weapon: null, body: null, head: null, shield: null } };
@@ -10802,9 +11206,10 @@ function beginNewGame(cfg) {
   leaveCurrentArea(); G.area = G.city; populateCity(G.city);
   G.player = newPlayer(cfg); markDiscovered(G.buildings.find(b => b.id === 'castle'));
   G.state = 'play'; $('title').hidden = true; $('msgs').innerHTML = '';
-  const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); G.player.pitch = S.pitch || 0; if (S.y != null) G.player.pos.y = S.y; G.player.sheathed = true; G.lastDistrict = 'outside';
+  const start = Survey.place(); G.player.sheathed = true; // (Aldhaven, Corrinvale or the edge of the known map: src/11_survey.js)
   // the story introduction (INTRO) is set aside while the project concentrates on the world itself; the hints wait so the first look is clear
   setTimeout(() => { if (G.state !== 'play') return;
+    const w = Survey.welcome(start); if (w) { for (const m of w) msg(m); return; }
     if (Input.touch) {
       msg('Welcome to Aldhaven. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
       msg('Carriages wait at signposts marked with a wheel. Tap Use at one, or Travel near one, to ride across the city.');
@@ -10815,7 +11220,7 @@ function beginNewGame(cfg) {
   }, 6000);
 }
 function toTitle() {
-  if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
+  Survey.close(); if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
   exitLock(); leaveCurrentArea(); G.area = G.city; G.state = 'title'; G.time = 18 * 60 + 5;
   $('title').hidden = false; $('msgs').innerHTML = ''; $('hint').textContent = ''; $('status').textContent = '';
   const cont = $('title').querySelector('[data-t="continue"]'); if (cont) cont.disabled = !readSave();
@@ -10870,6 +11275,7 @@ function frame(now) {
     if (G.resting) updateRest(dt);
     else if (!frozen) {
       if (Travel.cur) sdt = Travel.update(dt); else { updatePlayer(dt); Travel.watchPaused(); }
+      Survey.update(dt);
       G.time += sdt * TIME_SCALE; updateWeather();
       if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); for (const T of TOWNS) T.updateFolk(G.player.pos.x, G.player.pos.z, sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
@@ -10878,11 +11284,12 @@ function frame(now) {
     updateEntities(sdt); updateFX(dt); pickMusic(false);
     G.dmgFlash = Math.max(0, G.dmgFlash - dt); G.shake = Math.max(0, G.shake - dt);
     $('dmg').style.opacity = G.dmgFlash * 1.6;
-    if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw();
+    if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw(true); // (the objectives pulse)
     updateWorld(dt);
   }
+  MapView.work(G.state === 'play' ? 3 : 6); // (the map's pictures of the land, made a little each frame from the title screen on: some 1.6 s of work)
   updateTextHUD(dt); Touch.update();
-  if (G.area) {
+  if (G.area && !G.mapOpen) { // (the map covers the whole screen: the world behind it is not drawn while it is open)
     try { renderer.render(G.area.scene, camera); }
     catch (e) { // a hole in the scene graph: drop it, say where it was, and draw again next frame
       const fix = o => { const n = o.children.length; o.children = o.children.filter(Boolean); if (o.children.length !== n) console.warn('scene: dropped', n - o.children.length, 'empty child slot(s) under', o.type, o.name || ''); o.children.forEach(fix); };
@@ -10912,7 +11319,7 @@ function onKey(e) {
   const c = e.code;
   if (['F5', 'F9', 'Tab'].includes(c) || (c === 'Space' && G.state === 'play')) e.preventDefault();
   if (G.state !== 'play' || !G.player) return;
-  if (G.mapOpen) { if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
+  if (G.mapOpen) { if (Survey.sheet && Survey.sheetKey(c)) return; if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
   if (UI.cur) {
     if (c === 'Escape') { if (UI.cur.closable) UI.close(); return; }
     if ((c === 'KeyI' || c === 'KeyC' || c === 'Tab') && UI.is('char')) UI.close();
@@ -10922,6 +11329,7 @@ function onKey(e) {
   if (G.resting) { if (c === 'Escape' || c === 'KeyR') stopRest('You stop resting.'); return; }
   if (Travel.cur && !['F5', 'F9', 'KeyN'].includes(c)) { Travel.stop('You stop.'); if (['Escape', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space', 'KeyT', 'KeyV'].includes(c)) return; }
   if (G.player.dead || G.fading) return;
+  if (Survey.on && Survey.key(c)) return; // the compass in hand: bearings, the spyglass, the sheet
   switch (c) {
     case 'Escape': UI.openPause(); break;
     case 'KeyE': case 'KeyF': interact(); break;
@@ -10930,6 +11338,7 @@ function onKey(e) {
     case 'KeyM': MapView.open(); break;
     case 'Enter': case 'NumpadEnter': if (Travel.paused) Travel.resume(); break;
     case 'KeyR': UI.openRest(); break;
+    case 'KeyK': Survey.toggle(); break;
     case 'KeyT': case 'KeyV': UI.openTravel(); break;
     case 'KeyQ': startCast(); break;
     case 'KeyH': if (rpgUI()) quickPotion(); break;
@@ -10959,14 +11368,16 @@ function bindInput() {
     if (G.state !== 'play' || G.uiOpen || G.resting || !G.player || G.player.dead) return;
     if (!Input.locked && !Input.fallback) { requestLock(true); return; }
     if (Input.fallback) { Input.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button }; return; }
+    if (Survey.on) { if (e.button === 0) Survey.take(); return; }
     if (e.button === 0) startAttack(); else if (e.button === 2) startCast();
   });
   addEventListener('mouseup', e => {
     if (!Input.drag) return;
-    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
+    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Survey.on) { if (Input.drag.button === 0) Survey.take(); } else if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
     Input.drag = null;
   });
   addEventListener('contextmenu', e => { if (G.state === 'play') e.preventDefault(); });
+  renderer.domElement.addEventListener('wheel', e => { if (Survey.on && !G.mapOpen && !G.uiOpen) { Survey.zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2); e.preventDefault(); } }, { passive: false }); // the spyglass
   document.addEventListener('pointerlockchange', () => {
     Input.locked = document.pointerLockElement === renderer.domElement;
     if (!Input.locked) { if (Input.expectUnlock) Input.expectUnlock = false; else if (G.state === 'play' && !G.uiOpen && !G.resting && G.player && !G.player.dead) UI.openPause(); }
@@ -10986,19 +11397,20 @@ function bindInput() {
   $('title').addEventListener('click', e => {
     const b = e.target.closest('[data-t]'); if (!b || b.disabled) return; SFX.init(); SFX.play('click'); pickMusic(true);
     const t = b.dataset.t;
-    if (t === 'new') { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); } // character creation returns with the stats option
+    if (t === 'new') Survey.chooseStart(() => { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); }); // where to begin; character creation returns with the stats option
     if (t === 'continue') loadGame();
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { MapView.setZoom(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8)); e.preventDefault(); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { if (e.target.closest('#mapsurvey, #mapdebug')) return; e.preventDefault(); const dy = e.deltaY || e.deltaX; if (Survey.sheet && e.shiftKey) { Survey.turn(dy < 0 ? 0.1 : -0.1); return; } MapView.setZoom(MapView.zoom * Math.exp(-clamp(dy * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1), -240, 240) * 0.0022)); }, { passive: false }); // (a notch of a wheel zooms by a fifth; a trackpad's many small steps as far in all)
+  $('mapview').addEventListener('click', e => { const b = e.target.closest('[data-sv]'); if (b && !b.disabled) { SFX.play('click'); Survey.act(b.dataset.sv); } }); // the survey sheet's tools and the debug panel
   // the map: drag to look around it, tap or click a place to travel there
   { let drag = null; const mc = $('mapc');
-    mc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } });
-    mc.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
-      const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
-    mc.addEventListener('pointerup', e => { if (drag && !drag.moved && G.area === G.city) MapView.pick(e.clientX, e.clientY); drag = null; });
-    mc.addEventListener('pointercancel', () => { drag = null; });
+    mc.addEventListener('pointerdown', e => { try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } if (Survey.sheet && Survey.pdown(e)) return; if (!drag) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; });
+    mc.addEventListener('pointermove', e => { if (Survey.sheet && Survey.pmove(e)) return; if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
+      const t = MapView.tf; if (!t) return; const v = MapView.view || [t.cx, t.cz]; MapView.view = [v[0] - dx * t.dpr / t.scale, v[1] - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.later(); }); // (from the view as moved, which may not be drawn yet)
+    mc.addEventListener('pointerup', e => { if (Survey.sheet && Survey.pup(e)) return; if (!drag || drag.id !== e.pointerId) return; if (!drag.moved && G.area === G.city) { if (Survey.sheet) Survey.tap(e.clientX, e.clientY); else MapView.pick(e.clientX, e.clientY); } drag = null; });
+    mc.addEventListener('pointercancel', e => { Survey.pup(e); if (drag && drag.id === e.pointerId) drag = null; });
     $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }
   $('mapclose').addEventListener('click', () => MapView.close());
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
@@ -11034,7 +11446,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { RG, RG_N, RG_KEYS, REGION, RP, regionW, regionRaw, regionKind, regionIs, mereAt, torNear, fenBase, World, RIDGE, RQ, ridgeNear, ridgeAt, ridgeLand, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Survey, RG, RG_N, RG_KEYS, REGION, RP, regionW, regionRaw, regionKind, regionIs, mereAt, torNear, fenBase, World, RIDGE, RQ, ridgeNear, ridgeAt, ridgeLand, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

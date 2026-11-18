@@ -105,16 +105,17 @@ function playerDies(src) {
 function updatePlayer(dt) {
   const p = G.player;
   if (p.dead) { camera.position.y = lerp(camera.position.y, p.pos.y + 0.3, dt * 3); camera.rotation.z = lerp(camera.rotation.z, 0.6, dt * 3); return; }
-  const sens = 0.0022 * settings.sens;
+  const lk = Survey.lookK(), sens = 0.0022 * settings.sens * lk; // (through the spyglass the view turns more finely)
   p.yaw -= Input.mdx * sens; p.pitch -= Input.mdy * sens * (settings.invertY ? -1 : 1); Input.mdx = Input.mdy = 0;
-  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt;
-  if (keyDown('PageUp')) p.pitch += 1.5 * dt; if (keyDown('PageDown')) p.pitch -= 1.5 * dt;
+  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt * lk; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt * lk;
+  if (keyDown('PageUp')) p.pitch += 1.5 * dt * lk; if (keyDown('PageDown')) p.pitch -= 1.5 * dt * lk;
   p.pitch = clamp(p.pitch, -1.35, 1.35);
   let f = ((keyDown('KeyW') || keyDown('ArrowUp')) ? 1 : 0) - ((keyDown('KeyS') || keyDown('ArrowDown')) ? 1 : 0);
   let s = (keyDown('KeyD') ? 1 : 0) - (keyDown('KeyA') ? 1 : 0);
   const st = Input.stick; let analog = 1; // touch stick: partial pushes walk slower
   if (!f && !s && (st.x || st.y)) { f = -st.y; s = st.x; analog = clamp(Math.hypot(st.x, st.y), 0.3, 1); }
   const moving = f !== 0 || s !== 0;
+  if (moving && Survey.on) Survey.close('You put the compass away and walk on.');
   if (G.flying && !settings.dbgFly) setFlying(false);
   const fly = G.flying;
   const running = (keyDown('ShiftLeft') || keyDown('ShiftRight') || st.run) && (p.fat > 1 || fly) && moving;
@@ -135,7 +136,7 @@ function updatePlayer(dt) {
     p.pos.x += (-sn * f + cs * s) * spd * dt; p.pos.z += (-cs * f - sn * s) * spd * dt;
     collide(G.area, p.pos, 0.38, p.pos.y, 1.75); keepAshore(G.area, p.pos, ox, oz, 0.38, p.pos.y);
     if (G.area.kind === 'city' && Math.max(Math.abs(p.pos.x), Math.abs(p.pos.z)) > TG.R) wildFooting(p, ox, oz);
-    if (keyDown('Space') && p.onGround && p.fat > 3) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
+    if (keyDown('Space') && p.onGround && p.fat > 3 && !Survey.on) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
     p.vy -= 18 * dt; p.pos.y += p.vy * dt;
     const g = groundAt(G.area, p.pos.x, p.pos.z, 0.38, p.pos.y);
     if (p.pos.y <= g) { if (!p.onGround && p.vy < -11 && !p.safeFall && !settings.dbgNoFall) damagePlayer(Math.round((-p.vy - 11) * 3), { name: 'the fall' }); p.pos.y = g; p.vy = 0; p.onGround = true; p.safeFall = false; }

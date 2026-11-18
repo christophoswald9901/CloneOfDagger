@@ -12,8 +12,8 @@ const Touch = {
     const el = this.el = $('touch');
     const b = (k, label, cls = '') => `<button class="tb ${cls}" data-k="${k}">${label}</button>`;
     el.innerHTML = `<div class="stk" hidden><i></i></div>
-      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
-      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}
+      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyK', 'Survey', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
+      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}${b('svTake', 'Bearing')}${b('svIn', '+')}${b('svOut', '−')}${b('svMap', 'Sheet')}
         <div class="tside">${b('KeyH', 'Potion', 'pill')}${b('KeyZ', 'Draw', 'pill')}${b('spell', 'Spell', 'pill')}${b('KeyG', 'Fly', 'pill')}</div></div>`;
     this.btn = {}; for (const e of el.querySelectorAll('[data-k]')) this.btn[e.dataset.k] = e;
     if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) this.btn.full.remove();
@@ -47,14 +47,17 @@ const Touch = {
     if (show !== this.shown) { this.shown = show; this.el.classList.toggle('live', show); if (!show) this.release(); }
     if (!show) return;
     const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal');
-    const sig = [rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
+    const sv = Survey.on, sig = [sv, rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
     if (sig === this.sig) return; this.sig = sig;
     const B = this.btn;
     B.use.classList.toggle('ready', !!G.focus);
-    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying;
-    B.KeyG.hidden = !settings.dbgFly; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
-    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = B.KeyI.hidden = !rpg;
-    B.cast.hidden = !rpg || !P.spells.length; B.spell.hidden = !rpg || P.spells.length < 2;
+    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying || sv;
+    B.KeyG.hidden = !settings.dbgFly || sv; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
+    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = !rpg || sv; B.KeyI.hidden = !rpg;
+    B.cast.hidden = !rpg || !P.spells.length || sv; B.spell.hidden = !rpg || P.spells.length < 2 || sv;
+    // the compass in hand: note a bearing, work the spyglass, open the sheet
+    B.use.hidden = B.Space.hidden = sv; for (const k of ['svTake', 'svIn', 'svOut', 'svMap']) B[k].hidden = !sv;
+    B.KeyK.textContent = sv ? 'Put away' : 'Survey'; B.KeyK.classList.toggle('ready', sv);
     this.el.classList.toggle('min', !rpg);
     B.KeyZ.textContent = P.sheathed ? 'Draw' : 'Sheathe';
     B.KeyH.textContent = pots ? `Potion ×${pots.qty}` : 'Potion'; B.KeyH.classList.toggle('off', !pots);
@@ -124,6 +127,9 @@ const Touch = {
     if (k === 'use') { if (G.focus) interact(); else msg('There is nothing within reach to use.'); return; }
     if (k === 'spell') { if (P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; msg(`Spell selected: ${SPELLS[P.spells[P.spell]].name}.`); } return; }
     if (k === 'full') { this.fullscreen(); return; }
+    if (k === 'svTake') { Survey.take(); return; }
+    if (k === 'svIn' || k === 'svOut') { Survey.zoomBy(k === 'svIn' ? 1.4 : 1 / 1.4); return; }
+    if (k === 'svMap') { Survey.openSheet(); return; }
     onKey({ code: k, preventDefault() {} });
   },
   unpress(k) { if (k === 'Space' || k === 'KeyX') Input.vkeys[k] = false; },
