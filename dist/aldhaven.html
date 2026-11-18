@@ -28,6 +28,8 @@
   #travelinfo { position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 22; font-size: 19px; padding: 6px 12px; white-space: nowrap; max-width: max(220px, calc(100vw - 400px)); overflow: hidden; text-overflow: ellipsis; cursor: pointer; } /* out of the way: bottom left, clear of the compass */
   #mapdest { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(52px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; max-width: calc(100vw - 32px); background: rgba(20,16,12,.85); padding: 8px 12px; border: 2px solid #5a4a36; }
   #mapdest .nm { color: #efe2b8; font-size: 22px; margin-right: 6px; }
+  #survinfo { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--hudb, 60px) * 1.3 + 6px + env(safe-area-inset-bottom, 0px)); z-index: 5; pointer-events: none; text-align: center; text-shadow: 2px 2px 0 #000; width: calc(100% - 32px); }
+  #survinfo .a { font-size: 22px; color: #efe2b8; } #survinfo .a.new { color: #ffe39a; } #survinfo .b { font-size: 18px; color: #cbbd98; }
   #restinfo { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 22; font-size: 26px; white-space: nowrap; }
   #resume { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, .35); z-index: 15; cursor: pointer; padding: 16px; }
   #resume p { margin: 4px 0 0; color: var(--dim); }
@@ -110,10 +112,31 @@
   .menu .db { font-size: 27px; padding: 6px 14px; }
   .foot { margin: 18px auto 0; color: #cbbd98; font-size: 19px; text-align: center; max-width: 60ch; text-shadow: 2px 2px 0 #000; }
   #mapview { position: fixed; inset: 0; z-index: 25; background: #1b1712; }
-  #mapc { width: 100%; height: 100%; display: block; }
+  #mapc { width: 100%; height: 100%; display: block; touch-action: none; } /* (two fingers twist the ruler; the browser must not take them for a pinch) */
   #maplegend { position: absolute; left: 16px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); right: 140px; color: var(--dim); font-size: 20px; text-shadow: 2px 2px 0 #000; }
   #mapbtns { position: absolute; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; }
   #mapbtns .db { min-width: 44px; }
+  /* the survey sheet: the field book and the ruler's tools on the left, the debug panel at the right edge */
+  #mapsurvey { position: absolute; left: 12px; top: calc(12px + env(safe-area-inset-top, 0px)); width: min(316px, calc(100vw - 24px)); max-height: calc(100% - 96px); display: flex; flex-direction: column; gap: 5px; box-sizing: border-box; padding: 8px 10px; background: rgba(20,16,12,.88); border: 2px solid #5a4a36; font-size: 19px; }
+  #mapsurvey h4 { margin: 2px 0 0; font-family: 'IM Fell English SC', Georgia, serif; font-weight: 400; font-size: 21px; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  #mapsurvey h4 .rb { font-family: 'VT323', monospace; color: #f0d890; font-size: 20px; }
+  #mapsurvey.fold { width: auto; padding: 4px; }
+  body.touch #mapsurvey .rd .db.xs { min-height: 32px; min-width: 34px; } body.touch #mapsurvey .tools .db.xs { min-width: 0; padding: 4px 8px; }
+  #mapsurvey .book { overflow-y: auto; min-height: 0; flex: 0 1 auto; max-height: 26vh; display: flex; flex-direction: column; gap: 2px; scrollbar-color: #6a5c44 #1a1510; }
+  #mapsurvey .book p { margin: 0; }
+  #mapsurvey .rd { display: flex; align-items: center; gap: 8px; padding: 0 4px; background: rgba(0,0,0,.25); }
+  #mapsurvey .rd .st { color: var(--dim); font-size: 17px; flex: 1; }
+  #mapsurvey .rd b { font-weight: 400; color: #efe2b8; font-size: 22px; font-variant-numeric: tabular-nums; }
+  #mapsurvey .rd small { color: #ff9a7a; font-size: 16px; }
+  #mapsurvey .tools { display: flex; flex-wrap: wrap; gap: 5px; }
+  #mapsurvey #svpin { font-size: 17px; margin-top: -3px; }
+  #mapdebug { position: absolute; right: 16px; top: calc(68px + env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100vw - 32px); }
+  #mapdbg { box-sizing: border-box; width: min(300px, calc(100vw - 32px)); max-height: calc(100vh - 170px); overflow-y: auto; padding: 8px 10px; background: rgba(20,16,12,.92); border: 2px solid #5a4a36; font-size: 18px; }
+  #mapdbg .opt { margin: 0 0 8px; } #mapdbg .opt b { display: block; font-weight: 400; color: var(--dim); margin-bottom: 2px; }
+  #mapdbg .opt .db { margin: 2px 4px 0 0; } #mapdbg p { margin: 4px 0 0; font-size: 16px; }
+  #panel .db.start { text-align: left; padding: 8px 14px; }
+  #panel .db.start b { display: block; font-weight: 400; font-size: 26px; color: var(--gold); }
+  #panel .db.start small { display: block; color: var(--dim); font-size: 18px; line-height: 1.15; margin-top: 2px; }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; font-size: 30px; color: var(--gold); background: var(--bg); z-index: 40; font-family: 'IM Fell English SC', Georgia, serif; padding: 16px; text-align: center; }
   /* touch controls */
   html { -webkit-text-size-adjust: 100%; }
@@ -141,6 +164,10 @@
   #touch .tb.pill, #touch .tb.sq { position: static; width: auto; min-width: calc(76px * var(--ts)); height: calc(42px * var(--ts)); border-radius: 8px; padding: 0 calc(10px * var(--ts)); font-size: calc(19px * var(--ts)); white-space: nowrap; pointer-events: auto; }
   #touch .tbar { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(40px + env(safe-area-inset-top, 0px)); display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: calc(100% - 24px); }
   #touch .tbar .tb.sq { min-width: calc(64px * var(--ts)); }
+  #touch [data-k="svTake"] { right: 0; bottom: 0; width: calc(104px * var(--ts)); height: calc(104px * var(--ts)); font-size: calc(22px * var(--ts)); }
+  #touch [data-k="svIn"] { right: calc(118px * var(--ts)); bottom: calc(56px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(30px * var(--ts)); }
+  #touch [data-k="svOut"] { right: calc(118px * var(--ts)); bottom: calc(-6px * var(--ts)); width: calc(58px * var(--ts)); height: calc(58px * var(--ts)); font-size: calc(30px * var(--ts)); }
+  #touch [data-k="svMap"] { right: calc(10px * var(--ts)); bottom: calc(118px * var(--ts)); width: calc(84px * var(--ts)); height: calc(50px * var(--ts)); border-radius: 8px; }
   #touch.min [data-k="use"] { right: 0; bottom: 0; width: calc(96px * var(--ts)); height: calc(96px * var(--ts)); font-size: calc(23px * var(--ts)); }
   #touch.min .tb.jump { right: calc(112px * var(--ts)); bottom: calc(8px * var(--ts)); }
   #touch.min .tb.down { right: calc(112px * var(--ts)); bottom: calc(92px * var(--ts)); }
@@ -172,10 +199,11 @@
 <div id="status"></div>
 <div id="restinfo" class="panel" hidden></div>
 <div id="travelinfo" class="panel" hidden></div>
+<div id="survinfo" hidden></div>
 <div id="resume" hidden><div class="panel"><h2>Paused</h2><p>Click to return to Aldhaven</p></div></div>
 <div id="backdrop" hidden></div>
 <div id="panel" class="panel" hidden role="dialog" aria-modal="true"></div>
-<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
+<div id="mapview" hidden><canvas id="mapc"></canvas><div id="maplegend"></div><div id="mapdest" hidden></div><div id="mapsurvey" hidden></div><div id="mapdebug"><button id="mapdbgbtn" class="db sm" data-sv="dbg">Debug</button><div id="mapdbg" hidden></div></div><div id="mapbtns"><button id="mapzout" class="db" aria-label="Zoom out">−</button><button id="mapzin" class="db" aria-label="Zoom in">+</button><button id="mapclose" class="db">Close map</button></div></div>
 <div id="touch" aria-hidden="true"></div>
 <div id="title" hidden>
   <div class="title-wrap">
@@ -8856,16 +8884,17 @@ function playerDies(src) {
 function updatePlayer(dt) {
   const p = G.player;
   if (p.dead) { camera.position.y = lerp(camera.position.y, p.pos.y + 0.3, dt * 3); camera.rotation.z = lerp(camera.rotation.z, 0.6, dt * 3); return; }
-  const sens = 0.0022 * settings.sens;
+  const lk = Survey.lookK(), sens = 0.0022 * settings.sens * lk; // (through the spyglass the view turns more finely)
   p.yaw -= Input.mdx * sens; p.pitch -= Input.mdy * sens * (settings.invertY ? -1 : 1); Input.mdx = Input.mdy = 0;
-  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt;
-  if (keyDown('PageUp')) p.pitch += 1.5 * dt; if (keyDown('PageDown')) p.pitch -= 1.5 * dt;
+  if (keyDown('ArrowLeft')) p.yaw += 2.4 * dt * lk; if (keyDown('ArrowRight')) p.yaw -= 2.4 * dt * lk;
+  if (keyDown('PageUp')) p.pitch += 1.5 * dt * lk; if (keyDown('PageDown')) p.pitch -= 1.5 * dt * lk;
   p.pitch = clamp(p.pitch, -1.35, 1.35);
   let f = ((keyDown('KeyW') || keyDown('ArrowUp')) ? 1 : 0) - ((keyDown('KeyS') || keyDown('ArrowDown')) ? 1 : 0);
   let s = (keyDown('KeyD') ? 1 : 0) - (keyDown('KeyA') ? 1 : 0);
   const st = Input.stick; let analog = 1; // touch stick: partial pushes walk slower
   if (!f && !s && (st.x || st.y)) { f = -st.y; s = st.x; analog = clamp(Math.hypot(st.x, st.y), 0.3, 1); }
   const moving = f !== 0 || s !== 0;
+  if (moving && Survey.on) Survey.close('You put the compass away and walk on.');
   if (G.flying && !settings.dbgFly) setFlying(false);
   const fly = G.flying;
   const running = (keyDown('ShiftLeft') || keyDown('ShiftRight') || st.run) && (p.fat > 1 || fly) && moving;
@@ -8886,7 +8915,7 @@ function updatePlayer(dt) {
     p.pos.x += (-sn * f + cs * s) * spd * dt; p.pos.z += (-cs * f - sn * s) * spd * dt;
     collide(G.area, p.pos, 0.38, p.pos.y, 1.75); keepAshore(G.area, p.pos, ox, oz, 0.38, p.pos.y);
     if (G.area.kind === 'city' && Math.max(Math.abs(p.pos.x), Math.abs(p.pos.z)) > TG.R) wildFooting(p, ox, oz);
-    if (keyDown('Space') && p.onGround && p.fat > 3) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
+    if (keyDown('Space') && p.onGround && p.fat > 3 && !Survey.on) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
     p.vy -= 18 * dt; p.pos.y += p.vy * dt;
     const g = groundAt(G.area, p.pos.x, p.pos.z, 0.38, p.pos.y);
     if (p.pos.y <= g) { if (!p.onGround && p.vy < -11 && !p.safeFall && !settings.dbgNoFall) damagePlayer(Math.round((-p.vy - 11) * 3), { name: 'the fall' }); p.pos.y = g; p.vy = 0; p.onGround = true; p.safeFall = false; }
@@ -9328,6 +9357,298 @@ function dialogFor(npc) {
 }
 
 /* =====================================================================
+   Surveying (notes in docs/CARTOGRAPHY.md). K takes out a sighting
+   compass with a small spyglass: aim at a landmark and note its bearing
+   in the field book. On the map, now a survey sheet, lay the ruler with
+   its pin in that landmark, turn it by hand to the bearing and draw the
+   line: you stood somewhere on it. Two lines cross where you stood; a
+   third shows by the little triangle it leaves how good the fix is.
+   A new game starts in Aldhaven, in Corrinvale, or at the edge of the
+   known map, where the map does not show where you are. The debug panel
+   at the edge of the map switches what the map gives away.
+   ===================================================================== */
+const SURVEY_STARTS = [
+  { id: 'aldhaven', name: 'Aldhaven', sub: "On Pilgrim's Rise, above the walled port and the bay." },
+  { id: 'corrinvale', name: 'Corrinvale', sub: 'In the Grand Square of the canal town, under its belfry.' },
+  { id: 'edge', name: 'The edge of the known map', sub: 'High on the western mountains: the known country below you, the unknown over the crest behind. Your map does not show where you are; find it with the compass and the ruler.' },
+];
+// the edge start: a flat shoulder of the western home mountains, 1.2 km inside the border, in sight of five landmarks
+// (Mirrormere 4.5 km, Halewood 5 km, Corrinvale 8 km, Greywatch 9 km, the Ninefold Stones 13 km)
+const SURVEY_EDGE = { x: -8800, z: -9000, bearing: 78, map: [-6500, -10000] };
+// where each landmark is sighted: its tower, steeple or keep, not the middle of the place
+const SIGHT_AT = {
+  greywatch: S => [S.x - 10, S.z - 12], stones: S => [S.x, S.z], mirrormere: S => [S.x + 274, S.z - 34.6], kestrel: S => [S.x - 24, S.z + 6],
+  gullscar: () => [GULL.x, gullCoast(GULL.x) - 34], halewood: () => hallW(0, 0), // (the house itself, at the middle of its own frame)
+};
+const fmtBearing = b => { const w = Math.floor(b + 1e-6); return (b - w > 0.25 ? w + '½' : String(w)) + '°'; };
+const wrap360 = a => ((a % 360) + 360) % 360;
+
+const Survey = {
+  on: false, sheet: false, zoom: 3, ZMAX: 10, n: 0, v: 0, flash: 0, arm: null, grab: null, twist: null, ptrs: new Map(), pending: null, dbgOpen: false, sure: 0, told: false,
+
+  /* ---------- what is kept with the game ---------- */
+  fresh(start) { const edge = start === 'edge'; return { start, opts: { pos: edge ? 'never' : 'always', unknown: edge ? 'blank' : 'drawn', truth: false, needle: 'swing' }, reads: [], items: [], ruler: null, view: null, home: null }; },
+  st() { return G.flags.survey || (G.flags.survey = this.fresh('aldhaven')); }, // (games saved before surveying came in start as Aldhaven's)
+  opt(k) { return this.st().opts[k]; },
+  known(x, z) { return homeOut(x, z) <= 0; }, // the known map: the home country, inside the middle of its mountains
+  // whether the map shows where you are (and the travel panel how far things are)
+  showPos() { const o = this.opt('pos'), P = G.player; return o === 'always' || (o === 'known' && !!P && this.known(P.pos.x, P.pos.z)); },
+  blank() { return this.opt('unknown') === 'blank'; },
+  // the landmarks on the map that can be sighted: Aldhaven's and Corrinvale's towers, and the landmarks you know of
+  points() {
+    const found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
+    for (const l of G.city.landmarks) if (l.id === 'bell' || l.id === 'lighthouse') out.push({ name: 'Aldhaven, ' + l.name.replace(/^the /, 'the '), x: l.x, z: l.z });
+    for (const T of TOWNS) for (const l of T.landmarks) if (l.id === 'belfry' || l.id === 'cathedral') out.push({ name: T.name + ', ' + l.name, x: l.x, z: l.z });
+    for (const S of SITES) if (SIGHT_AT[S.id] && (found[S.id] || heard[S.id])) { const [x, z] = SIGHT_AT[S.id](S); out.push({ name: S.name.replace(/^the /, 'the '), x, z }); }
+    return out;
+  },
+  // where the map opens when it does not show you: where you last marked yourself, else the ruler, else where you began
+  anchor() { const s = this.st(); for (let i = s.items.length - 1; i >= 0; i--) if (s.items[i].k === 'mark') return [s.items[i].x, s.items[i].z]; if (s.ruler) return [s.ruler.x, s.ruler.z]; return s.home || [0, -30]; },
+
+  /* ---------- a new game: where it begins ---------- */
+  chooseStart(go) {
+    $('title').hidden = true; const back = () => { UI.close(true); $('title').hidden = false; };
+    UI.open('start', () => `<h2>Where does your journey begin?</h2><div class="btns col">${SURVEY_STARTS.map(o => `<button class="db start" data-a="s:${o.id}"><b>${esc(o.name)}</b><small>${esc(o.sub)}</small></button>`).join('')}</div><div class="btns"><button class="db" data-a="back">Back</button></div>`,
+      { cls: 'mid', leave: back, onAct: a => { if (a === 'back') { back(); return; } if (a.startsWith('s:')) { this.pending = a.slice(2); UI.close(true); go(); } } });
+  },
+  // put the new player at the start chosen (beginNewGame), with the map that goes with it
+  place() {
+    const start = SURVEY_STARTS.some(o => o.id === this.pending) ? this.pending : 'aldhaven'; this.pending = null; this.close();
+    const s = G.flags.survey = this.fresh(start), found = G.flags.found || (G.flags.found = {}), day = dayOf(G.time) + 1, P = G.player;
+    if (start === 'corrinvale') {
+      const T = TOWNS[0], sq = T.landmarks.find(l => l.id === 'square'), bf = T.landmarks.find(l => l.id === 'belfry');
+      found[T.id] = day; setArea(G.city, sq.x, sq.z, Math.atan2(-(bf.x - sq.x), -(bf.z - sq.z))); P.pitch = 0.12; G.lastDistrict = null; s.home = [sq.x, sq.z];
+    } else if (start === 'edge') {
+      for (const S of SITES) found[S.id] = day; // the known map shows the country's landmarks
+      const E = SURVEY_EDGE; setArea(G.city, E.x, E.z, -E.bearing * Math.PI / 180); P.pitch = -0.05; G.lastDistrict = 'outside'; s.home = E.map; MapView.zoom = 0.06; // (the map opens over the west of the country, not on you)
+    } else { const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); P.pitch = S.pitch || 0; if (S.y != null) P.pos.y = S.y; G.lastDistrict = 'outside'; s.home = [S.x, S.z]; }
+    return start;
+  },
+  welcome(start) {
+    const t = Input.touch;
+    if (start === 'edge') return [`You stand at the edge of the known map. To the east the known country lies below you; over the crest to the west the land is unknown. Your map (${t ? 'Map' : 'M'}) shows the country, but not where you are.`,
+      `${t ? 'Tap Survey' : 'Press K'} for the compass. Sight a landmark you can find on the map, note its bearing, then lay the ruler through that landmark on the map at that bearing and draw the line. Where two lines cross, you are.`];
+    if (start === 'corrinvale') return [`Welcome to Corrinvale. ${t ? 'The buttons at the top open the map and your journal.' : 'M opens the map, J your journal.'}`, `${t ? 'Survey' : 'K'} takes out a compass and a ruler, to find where you are from the landmarks you can see.`];
+    return null;
+  },
+
+  /* ---------- the compass in hand ---------- */
+  heading() { return wrap360(-G.player.yaw * 180 / Math.PI); },
+  toggle() { if (this.on || this.sheet) this.close('You put the compass and the ruler away.'); else this.open(); },
+  open() {
+    const P = G.player; if (!P || P.dead || G.state !== 'play') return;
+    if (G.area !== G.city) { msg('You need open sky to take a bearing.'); return; }
+    if (Travel.cur) Travel.stop('You stop.');
+    this.on = true; this.n = this.heading(); this.v = 0; SFX.play('click');
+    if (!this.told) { this.told = true; msg(Input.touch ? 'Compass out. Drag to aim at a landmark and tap Bearing to note it; + and − work the spyglass, Sheet opens the map with the ruler. Walking puts it away.'
+      : 'Compass out. Aim at a landmark and click (or Enter) to note its bearing. The wheel or + / − works the spyglass, M opens the map with the ruler, K puts it all away; walking does too.'); }
+  },
+  close(text) {
+    if (!this.on && !this.sheet) return;
+    this.on = false; $('survinfo').hidden = true; this._info = ''; this.arm = null; this.grab = this.twist = null;
+    if (this.sheet) { this.sheet = false; if (G.mapOpen) MapView.close(); }
+    this.applyFov(); if (text) msg(text);
+  },
+  // keys while the compass is out (true: taken)
+  key(c) {
+    if (c === 'KeyK' || c === 'Escape') { this.close('You put the compass away.'); return true; }
+    if (c === 'Enter' || c === 'NumpadEnter' || c === 'Space') { this.take(); return true; }
+    if (c === 'KeyM') { this.openSheet(); return true; }
+    if (c === 'Equal' || c === 'NumpadAdd') { this.zoomBy(1.25); return true; }
+    if (c === 'Minus' || c === 'NumpadSubtract') { this.zoomBy(0.8); return true; }
+    if (c === 'KeyE' || c === 'KeyF') this.close(); // (and then talk, or open the door)
+    return false;
+  },
+  update(dt) {
+    if (!this.on) return;
+    const P = G.player; if (G.area !== G.city || Travel.cur || G.resting || !P || P.dead) { this.close(); return; }
+    const t = this.heading();
+    if (this.opt('needle') === 'steady') { this.n = t; this.v = 0; }
+    else for (let k = 0; k < 3; k++) { const h = dt / 3, d = ((t - this.n + 540) % 360) - 180; this.v += (d * 24 - this.v * 4.4) * h; this.n = wrap360(this.n + this.v * h); } // the needle lags as you turn, swings past and settles
+    this.flash = Math.max(0, this.flash - dt * 3);
+    this.applyFov(); this.info();
+  },
+  info() {
+    const el = $('survinfo'), show = this.on && !G.mapOpen && !G.uiOpen && G.state === 'play'; if (el.hidden !== !show) el.hidden = !show; if (!show) return;
+    const r = this.st().reads, last = r[r.length - 1], a = `${this.zoom > 1.05 ? 'spyglass ×' + this.zoom.toFixed(1) : 'compass sights'}${last ? ` · last bearing ${fmtBearing(last.b)}, station ${last.st}` : ''}${this.opt('truth') ? ` · (true ${this.heading().toFixed(1)}°)` : ''}`,
+      b = Input.touch ? 'drag to aim · Bearing notes it · + − spyglass · Sheet: map and ruler' : 'click or Enter: note the bearing · wheel or + −: spyglass · M: map and ruler · K: put away', t = a + '\n' + b;
+    if (t !== this._info) { this._info = t; el.innerHTML = `<div class="a${this.flash > 0 ? ' new' : ''}">${esc(a)}</div><div class="b">${esc(b)}</div>`; }
+  },
+  // the spyglass: a narrower view, aimed more finely, and far things clear of the haze in proportion
+  applyFov() { if (typeof camera === 'undefined' || !camera) return; const f = this.on && !this.sheet ? settings.fov / this.zoom : settings.fov; if (Math.abs(camera.fov - f) > 1e-3) { camera.fov = f; camera.updateProjectionMatrix(); } },
+  lookK() { return this.on && !this.sheet ? 1 / this.zoom : 1; },
+  fogK() { return this.on && !this.sheet ? this.zoom : 1; },
+  zoomBy(k) { if (this.on) this.zoom = clamp(this.zoom * k, 1, this.ZMAX); },
+  // what the card reads now: the needle, and the tremble of the hand that holds it
+  reading() { if (this.opt('needle') === 'steady') return this.heading(); const c = G.clock; return wrap360(this.n + 0.32 * Math.sin(c * 1.9) + 0.22 * Math.sin(c * 3.3 + 1.3)); },
+  take() {
+    if (!this.on) return; const s = this.st(), P = G.player, b = wrap360(Math.round(this.reading() * 2) / 2), last = s.reads[s.reads.length - 1];
+    const st = !last ? 1 : Math.hypot(last.x - P.pos.x, last.z - P.pos.z) < 30 ? last.st : last.st + 1; // a new station once you have walked on
+    s.reads.push({ b, tb: Math.round(this.heading() * 10) / 10, st, t: Math.round(G.time), x: Math.round(P.pos.x * 10) / 10, z: Math.round(P.pos.z * 10) / 10 }); while (s.reads.length > 40) s.reads.shift();
+    SFX.play('click'); this.flash = 1; msg(`Bearing ${fmtBearing(b)} noted (station ${st}).`);
+  },
+  // the view through the sights: the spyglass's round field, the hair, the compass card under it
+  hud(x, W, H, s) {
+    const cx = Math.round(W / 2), cy = Math.round(H / 2);
+    if (this.zoom > 1.05) { const R = Math.round(Math.min(W, H) * 0.48); x.save(); x.fillStyle = 'rgba(8,6,4,0.92)'; x.beginPath(); x.rect(0, 0, W, H); x.arc(cx, cy, R, 0, Math.PI * 2, true); x.fill('evenodd');
+      x.strokeStyle = this.flash > 0 ? `rgba(240,210,120,${0.5 + this.flash * 0.5})` : '#6a5228'; x.lineWidth = 2 * s; x.beginPath(); x.arc(cx, cy, R, 0, Math.PI * 2); x.stroke(); x.restore(); }
+    const hair = (col, w) => { x.fillStyle = col; x.fillRect(cx - (w - s) / 2, cy - 44 * s, w, 37 * s); x.fillRect(cx - (w - s) / 2, cy + 7 * s, w, 37 * s); x.fillRect(cx - 26 * s, cy - (w - s) / 2, 19 * s, w); x.fillRect(cx + 7 * s, cy - (w - s) / 2, 19 * s, w); };
+    hair('rgba(255,240,200,0.35)', 3 * s); hair('rgba(24,16,8,0.9)', s);
+    const cw = Math.min(W - 24 * s, 170 * s), ch = 15 * s, x0 = Math.round(cx - cw / 2), y0 = H - ch - 8 * s, span = 12, rd = this.reading();
+    x.fillStyle = '#120e0a'; x.fillRect(x0 - s, y0 - s, cw + 2 * s, ch + 2 * s); x.fillStyle = '#e6dab4'; x.fillRect(x0, y0, cw, ch);
+    x.save(); x.beginPath(); x.rect(x0, y0, cw, ch); x.clip(); x.textAlign = 'center'; x.textBaseline = 'bottom'; x.font = `${8 * s}px VT323, monospace`;
+    for (let a = Math.floor(rd - span - 1); a <= rd + span + 1; a++) { const X0 = Math.round(cx + (a - rd) / span * cw / 2), aa = wrap360(a), big = aa % 10 === 0;
+      x.fillStyle = '#2a1e10'; x.fillRect(X0, y0, s, big ? 6 * s : aa % 5 === 0 ? 4 * s : 2 * s);
+      if (big) { x.fillStyle = aa === 0 ? '#b0301a' : '#2a1e10'; x.fillText({ 0: 'N', 90: 'E', 180: 'S', 270: 'W' }[aa] || String(aa), X0 + s / 2, y0 + ch); } }
+    x.restore(); x.fillStyle = '#b0301a'; x.fillRect(cx - s, y0 - 3 * s, 2 * s, ch + 3 * s); // the lubber line: read the card here
+    // (what the spyglass is set to and the last bearing are page text, #survinfo: crisp where the HUD is pixelated)
+  },
+
+  /* ---------- the sheet: the map with the ruler and the field book ---------- */
+  openSheet() {
+    if (G.area.kind !== 'city') return;
+    this.sheet = true; this.arm = null; this.applyFov(); MapView.open();
+    if (!G.mapOpen) this.sheet = false;
+  },
+  onMapOpen() { $('mapdebug').hidden = G.area.kind !== 'city'; this.panel(); this.debugPanel(); },
+  onMapClose() { if (!this.showPos() && MapView.view) this.st().view = MapView.view.slice(); this.sheet = false; this.arm = null; this.grab = this.twist = null; this.ptrs.clear(); $('mapsurvey').hidden = true; this.applyFov(); },
+  sheetKey(c) {
+    if (c === 'KeyK') { this.close('You put the compass and the ruler away.'); return true; }
+    if (c === 'KeyM' || c === 'Escape') { MapView.close(); return true; } // back to the compass
+    const k = keyDown('ShiftLeft') || keyDown('ShiftRight') ? 1 : 0.1;
+    if (c === 'BracketLeft' || c === 'Comma') { this.turn(-k); return true; }
+    if (c === 'BracketRight' || c === 'Period') { this.turn(k); return true; }
+    if (c === 'Enter' || c === 'NumpadEnter') { this.line(); return true; }
+    if (c === 'Backspace') { this.undo(); return true; }
+    return false;
+  },
+  legend() { return Input.touch ? 'The survey sheet. Drag the ruler to move it: its pin settles on a landmark. Turn it by its knobs, or twist it with two fingers, to the bearing in your field book, then Draw line. Where the lines cross is where you stood.'
+    : 'The survey sheet. Drag the ruler to move it: its pin settles on a landmark. Turn it by the knobs at its ends ([ and ] or Shift+wheel turn it finely, Shift+[ ] by degrees) to the bearing in your field book, then Draw line (Enter). Where the lines cross is where you stood. M goes back to the compass.'; },
+  // the ruler on screen (CSS pixels): its pin, the way it points, its length and width
+  geo(t) { const R = this.st().ruler, d = t.dpr, a = R.a * Math.PI / 180, ux = Math.sin(a), uy = -Math.cos(a);
+    return { cx: (t.W / 2 + (R.x - t.cx) * t.scale) / d, cy: (t.H / 2 + (R.z - t.cz) * t.scale) / d, ux, uy, nx: -uy, ny: ux, half: Math.min(440, 0.42 * Math.min(innerWidth, innerHeight)), w: 30 }; },
+  brg(ax, ay, bx, by) { return wrap360(Math.atan2(bx - ax, -(by - ay)) * 180 / Math.PI); },
+  turn(d) { const R = this.st().ruler; if (!R) return; R.a = wrap360(Math.round((R.a + d) * 10) / 10); MapView.draw(); this.panelRuler(); },
+  // the line along the ruler's edge, carried on across the whole sheet (as with a long straight-edge: the landmarks stand kilometres off)
+  line() { const t = MapView.tf, R = this.st().ruler; if (!t || !R) return; const L = Math.max(this.geo(t).half * t.dpr / t.scale, 26000), a = R.a * Math.PI / 180, dx = Math.sin(a) * L, dz = -Math.cos(a) * L, r = v => Math.round(v * 10) / 10;
+    this.st().items.push({ k: 'line', ax: r(R.x - dx), az: r(R.z - dz), bx: r(R.x + dx), bz: r(R.z + dz), a: R.a }); SFX.play('click'); MapView.draw(); this.panel(); },
+  undo() { const s = this.st(); if (!s.items.length) return; s.items.pop(); MapView.draw(); this.panel(); },
+  // a tap on the sheet: marks where you are, when Mark is armed
+  tap(px, py) { if (this.arm !== 'mark') return; const w = MapView.toWorld(px, py), P = G.player; if (!w) return; const r = v => Math.round(v * 10) / 10;
+    this.st().items.push({ k: 'mark', x: r(w[0]), z: r(w[1]), tx: r(P.pos.x), tz: r(P.pos.z), t: Math.round(G.time) }); this.arm = null; SFX.play('click'); MapView.draw(); this.panel(); },
+  hit(px, py) { const t = MapView.tf; if (!t || !this.st().ruler) return null; const g = this.geo(t), dx = px - g.cx, dy = py - g.cy, al = dx * g.ux + dy * g.uy, ac = dx * g.nx + dy * g.ny;
+    if (Math.abs(al) > g.half + 8 || ac < -12 || ac > g.w + 12) return null; return Math.abs(al) > g.half - 44 ? 'turn' : 'move'; },
+  // pointers on the sheet (true: the ruler took it, the map does not pan)
+  pdown(e) {
+    this.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (this.grab && this.grab.id !== e.pointerId && !this.twist) { const p1 = this.ptrs.get(this.grab.id); if (p1) { this.twist = { id: e.pointerId, b0: this.brg(p1[0], p1[1], e.clientX, e.clientY), a0: this.st().ruler.a }; return true; } } // a second finger twists the ruler
+    const h = this.hit(e.clientX, e.clientY); if (!h) return false;
+    const R = this.st().ruler, g = this.geo(MapView.tf);
+    this.grab = h === 'turn' ? { id: e.pointerId, kind: 'turn', off: this.brg(g.cx, g.cy, e.clientX, e.clientY) - R.a } : { id: e.pointerId, kind: 'move', sx: e.clientX, sy: e.clientY, x0: R.x, z0: R.z };
+    return true;
+  },
+  pmove(e) {
+    if (!this.ptrs.has(e.pointerId)) return false; this.ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    const g0 = this.grab; if (!g0) return false; const R = this.st().ruler, t = MapView.tf;
+    if (this.twist) { const p1 = this.ptrs.get(g0.id), p2 = this.ptrs.get(this.twist.id); if (p1 && p2) R.a = wrap360(Math.round((this.twist.a0 + this.brg(p1[0], p1[1], p2[0], p2[1]) - this.twist.b0) * 10) / 10); }
+    else if (g0.id === e.pointerId) { if (g0.kind === 'move') { R.x = g0.x0 + (e.clientX - g0.sx) * t.dpr / t.scale; R.z = g0.z0 + (e.clientY - g0.sy) * t.dpr / t.scale; }
+      else { const g = this.geo(t); R.a = wrap360(Math.round((this.brg(g.cx, g.cy, e.clientX, e.clientY) - g0.off) * 10) / 10); } }
+    else return false;
+    MapView.draw(); this.panelRuler(); return true;
+  },
+  pup(e) {
+    this.ptrs.delete(e.pointerId); const g0 = this.grab; if (!g0) return false;
+    if (this.twist && e.pointerId === this.twist.id) { this.twist = null; return true; }
+    if (e.pointerId !== g0.id) return false;
+    this.twist = null; this.grab = null; if (g0.kind === 'move') this.snap(); MapView.draw(); this.panelRuler(); return true;
+  },
+  // the pin settles into a landmark dropped near it
+  snap() { const R = this.st().ruler, t = MapView.tf; let best = null, bd = 20 * t.dpr; for (const p of this.points()) { const d = Math.hypot(p.x - R.x, p.z - R.z) * t.scale; if (d < bd) { bd = d; best = p; } } if (best) { R.x = best.x; R.z = best.z; } },
+  pinned() { const R = this.st().ruler; return R && this.points().find(p => Math.hypot(p.x - R.x, p.z - R.z) < 0.5); },
+  rulerText() { const R = this.st().ruler; if (!R) return ''; const a = wrap360(R.a) % 180, f = v => v.toFixed(1).padStart(5, '0') + '°'; return `${f(a)} · ${f(a + 180)}`; },
+  panelRuler() { const e = $('svrb'); if (e) e.textContent = this.rulerText(); const p = $('svpin'); if (p) { const q = this.pinned(); p.textContent = q ? 'pinned in ' + q.name : 'pin not in a landmark'; } },
+  panel() {
+    const el = $('mapsurvey'); if (!this.sheet) { el.hidden = true; return; } el.hidden = false;
+    const s = this.st(), truth = s.opts.truth, sure = performance.now() - this.sure < 3000, pin = this.pinned();
+    const rows = s.reads.map((r, i) => [r, i]).reverse().map(([r, i]) => `<div class="rd"><span class="st">station ${r.st}</span><b>${fmtBearing(r.b)}</b>${truth ? `<small>true ${r.tb.toFixed(1)}°</small>` : ''}<button class="db xs" data-sv="del:${i}" aria-label="Strike out">✕</button></div>`).join('');
+    if (this.fold) { el.classList.add('fold'); el.innerHTML = `<button class="db sm" data-sv="fold">Field book and ruler ▸</button>`; return; } el.classList.remove('fold'); // (folded away, so a small screen shows the map)
+    el.innerHTML = `<h4>Field book <button class="db xs" data-sv="fold" aria-label="Fold the field book away">◂</button></h4><div class="book">${rows || '<p class="dim">No bearings yet: take them with the compass (Sight).</p>'}</div>
+      <h4>Ruler <span id="svrb" class="rb">${this.rulerText()}</span></h4><div id="svpin" class="dim">${pin ? 'pinned in ' + esc(pin.name) : 'pin not in a landmark'}</div>
+      <div class="tools"><button class="db xs" data-sv="t:-1">↺1°</button><button class="db xs" data-sv="t:-0.1">↺0.1°</button><button class="db xs" data-sv="t:0.1">0.1°↻</button><button class="db xs" data-sv="t:1">1°↻</button></div>
+      <div class="tools"><button class="db sm" data-sv="line">Draw line</button><button class="db sm${this.arm === 'mark' ? ' on' : ''}" data-sv="mark">${this.arm === 'mark' ? 'Tap where you are' : 'Mark my position'}</button></div>
+      <div class="tools"><button class="db sm" data-sv="undo" ${s.items.length ? '' : 'disabled'}>Undo</button><button class="db sm" data-sv="clear" ${s.items.length ? '' : 'disabled'}>${sure ? 'Clear: sure?' : 'Clear sheet'}</button><button class="db sm" data-sv="mid">Ruler here</button></div>
+      <div class="tools"><button class="db sm primary" data-sv="sight">Sight</button><button class="db sm" data-sv="away">Put away</button></div>`;
+  },
+  debugPanel() {
+    const el = $('mapdbg'), o = this.st().opts; $('mapdbgbtn').classList.toggle('on', this.dbgOpen); el.hidden = !this.dbgOpen; if (!this.dbgOpen) return;
+    const ch = (k, v, l) => `<button class="db xs${o[k] === v ? ' on' : ''}" data-sv="o:${k}:${v}">${l}</button>`, start = SURVEY_STARTS.find(q => q.id === this.st().start);
+    el.innerHTML = `<div class="opt"><b>Your position on the map</b>${ch('pos', 'always', 'Always')}${ch('pos', 'known', 'In the known land')}${ch('pos', 'never', 'Never')}</div>
+      <div class="opt"><b>Land beyond the known map</b>${ch('unknown', 'drawn', 'Drawn as you go')}${ch('unknown', 'blank', 'Left blank')}</div>
+      <div class="opt"><b>Compass needle</b>${ch('needle', 'swing', 'Swings and settles')}${ch('needle', 'steady', 'Steady and exact')}</div>
+      <div class="opt"><b>Check your fixes</b>${ch('truth', true, 'Show where you are')}${ch('truth', false, 'Hide')}</div>
+      <p class="dim">Started: ${esc(start ? start.name : 'Aldhaven')}. These belong to this game and are saved with it.</p>`;
+  },
+  act(a) {
+    const s = this.st();
+    if (a === 'dbg') { this.dbgOpen = !this.dbgOpen; this.debugPanel(); return; }
+    if (a.startsWith('o:')) { const [, k, v] = a.split(':'); const was = this.showPos(); s.opts[k] = v === 'true' ? true : v === 'false' ? false : v;
+      if (was && !this.showPos() && !MapView.view && MapView.tf) MapView.view = [MapView.tf.cx, MapView.tf.cz]; // (the map stops following you)
+      this.debugPanel(); this.panel(); MapView.draw(); return; }
+    if (a.startsWith('t:')) { this.turn(+a.slice(2)); return; }
+    if (a.startsWith('del:')) { s.reads.splice(+a.slice(4), 1); this.panel(); return; }
+    if (a === 'fold') { this.fold = !this.fold; this.panel(); return; }
+    if (a === 'line') this.line();
+    else if (a === 'mark') { this.arm = this.arm === 'mark' ? null : 'mark'; this.panel(); }
+    else if (a === 'undo') this.undo();
+    else if (a === 'clear') { if (performance.now() - this.sure < 3000) { s.items = []; this.sure = 0; MapView.draw(); } else this.sure = performance.now(); this.panel(); }
+    else if (a === 'mid') { const t = MapView.tf; if (t && s.ruler) { s.ruler.x = t.cx; s.ruler.z = t.cz; MapView.draw(); this.panelRuler(); } }
+    else if (a === 'sight') MapView.close();
+    else if (a === 'away') this.close('You put the compass and the ruler away.');
+  },
+  // the unknown land, left blank: paper beyond the edge of the known map
+  blankOut(x, X, Z, W, H) {
+    const x0 = X(WORLD.x0), z0 = Z(WORLD.z0), x1 = X(WORLD.x1), z1 = Math.max(H, Z(WORLD.z1)) + 10;
+    x.save(); x.fillStyle = '#2b2a20'; x.beginPath(); x.rect(0, 0, W, H); x.rect(x0, z0, x1 - x0, z1 - z0); x.fill('evenodd');
+    x.strokeStyle = 'rgba(200,180,130,0.45)'; x.lineWidth = 2; x.setLineDash([10, 6]); x.beginPath(); x.moveTo(x0, z1); x.lineTo(x0, z0); x.lineTo(x1, z0); x.lineTo(x1, z1); x.stroke(); x.restore();
+  },
+  // pencil lines and your marks (under the map's labels), and the landmarks you can sight while the kit is out
+  drawMap(x, X, Z, t) {
+    const s = this.st(), d = t.dpr; x.save(); x.lineCap = 'round';
+    for (const it of s.items) if (it.k === 'line') { x.strokeStyle = 'rgba(0,0,0,0.5)'; x.lineWidth = Math.max(2, 2.6 * d); x.beginPath(); x.moveTo(X(it.ax), Z(it.az)); x.lineTo(X(it.bx), Z(it.bz)); x.stroke();
+      x.strokeStyle = 'rgba(232,224,204,0.92)'; x.lineWidth = Math.max(1, 1.2 * d); x.stroke(); }
+    if (this.on || this.sheet) for (const p of this.points()) { const px = X(p.x), pz = Z(p.z); x.strokeStyle = '#1b1712'; x.lineWidth = 3 * d; x.beginPath(); x.arc(px, pz, 4.5 * d, 0, 7); x.stroke(); x.strokeStyle = '#f0d27a'; x.lineWidth = 1.4 * d; x.stroke(); x.fillStyle = '#f0d27a'; x.fillRect(px - d, pz - d, 2 * d, 2 * d); }
+    let n = 0; x.font = `${Math.round(13 * d)}px VT323, monospace`; x.textAlign = 'left'; x.textBaseline = 'middle';
+    for (const it of s.items) if (it.k === 'mark') { n++; const px = X(it.x), pz = Z(it.z), r = 6 * d;
+      x.strokeStyle = '#1b1712'; x.lineWidth = 3.5 * d; x.beginPath(); x.arc(px, pz, r, 0, 7); x.stroke(); x.strokeStyle = '#e8573a'; x.lineWidth = 1.8 * d; x.stroke(); x.fillStyle = '#e8573a'; x.beginPath(); x.arc(px, pz, 1.6 * d, 0, 7); x.fill();
+      x.fillStyle = '#000'; x.fillText(String(n), px + r + 3 * d + 1, pz + 1); x.fillStyle = '#ffb49a'; x.fillText(String(n), px + r + 3 * d, pz); }
+    x.restore();
+  },
+  // over everything: the ruler, and (to check your work) where you really are
+  drawTop(x, X, Z, t) {
+    const s = this.st(), d = t.dpr, P = G.player;
+    if (s.opts.truth && P) { x.save(); x.font = `${Math.round(13 * d)}px VT323, monospace`; x.textBaseline = 'middle'; let n = 0;
+      for (const it of s.items) if (it.k === 'mark') { n++; const a = [X(it.x), Z(it.z)], b = [X(it.tx), Z(it.tz)], m = Math.hypot(it.x - it.tx, it.z - it.tz);
+        x.strokeStyle = '#ff6a4a'; x.lineWidth = 1.2 * d; x.setLineDash([4 * d, 3 * d]); x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); x.setLineDash([]);
+        const txt = `${n}: ${m >= 1000 ? (m / 1000).toFixed(2) + ' km' : Math.round(m) + ' m'} off`; x.textAlign = 'left'; x.fillStyle = '#000'; x.fillText(txt, a[0] + 10 * d + 1, a[1] + 12 * d + 1); x.fillStyle = '#ff9a7a'; x.fillText(txt, a[0] + 10 * d, a[1] + 12 * d); }
+      const px = X(P.pos.x), pz = Z(P.pos.z), k = 7 * d; x.strokeStyle = '#000'; x.lineWidth = 4 * d; x.beginPath(); x.moveTo(px - k, pz - k); x.lineTo(px + k, pz + k); x.moveTo(px + k, pz - k); x.lineTo(px - k, pz + k); x.stroke(); x.strokeStyle = '#ff4a3a'; x.lineWidth = 2 * d; x.stroke();
+      x.textAlign = 'left'; x.fillStyle = '#000'; x.fillText('you are here', px + k + 4 * d + 1, pz + 1); x.fillStyle = '#ff9a7a'; x.fillText('you are here', px + k + 4 * d, pz); x.restore(); }
+    if (!this.sheet) return;
+    if (!s.ruler) s.ruler = { x: t.cx, z: t.cz, a: 0 }; // (first laid in the middle of the sheet)
+    const g = this.geo(t), Q = (al, ac) => [(g.cx + g.ux * al + g.nx * ac) * d, (g.cy + g.uy * al + g.ny * ac) * d];
+    x.save(); x.beginPath(); [[-g.half, 0], [g.half, 0], [g.half, g.w], [-g.half, g.w]].forEach(([al, ac], i) => { const [px, py] = Q(al, ac); i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.closePath();
+    x.fillStyle = 'rgba(214,190,130,0.6)'; x.fill(); x.strokeStyle = 'rgba(50,34,16,0.9)'; x.lineWidth = 1.5 * d; x.stroke();
+    x.strokeStyle = 'rgba(46,30,14,0.95)'; x.lineWidth = d; for (let k = -40; k <= 40; k++) { const al = k / 40 * g.half, L = k % 10 === 0 ? 13 : k % 5 === 0 ? 9 : 5; const [ax, ay] = Q(al, 0), [bx, by] = Q(al, L); x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); }
+    { const [ax, ay] = Q(-g.half, 0), [bx, by] = Q(g.half, 0); x.strokeStyle = '#1e1408'; x.lineWidth = 1.6 * d; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); } // the drawing edge, through the pin
+    for (const sg of [-1, 1]) { const [kx, ky] = Q(sg * (g.half - 20), g.w / 2 + 2); x.fillStyle = 'rgba(110,76,36,0.95)'; x.strokeStyle = '#1e1408'; x.lineWidth = 1.5 * d; x.beginPath(); x.arc(kx, ky, 10 * d, 0, 7); x.fill(); x.stroke();
+      x.strokeStyle = '#e8d29a'; x.lineWidth = 1.4 * d; x.beginPath(); x.arc(kx, ky, 5.5 * d, -2.4, 1.6); x.stroke(); } // the knobs to turn it by
+    const [pX, pY] = Q(0, 0); x.fillStyle = '#e8c860'; x.strokeStyle = '#1e1408'; x.lineWidth = 1.6 * d; x.beginPath(); x.arc(pX, pY, 4.5 * d, 0, 7); x.fill(); x.stroke(); // the pin
+    const [lx, ly] = Q(0, g.w + 16), txt = this.rulerText(); x.font = `${Math.round(17 * d)}px VT323, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle'; const tw = x.measureText(txt).width + 12 * d;
+    x.fillStyle = 'rgba(20,16,12,0.85)'; x.fillRect(lx - tw / 2, ly - 10 * d, tw, 20 * d); x.fillStyle = '#f0d890'; x.fillText(txt, lx, ly + d);
+    x.restore();
+  },
+};
+
+/* =====================================================================
    Touch controls for tablets: a floating stick under the left thumb,
    drag anywhere else to look, and stone buttons that stand in for keys.
    They switch on with the first touch (or always / never, in Settings);
@@ -9341,8 +9662,8 @@ const Touch = {
     const el = this.el = $('touch');
     const b = (k, label, cls = '') => `<button class="tb ${cls}" data-k="${k}">${label}</button>`;
     el.innerHTML = `<div class="stk" hidden><i></i></div>
-      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
-      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}
+      <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyK', 'Survey', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
+      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}${b('svTake', 'Bearing')}${b('svIn', '+')}${b('svOut', '−')}${b('svMap', 'Sheet')}
         <div class="tside">${b('KeyH', 'Potion', 'pill')}${b('KeyZ', 'Draw', 'pill')}${b('spell', 'Spell', 'pill')}${b('KeyG', 'Fly', 'pill')}</div></div>`;
     this.btn = {}; for (const e of el.querySelectorAll('[data-k]')) this.btn[e.dataset.k] = e;
     if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) this.btn.full.remove();
@@ -9376,14 +9697,17 @@ const Touch = {
     if (show !== this.shown) { this.shown = show; this.el.classList.toggle('live', show); if (!show) this.release(); }
     if (!show) return;
     const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal');
-    const sig = [rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
+    const sv = Survey.on, sig = [sv, rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
     if (sig === this.sig) return; this.sig = sig;
     const B = this.btn;
     B.use.classList.toggle('ready', !!G.focus);
-    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying;
-    B.KeyG.hidden = !settings.dbgFly; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
-    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = B.KeyI.hidden = !rpg;
-    B.cast.hidden = !rpg || !P.spells.length; B.spell.hidden = !rpg || P.spells.length < 2;
+    B.Space.textContent = G.flying ? 'Rise' : 'Jump'; B.KeyX.hidden = !G.flying || sv;
+    B.KeyG.hidden = !settings.dbgFly || sv; B.KeyG.textContent = G.flying ? 'Land' : 'Fly';
+    const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = !rpg || sv; B.KeyI.hidden = !rpg;
+    B.cast.hidden = !rpg || !P.spells.length || sv; B.spell.hidden = !rpg || P.spells.length < 2 || sv;
+    // the compass in hand: note a bearing, work the spyglass, open the sheet
+    B.use.hidden = B.Space.hidden = sv; for (const k of ['svTake', 'svIn', 'svOut', 'svMap']) B[k].hidden = !sv;
+    B.KeyK.textContent = sv ? 'Put away' : 'Survey'; B.KeyK.classList.toggle('ready', sv);
     this.el.classList.toggle('min', !rpg);
     B.KeyZ.textContent = P.sheathed ? 'Draw' : 'Sheathe';
     B.KeyH.textContent = pots ? `Potion ×${pots.qty}` : 'Potion'; B.KeyH.classList.toggle('off', !pots);
@@ -9453,6 +9777,9 @@ const Touch = {
     if (k === 'use') { if (G.focus) interact(); else msg('There is nothing within reach to use.'); return; }
     if (k === 'spell') { if (P.spells.length) { P.spell = (P.spell + 1) % P.spells.length; msg(`Spell selected: ${SPELLS[P.spells[P.spell]].name}.`); } return; }
     if (k === 'full') { this.fullscreen(); return; }
+    if (k === 'svTake') { Survey.take(); return; }
+    if (k === 'svIn' || k === 'svOut') { Survey.zoomBy(k === 'svIn' ? 1.4 : 1 / 1.4); return; }
+    if (k === 'svMap') { Survey.openSheet(); return; }
     onKey({ code: k, preventDefault() {} });
   },
   unpress(k) { if (k === 'Space' || k === 'KeyX') Input.vkeys[k] = false; },
@@ -9855,8 +10182,8 @@ const UI = {
     });
   },
   openControls(back) {
-    const rows = [['W A S D', 'Move'], ['Mouse', 'Look (click the view to capture the mouse)'], ['Shift', 'Run'], ['Space', 'Jump'], ['Left click', 'Attack with your weapon (draws it first if sheathed)'], ['Z', 'Draw or sheathe your weapon'], ['Right click / Q', 'Cast selected spell'], ['1 – 3', 'Select spell'], ['E or F', 'Talk, open doors, search corpses and chests'], ['H', 'Drink a healing potion'], ['I or C', 'Character sheet and inventory'], ['J', 'Journal'], ['M', 'Map (mouse wheel zooms)'], ['R', 'Rest or wait'], ['T', 'Hire a carriage (at a stop, or find the nearest one)'], ['G', 'Fly on / off (debug; enable it in Settings). Space rises, X sinks, you fly where you look'], ['F5 / F9', 'Quick save / quick load'], ['N', 'Toggle music'], ['Arrow keys', 'Turn and move without a mouse'], ['Esc', 'Pause menu']];
-    const touch = [['Left side', 'Put a thumb down anywhere and push to walk; push to the edge to run'], ['Right side', 'Drag to look around; tap to talk or open what you are facing'], ['Attack', 'Swing your weapon (the first tap draws it). Keep your thumb down and drag to aim'], ['Use', 'Talk, open doors, search corpses and chests (lights up when something is in reach)'], ['Cast', 'Cast the selected spell; Spell switches between spells'], ['Jump', 'Jump, or rise while flying (Down sinks)'], ['Top row', 'Pause menu, map, journal, character sheet, rest and carriages'], ['Rest screen', 'Tap it to stop resting'], ['Menus', 'Tap outside a menu to close it and return to the game']];
+    const rows = [['W A S D', 'Move'], ['Mouse', 'Look (click the view to capture the mouse)'], ['Shift', 'Run'], ['Space', 'Jump'], ['Left click', 'Attack with your weapon (draws it first if sheathed)'], ['Z', 'Draw or sheathe your weapon'], ['Right click / Q', 'Cast selected spell'], ['1 – 3', 'Select spell'], ['E or F', 'Talk, open doors, search corpses and chests'], ['H', 'Drink a healing potion'], ['I or C', 'Character sheet and inventory'], ['J', 'Journal'], ['M', 'Map (mouse wheel zooms)'], ['R', 'Rest or wait'], ['K', 'Survey: take out the compass (click notes a bearing, wheel works the spyglass, M opens the map with the ruler), K again puts it away'], ['T', 'Hire a carriage (at a stop, or find the nearest one)'], ['G', 'Fly on / off (debug; enable it in Settings). Space rises, X sinks, you fly where you look'], ['F5 / F9', 'Quick save / quick load'], ['N', 'Toggle music'], ['Arrow keys', 'Turn and move without a mouse'], ['Esc', 'Pause menu']];
+    const touch = [['Left side', 'Put a thumb down anywhere and push to walk; push to the edge to run'], ['Right side', 'Drag to look around; tap to talk or open what you are facing'], ['Attack', 'Swing your weapon (the first tap draws it). Keep your thumb down and drag to aim'], ['Use', 'Talk, open doors, search corpses and chests (lights up when something is in reach)'], ['Cast', 'Cast the selected spell; Spell switches between spells'], ['Jump', 'Jump, or rise while flying (Down sinks)'], ['Top row', 'Pause menu, map, journal, character sheet, rest, survey and travel'], ['Survey', 'The compass: drag to aim, Bearing notes it, + and − work the spyglass, Sheet opens the map with the ruler (move it, turn it by its knobs or with two fingers)'], ['Rest screen', 'Tap it to stop resting'], ['Menus', 'Tap outside a menu to close it and return to the game']];
     const table = (r) => `<div class="keys">${r.map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>`;
     this.open('controls', () => `<h2>Controls</h2><div class="scroll" style="max-height:64vh">${Input.touch ? `<h3>Touch</h3>${table(touch)}<h3>Keyboard and mouse</h3>` : ''}${table(rows)}${Input.touch ? '' : `<h3>Touch screens</h3>${table(touch)}`}</div><div class="btns"><button class="db" data-a="back">Back</button>${this.resumeBtn()}</div>`,
       { cls: 'mid', leave: this.subLeave(back), onAct: (a) => { if (a === 'resume') this.close(true); else if (a === 'back') back ? back() : this.close(); }, onClose: null });
@@ -9904,7 +10231,7 @@ const UI = {
     const s = nearestStop(P.pos.x, P.pos.z), km = d => d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d / 10) * 10 + ' m';
     const render = () => `<h2>Travel on foot</h2><p class="dim">The world runs faster while you travel. Any key, or a tap on the banner, stops you; so does anything worth stopping for.</p>
       <div class="btns col">${Travel.paused ? `<button class="db primary" data-a="resume" autofocus>${Travel.paused.c.mode === 'ahead' ? 'Go on the way you were going' : `Go on to ${esc(Travel.paused.c.name)}`}</button>` : ''}<button class="db" data-a="ahead">Walk straight on (${dir})</button>${road ? `<button class="db" data-a="road">Follow this road to the next fork (${km(road.len)})</button>` : ''}<button class="db" data-a="map">Choose a place on the map</button></div>
-      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)} · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
+      ${goals.length ? `<div class="list scroll">${goals.map((g, i) => `<div class="row"><div class="nm">${esc(g.name)}<small>${esc(g.sub)}${Survey.showPos() ? ` · ${km(g.d)} ${describeDir(P.pos.x, P.pos.z, g.x, g.z).replace(/^.* to the /, '').replace(/ of here$/, '')}` : ''}</small></div><button class="db sm" data-a="r${i}">By road</button><button class="db sm" data-a="s${i}">Straight</button></div>`).join('')}</div>` : '<p class="note">Landmarks you find, or hear of from people on the road, are listed here.</p>'}
       <div class="btns"><span class="dim">Speed</span>${Travel.SPEEDS.map(v => `<button class="db sm${Travel.rate() === v ? ' primary' : ''}" data-a="v${v}">×${v}</button>`).join('')}</div>
       ${s && insideCity(P.pos.x, P.pos.z, -40) ? `<p class="note">Inside the walls the carriages are quicker: the nearest stop is at ${esc(s.name)}, ${describeDir(P.pos.x, P.pos.z, s.x, s.z)}.</p>` : ''}
       <div class="btns"><button class="db" data-a="close">Stay here</button></div>`;
@@ -9954,12 +10281,12 @@ const MapView = {
   // pick: opened to choose where to travel (starts zoomed out over the country)
   open(pick = false) {
     if (G.area.kind === 'interior') { msg(`You are inside ${G.area.name}. There is no need for a map here.`); return; }
-    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = null; this.dest = null; $('mapdest').hidden = true;
+    G.mapOpen = true; G.uiOpen = true; exitLock(); $('mapview').hidden = false; this.view = Survey.showPos() ? null : Survey.st().view || Survey.anchor(); this.dest = null; $('mapdest').hidden = true; // (a map that does not show you stays where you left it)
     const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
-    this.draw();
+    this.draw(); Survey.onMapOpen();
     if (Travel.paused && G.area === G.city) { const c = Travel.paused.c, el = $('mapdest'); el.innerHTML = `<span class="nm">${esc(c.mode === 'ahead' ? 'Your walk, paused' : `Your journey to ${c.name}, paused`)}</span><button class="db sm" data-m="resume">Go on</button><button class="db sm" data-m="clear">✕</button>`; el.hidden = false; } // (a paused journey can be taken up from the map too)
   },
-  close() { G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
+  close() { Survey.onMapClose(); G.mapOpen = false; G.uiOpen = false; $('mapview').hidden = true; $('mapdest').hidden = true; if (G.state === 'play') requestLock(false); },
   setZoom(z) { this.zoom = clamp(z, this.ZMIN, this.ZMAX); this.draw(); },
   // a country, shaded, drawn once: sea, lowland, upland, woods, bare rock and snow. The home country at 300 pixels square when the map is
   // first opened; the others at 150 (the same scale) as the last step of their plan, with their rivers and roads drawn in, and kept after the country
@@ -9995,7 +10322,7 @@ const MapView = {
     for (const S of SITES) { const d = Math.hypot((S.x - w[0]) * t.scale, (S.z - w[1]) * t.scale); if (d < bd && ((G.flags.found || {})[S.id] || (G.flags.heard || {})[S.id])) { bd = d; best = { name: S.name, x: S.road[0][0], z: S.road[0][1] }; } }
     this.dest = best ? { ...best } : { name: 'the place you marked', x: w[0], z: w[1] };
     const d = Math.hypot(this.dest.x - P.pos.x, this.dest.z - P.pos.z), el = $('mapdest');
-    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))} · ${d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m'}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
+    el.innerHTML = `<span class="nm">${esc(capFirst(this.dest.name))}${Survey.showPos() ? ' · ' + (d >= 1000 ? (d / 1000).toFixed(1) + ' km' : Math.round(d) + ' m') : ''}</span><button class="db sm" data-m="road">Travel by road</button><button class="db sm" data-m="straight">Go straight there</button><button class="db sm" data-m="clear">✕</button>`;
     el.hidden = false; this.draw();
   },
   go(how) {
@@ -10009,8 +10336,9 @@ const MapView = {
     const legend = $('maplegend');
     if (G.area.kind === 'dungeon') { this.drawDungeon(x, W, H); legend.textContent = 'The Catacombs — explored passages. The door marks the way out. (M or Esc to close)'; return; }
     const M = G.city.map; const span = 262 / this.zoom; const scale = Math.min(W, H) / (span * 2), region = this.zoom < 0.95;
-    let cx = this.zoom > 1.05 ? clamp(P.pos.x, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(P.pos.z, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
-    if (region || Math.hypot(P.pos.x, P.pos.z) > 900) { cx = P.pos.x; cz = P.pos.z; } // (out in the country, or in another town, the map is about where you are)
+    const [ax, az] = Survey.showPos() ? [P.pos.x, P.pos.z] : Survey.anchor(); // (where you are, or where the map was left when it does not show you)
+    let cx = this.zoom > 1.05 ? clamp(ax, -WORLD_R + span, WORLD_R - span) : 0, cz = this.zoom > 1.05 ? clamp(az, -WORLD_R + span, WORLD_R - span) : -30; // unzoomed: the city plus Pilgrim's Rise
+    if (region || Math.hypot(ax, az) > 900) { cx = ax; cz = az; } // (out in the country, or in another town, the map is about where you are)
     if (this.view) { cx = this.view[0]; cz = this.view[1]; }
     this.tf = { cx, cz, scale, W, H, dpr };
     const X = v => W / 2 + (v - cx) * scale, Z = v => H / 2 + (v - cz) * scale;
@@ -10097,18 +10425,21 @@ const MapView = {
       if (f) { if (this.zoom >= 0.3) for (const l of T.landmarks) if (!l.gate || this.zoom >= 1) labels.push([capFirst(l.name), X(l.x), Z(l.z) - 6, '#d8cca8', Math.round(fs * 0.85)]);
  }
       if (this.zoom < 0.3) labels.push([T.name, X(T.x), Z(T.z) - 8, '#efe2b8', Math.round(fs * 1.1)]); } // (the big towns are known by name from the start)
+    if (Survey.blank()) Survey.blankOut(x, X, Z, W, H); // the land beyond the known map, left blank
     // the landmarks you know of, the places you have come upon, the way you are going
     const found = G.flags.found || {}, heard = G.flags.heard || {};
     for (const S of SITES) { if ((!found[S.id] && !heard[S.id]) || (S.kind === 'town' && found[S.id])) continue; const px = X(S.x), pz = Z(S.z), r = Math.max(5, 7 * dpr);
       x.fillStyle = found[S.id] ? '#e8d8a8' : 'rgba(232,216,168,0.45)'; x.strokeStyle = '#1b1712'; x.lineWidth = 2; x.beginPath(); x.moveTo(px, pz - r); x.lineTo(px + r, pz); x.lineTo(px, pz + r); x.lineTo(px - r, pz); x.closePath(); x.fill(); x.stroke();
       labels.push([S.name.replace(/^the /, 'The ') + (found[S.id] ? '' : ' ?'), px, pz - r - 6, found[S.id] ? '#efe2b8' : '#b8a888', Math.round(fs * 0.95)]); }
-    for (const p of POI.known()) { circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
-    if (Travel.cur || Travel.paused) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
+    for (const p of POI.known()) { if (Survey.blank() && !Survey.known(p.x, p.z)) continue; circ(p.x, p.z, Math.max(2.5 * dpr, 4) / scale, '#c8a860'); if (this.zoom > 0.25) labels.push([capFirst(p.name.replace(/^an? /, '')), X(p.x), Z(p.z) - 8, '#c8b890', Math.round(fs * 0.75)]); }
+    if ((Travel.cur || Travel.paused) && Survey.showPos()) { const pts = (Travel.cur || Travel.paused.c).pts; x.strokeStyle = '#ffd24a'; x.lineWidth = Math.max(2, 2 * dpr); x.setLineDash([8, 6]); x.beginPath(); pts.forEach(([px, pz], q) => q ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); x.stroke(); x.setLineDash([]); }
     if (this.dest) { const px = X(this.dest.x), pz = Z(this.dest.z); x.strokeStyle = '#ffd24a'; x.lineWidth = 3; x.beginPath(); x.moveTo(px - 9, pz - 9); x.lineTo(px + 9, pz + 9); x.moveTo(px + 9, pz - 9); x.lineTo(px - 9, pz + 9); x.stroke(); }
+    Survey.drawMap(x, X, Z, this.tf); // pencil lines and marks
     x.textAlign = 'center';
     for (const [l, lx, lz, col, size] of labels) { x.font = `${size || fs}px VT323, monospace`; x.fillStyle = '#000'; x.fillText(l, lx + 1, lz + 1); x.fillStyle = col || '#efe2b8'; x.fillText(l, lx, lz); }
-    this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
-    legend.textContent = G.area.kind !== 'city' ? '' : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
+    Survey.drawTop(x, X, Z, this.tf); // the ruler, and where you really are when checking
+    if (Survey.showPos()) this.arrow(x, X(P.pos.x), Z(P.pos.z), P.yaw, Math.max(8, 10 * Math.sqrt(this.zoom)));
+    legend.textContent = G.area.kind !== 'city' ? '' : Survey.sheet ? Survey.legend() : region ? `The country round Aldhaven — landmarks you know of are marked. ${Input.touch ? 'Drag to look around, tap a place to travel there; + and − zoom.' : 'Drag to look around, click a place to travel there; wheel or + / − zoom. (M or Esc to close)'}`
       : 'Aldhaven — gold wheels are carriage stops, buildings you know are named, yellow marks your objectives. ' + (Input.touch ? 'Zoom with + and −; tap a place to travel there.' : 'Wheel or + / − to zoom; click a place to travel there. (M or Esc to close)');
   },
   drawDungeon(x, W, H) {
@@ -10159,7 +10490,7 @@ function drawHUD() {
   const P = G.player; const s = Math.max(1, Math.round(H / 190));
   // weapon / casting hands
   const rpg = rpgUI();
-  if (rpg && !P.dead && (!P.sheathed || P.castT >= 0)) {
+  if (rpg && !P.dead && !Survey.on && (!P.sheathed || P.castT >= 0)) {
     const bobX = Math.sin(P.bob) * 3 * s, bobY = Math.abs(Math.cos(P.bob)) * 3 * s + (1 - (P.drawT ?? 1)) * 70 * s;
     const art = weaponArt(P.equip.weapon); const ws = s * 1.25;
     let ox = W * 0.47 + bobX, oy = H - 76 * ws + bobY + 6 * s, rot = 0;
@@ -10177,7 +10508,7 @@ function drawHUD() {
     x.save(); x.imageSmoothingEnabled = false; x.translate(ox + 56 * ws, oy + 60 * ws); x.rotate(rot); x.drawImage(art, -56 * ws, -60 * ws, 80 * ws, 80 * ws); x.restore();
   }
   // crosshair
-  x.fillStyle = 'rgba(255,236,190,0.75)'; x.fillRect(Math.round(W / 2) - s, Math.round(H / 2), 3 * s, s); x.fillRect(Math.round(W / 2), Math.round(H / 2) - s, s, 3 * s);
+  if (!Survey.on) { x.fillStyle = 'rgba(255,236,190,0.75)'; x.fillRect(Math.round(W / 2) - s, Math.round(H / 2), 3 * s, s); x.fillRect(Math.round(W / 2), Math.round(H / 2) - s, s, 3 * s); }
   // vitals
   if (rpg) {
   const bw = 4 * s, bh = 42 * s, bx = 6 * s, by = H - 6 * s - bh;
@@ -10189,7 +10520,8 @@ function drawHUD() {
   const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal'); label(`${P.gold}g${pots ? '  ' + pots.qty + '♥' : ''}`, bx + 3 * (bw + 2 * s) + 2 * s, H - 15 * s);
   if (G.wanted && G.area.kind === 'city') label('WANTED', bx, by - 3 * s, Math.floor(performance.now() / 400) % 2 ? '#ff5a4a' : '#a02a20');
   }
-  // compass
+  // compass: the sighting card while surveying
+  if (Survey.on) { Survey.hud(x, W, H, s); return; }
   const cw = 76 * s, ch = 11 * s, cx0 = W - cw - 6 * s, cy0 = H - ch - 6 * s;
   x.fillStyle = '#120e0a'; x.fillRect(cx0 - s, cy0 - s, cw + 2 * s, ch + 2 * s); x.fillStyle = '#3a3028'; x.fillRect(cx0, cy0, cw, ch);
   const heading = ((-P.yaw * 180 / Math.PI) % 360 + 360) % 360;
@@ -10300,6 +10632,7 @@ function updateSky(area, dt) {
   const hi = Math.max(cp.y - 2, above), lift = 1 + clamp((hi - 4) / 22, 0, 2.6) + 3.2 * smoothstep(70, 260, hi); // and from the peaks, or on the wing, across the country
   const open = 1 + 0.55 * smoothstep(420, 1000, Math.max(Math.abs(cp.x), Math.abs(cp.z))); // out in the open country the air is clearer than over the smoky town
   area.scene.fog.near = lerp(18, 60, L) * fogMul * (1 + (lift - 1) * 0.18) * open; area.scene.fog.far = lerp(115, 260, L) * fogMul * lift * open;
+  { const k = Survey.fogK(); area.scene.fog.near *= k; area.scene.fog.far *= k; } // (through the spyglass far things stand clear of the haze)
   S.sky.position.copy(cp); S.stars.position.copy(cp); S.mountains.position.set(cp.x, 38, cp.z); S.mountains.visible = false; // real ground now reaches the horizon; the painted range would only fight it
   S.clouds.position.set(cp.x, Math.max(170, cp.y + 90), cp.z); // the cloud deck stays overhead, even on the peaks
   S.starMat.opacity = clamp((0.55 - L) * 2.6, 0, 1) * (wx === 'clear' ? 1 : 0.2);
@@ -10547,7 +10880,7 @@ function saveGame() {
 }
 function loadGame(data) {
   data = data || readSave(); if (!data || !data.player) { msg('No saved game found.'); return; }
-  if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
+  Survey.close(); if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
   leaveCurrentArea(); G.area = G.city;
   G.time = data.time; G.flags = data.flags || {}; G.quests = data.quests || []; G.wanted = data.wanted; G.bState = data.bState || {}; G.weather = data.weather || 'clear'; G.weatherDay = data.weatherDay ?? -1;
   const sp = data.player; const P = { ...sp, pos: new THREE.Vector3(...sp.pos), vy: 0, onGround: true, swingT: -1, castT: -1, dead: false, hurtT: 0, equip: { weapon: null, body: null, head: null, shield: null } };
@@ -10579,9 +10912,10 @@ function beginNewGame(cfg) {
   leaveCurrentArea(); G.area = G.city; populateCity(G.city);
   G.player = newPlayer(cfg); markDiscovered(G.buildings.find(b => b.id === 'castle'));
   G.state = 'play'; $('title').hidden = true; $('msgs').innerHTML = '';
-  const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); G.player.pitch = S.pitch || 0; if (S.y != null) G.player.pos.y = S.y; G.player.sheathed = true; G.lastDistrict = 'outside';
+  const start = Survey.place(); G.player.sheathed = true; // (Aldhaven, Corrinvale or the edge of the known map: src/11_survey.js)
   // the story introduction (INTRO) is set aside while the project concentrates on the world itself; the hints wait so the first look is clear
   setTimeout(() => { if (G.state !== 'play') return;
+    const w = Survey.welcome(start); if (w) { for (const m of w) msg(m); return; }
     if (Input.touch) {
       msg('Welcome to Aldhaven. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
       msg('Carriages wait at signposts marked with a wheel. Tap Use at one, or Travel near one, to ride across the city.');
@@ -10592,7 +10926,7 @@ function beginNewGame(cfg) {
   }, 6000);
 }
 function toTitle() {
-  if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
+  Survey.close(); if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
   exitLock(); leaveCurrentArea(); G.area = G.city; G.state = 'title'; G.time = 18 * 60 + 5;
   $('title').hidden = false; $('msgs').innerHTML = ''; $('hint').textContent = ''; $('status').textContent = '';
   const cont = $('title').querySelector('[data-t="continue"]'); if (cont) cont.disabled = !readSave();
@@ -10647,6 +10981,7 @@ function frame(now) {
     if (G.resting) updateRest(dt);
     else if (!frozen) {
       if (Travel.cur) sdt = Travel.update(dt); else { updatePlayer(dt); Travel.watchPaused(); }
+      Survey.update(dt);
       G.time += sdt * TIME_SCALE; updateWeather();
       if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); for (const T of TOWNS) T.updateFolk(G.player.pos.x, G.player.pos.z, sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
@@ -10689,7 +11024,7 @@ function onKey(e) {
   const c = e.code;
   if (['F5', 'F9', 'Tab'].includes(c) || (c === 'Space' && G.state === 'play')) e.preventDefault();
   if (G.state !== 'play' || !G.player) return;
-  if (G.mapOpen) { if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
+  if (G.mapOpen) { if (Survey.sheet && Survey.sheetKey(c)) return; if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
   if (UI.cur) {
     if (c === 'Escape') { if (UI.cur.closable) UI.close(); return; }
     if ((c === 'KeyI' || c === 'KeyC' || c === 'Tab') && UI.is('char')) UI.close();
@@ -10699,6 +11034,7 @@ function onKey(e) {
   if (G.resting) { if (c === 'Escape' || c === 'KeyR') stopRest('You stop resting.'); return; }
   if (Travel.cur && !['F5', 'F9', 'KeyN'].includes(c)) { Travel.stop('You stop.'); if (['Escape', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space', 'KeyT', 'KeyV'].includes(c)) return; }
   if (G.player.dead || G.fading) return;
+  if (Survey.on && Survey.key(c)) return; // the compass in hand: bearings, the spyglass, the sheet
   switch (c) {
     case 'Escape': UI.openPause(); break;
     case 'KeyE': case 'KeyF': interact(); break;
@@ -10707,6 +11043,7 @@ function onKey(e) {
     case 'KeyM': MapView.open(); break;
     case 'Enter': case 'NumpadEnter': if (Travel.paused) Travel.resume(); break;
     case 'KeyR': UI.openRest(); break;
+    case 'KeyK': Survey.toggle(); break;
     case 'KeyT': case 'KeyV': UI.openTravel(); break;
     case 'KeyQ': startCast(); break;
     case 'KeyH': if (rpgUI()) quickPotion(); break;
@@ -10736,14 +11073,16 @@ function bindInput() {
     if (G.state !== 'play' || G.uiOpen || G.resting || !G.player || G.player.dead) return;
     if (!Input.locked && !Input.fallback) { requestLock(true); return; }
     if (Input.fallback) { Input.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button }; return; }
+    if (Survey.on) { if (e.button === 0) Survey.take(); return; }
     if (e.button === 0) startAttack(); else if (e.button === 2) startCast();
   });
   addEventListener('mouseup', e => {
     if (!Input.drag) return;
-    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
+    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Survey.on) { if (Input.drag.button === 0) Survey.take(); } else if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
     Input.drag = null;
   });
   addEventListener('contextmenu', e => { if (G.state === 'play') e.preventDefault(); });
+  renderer.domElement.addEventListener('wheel', e => { if (Survey.on && !G.mapOpen && !G.uiOpen) { Survey.zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2); e.preventDefault(); } }, { passive: false }); // the spyglass
   document.addEventListener('pointerlockchange', () => {
     Input.locked = document.pointerLockElement === renderer.domElement;
     if (!Input.locked) { if (Input.expectUnlock) Input.expectUnlock = false; else if (G.state === 'play' && !G.uiOpen && !G.resting && G.player && !G.player.dead) UI.openPause(); }
@@ -10763,19 +11102,20 @@ function bindInput() {
   $('title').addEventListener('click', e => {
     const b = e.target.closest('[data-t]'); if (!b || b.disabled) return; SFX.init(); SFX.play('click'); pickMusic(true);
     const t = b.dataset.t;
-    if (t === 'new') { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); } // character creation returns with the stats option
+    if (t === 'new') Survey.chooseStart(() => { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); }); // where to begin; character creation returns with the stats option
     if (t === 'continue') loadGame();
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { MapView.setZoom(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8)); e.preventDefault(); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { if (e.target.closest('#mapsurvey, #mapdebug')) return; e.preventDefault(); const dy = e.deltaY || e.deltaX; if (Survey.sheet && e.shiftKey) { Survey.turn(dy < 0 ? 0.1 : -0.1); return; } MapView.setZoom(MapView.zoom * (dy < 0 ? 1.25 : 0.8)); }, { passive: false });
+  $('mapview').addEventListener('click', e => { const b = e.target.closest('[data-sv]'); if (b && !b.disabled) { SFX.play('click'); Survey.act(b.dataset.sv); } }); // the survey sheet's tools and the debug panel
   // the map: drag to look around it, tap or click a place to travel there
   { let drag = null; const mc = $('mapc');
-    mc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } });
-    mc.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
+    mc.addEventListener('pointerdown', e => { try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } if (Survey.sheet && Survey.pdown(e)) return; if (!drag) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; });
+    mc.addEventListener('pointermove', e => { if (Survey.sheet && Survey.pmove(e)) return; if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
       const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
-    mc.addEventListener('pointerup', e => { if (drag && !drag.moved && G.area === G.city) MapView.pick(e.clientX, e.clientY); drag = null; });
-    mc.addEventListener('pointercancel', () => { drag = null; });
+    mc.addEventListener('pointerup', e => { if (Survey.sheet && Survey.pup(e)) return; if (!drag || drag.id !== e.pointerId) return; if (!drag.moved && G.area === G.city) { if (Survey.sheet) Survey.tap(e.clientX, e.clientY); else MapView.pick(e.clientX, e.clientY); } drag = null; });
+    mc.addEventListener('pointercancel', e => { Survey.pup(e); if (drag && drag.id === e.pointerId) drag = null; });
     $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }
   $('mapclose').addEventListener('click', () => MapView.close());
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
@@ -10802,7 +11142,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Survey, World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

@@ -15,9 +15,12 @@ async def main():
     x, y = await center('#title [data-t=settings]'); await tap(c, x, y)
     print('title settings: back on screen', await onscreen('#panel [data-a=back]'), await state())
     await tap(c, 60, 300); print('  after outside tap', await state())
-    # title → new game goes straight into the world
-    x, y = await center('#title [data-t=new]'); await tap(c, x, y); await asyncio.sleep(1)
-    print('new game', await state(), 'name', await c.ev("__game.G.player.name"))
+    # title → new game asks where to begin (a tap outside goes back to the title), then goes straight into the world
+    x, y = await center('#title [data-t=new]'); await tap(c, x, y)
+    print('new game: where to begin, back', await onscreen('#panel [data-a=back]'), 'edge', await onscreen('#panel [data-a="s:edge"]'), await state())
+    await tap(c, 40, 300); print('  after outside tap', await state())
+    x, y = await center('#title [data-t=new]'); await tap(c, x, y); x, y = await center('#panel [data-a="s:aldhaven"]'); await tap(c, x, y); await asyncio.sleep(1)
+    print('new game', await state(), 'name', await c.ev("__game.G.player.name"), 'start', await c.ev("__game.Survey.st().start"))
     # pause → settings: buttons reachable, Resume resumes
     x, y = await center('#touch [data-k=Escape]'); await tap(c, x, y)
     x, y = await center('#panel [data-a=settings]'); await tap(c, x, y)

@@ -63,6 +63,7 @@ function updateSky(area, dt) {
   const hi = Math.max(cp.y - 2, above), lift = 1 + clamp((hi - 4) / 22, 0, 2.6) + 3.2 * smoothstep(70, 260, hi); // and from the peaks, or on the wing, across the country
   const open = 1 + 0.55 * smoothstep(420, 1000, Math.max(Math.abs(cp.x), Math.abs(cp.z))); // out in the open country the air is clearer than over the smoky town
   area.scene.fog.near = lerp(18, 60, L) * fogMul * (1 + (lift - 1) * 0.18) * open; area.scene.fog.far = lerp(115, 260, L) * fogMul * lift * open;
+  { const k = Survey.fogK(); area.scene.fog.near *= k; area.scene.fog.far *= k; } // (through the spyglass far things stand clear of the haze)
   S.sky.position.copy(cp); S.stars.position.copy(cp); S.mountains.position.set(cp.x, 38, cp.z); S.mountains.visible = false; // real ground now reaches the horizon; the painted range would only fight it
   S.clouds.position.set(cp.x, Math.max(170, cp.y + 90), cp.z); // the cloud deck stays overhead, even on the peaks
   S.starMat.opacity = clamp((0.55 - L) * 2.6, 0, 1) * (wx === 'clear' ? 1 : 0.2);
@@ -310,7 +311,7 @@ function saveGame() {
 }
 function loadGame(data) {
   data = data || readSave(); if (!data || !data.player) { msg('No saved game found.'); return; }
-  if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
+  Survey.close(); if (UI.cur) UI.close(true); if (G.mapOpen) MapView.close(); if (G.resting) stopRest();
   leaveCurrentArea(); G.area = G.city;
   G.time = data.time; G.flags = data.flags || {}; G.quests = data.quests || []; G.wanted = data.wanted; G.bState = data.bState || {}; G.weather = data.weather || 'clear'; G.weatherDay = data.weatherDay ?? -1;
   const sp = data.player; const P = { ...sp, pos: new THREE.Vector3(...sp.pos), vy: 0, onGround: true, swingT: -1, castT: -1, dead: false, hurtT: 0, equip: { weapon: null, body: null, head: null, shield: null } };
@@ -342,9 +343,10 @@ function beginNewGame(cfg) {
   leaveCurrentArea(); G.area = G.city; populateCity(G.city);
   G.player = newPlayer(cfg); markDiscovered(G.buildings.find(b => b.id === 'castle'));
   G.state = 'play'; $('title').hidden = true; $('msgs').innerHTML = '';
-  const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); G.player.pitch = S.pitch || 0; if (S.y != null) G.player.pos.y = S.y; G.player.sheathed = true; G.lastDistrict = 'outside';
+  const start = Survey.place(); G.player.sheathed = true; // (Aldhaven, Corrinvale or the edge of the known map: src/11_survey.js)
   // the story introduction (INTRO) is set aside while the project concentrates on the world itself; the hints wait so the first look is clear
   setTimeout(() => { if (G.state !== 'play') return;
+    const w = Survey.welcome(start); if (w) { for (const m of w) msg(m); return; }
     if (Input.touch) {
       msg('Welcome to Aldhaven. Walk with your left thumb, look by dragging on the right. The buttons at the top open the map and your journal.');
       msg('Carriages wait at signposts marked with a wheel. Tap Use at one, or Travel near one, to ride across the city.');
@@ -355,7 +357,7 @@ function beginNewGame(cfg) {
   }, 6000);
 }
 function toTitle() {
-  if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
+  Survey.close(); if (G.resting) stopRest(); if (G.mapOpen) MapView.close(); if (UI.cur) UI.close(true);
   exitLock(); leaveCurrentArea(); G.area = G.city; G.state = 'title'; G.time = 18 * 60 + 5;
   $('title').hidden = false; $('msgs').innerHTML = ''; $('hint').textContent = ''; $('status').textContent = '';
   const cont = $('title').querySelector('[data-t="continue"]'); if (cont) cont.disabled = !readSave();
@@ -410,6 +412,7 @@ function frame(now) {
     if (G.resting) updateRest(dt);
     else if (!frozen) {
       if (Travel.cur) sdt = Travel.update(dt); else { updatePlayer(dt); Travel.watchPaused(); }
+      Survey.update(dt);
       G.time += sdt * TIME_SCALE; updateWeather();
       if (G.area.kind === 'city') { cityTick(G.area, sdt); Sites.update(G.player.pos.x, G.player.pos.z); POI.update(G.player.pos.x, G.player.pos.z); Roads.update(sdt); for (const T of TOWNS) T.updateFolk(G.player.pos.x, G.player.pos.z, sdt); }
       updateProjectiles(dt); Quests.tick(); G.focus = computeFocus();
@@ -452,7 +455,7 @@ function onKey(e) {
   const c = e.code;
   if (['F5', 'F9', 'Tab'].includes(c) || (c === 'Space' && G.state === 'play')) e.preventDefault();
   if (G.state !== 'play' || !G.player) return;
-  if (G.mapOpen) { if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
+  if (G.mapOpen) { if (Survey.sheet && Survey.sheetKey(c)) return; if (c === 'KeyM' || c === 'Escape') MapView.close(); return; }
   if (UI.cur) {
     if (c === 'Escape') { if (UI.cur.closable) UI.close(); return; }
     if ((c === 'KeyI' || c === 'KeyC' || c === 'Tab') && UI.is('char')) UI.close();
@@ -462,6 +465,7 @@ function onKey(e) {
   if (G.resting) { if (c === 'Escape' || c === 'KeyR') stopRest('You stop resting.'); return; }
   if (Travel.cur && !['F5', 'F9', 'KeyN'].includes(c)) { Travel.stop('You stop.'); if (['Escape', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'Space', 'KeyT', 'KeyV'].includes(c)) return; }
   if (G.player.dead || G.fading) return;
+  if (Survey.on && Survey.key(c)) return; // the compass in hand: bearings, the spyglass, the sheet
   switch (c) {
     case 'Escape': UI.openPause(); break;
     case 'KeyE': case 'KeyF': interact(); break;
@@ -470,6 +474,7 @@ function onKey(e) {
     case 'KeyM': MapView.open(); break;
     case 'Enter': case 'NumpadEnter': if (Travel.paused) Travel.resume(); break;
     case 'KeyR': UI.openRest(); break;
+    case 'KeyK': Survey.toggle(); break;
     case 'KeyT': case 'KeyV': UI.openTravel(); break;
     case 'KeyQ': startCast(); break;
     case 'KeyH': if (rpgUI()) quickPotion(); break;
@@ -499,14 +504,16 @@ function bindInput() {
     if (G.state !== 'play' || G.uiOpen || G.resting || !G.player || G.player.dead) return;
     if (!Input.locked && !Input.fallback) { requestLock(true); return; }
     if (Input.fallback) { Input.drag = { x: e.clientX, y: e.clientY, moved: false, button: e.button }; return; }
+    if (Survey.on) { if (e.button === 0) Survey.take(); return; }
     if (e.button === 0) startAttack(); else if (e.button === 2) startCast();
   });
   addEventListener('mouseup', e => {
     if (!Input.drag) return;
-    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
+    if (!Input.drag.moved && G.state === 'play' && !G.uiOpen) { if (Survey.on) { if (Input.drag.button === 0) Survey.take(); } else if (Input.drag.button === 0) startAttack(); else if (Input.drag.button === 2) startCast(); }
     Input.drag = null;
   });
   addEventListener('contextmenu', e => { if (G.state === 'play') e.preventDefault(); });
+  renderer.domElement.addEventListener('wheel', e => { if (Survey.on && !G.mapOpen && !G.uiOpen) { Survey.zoomBy(e.deltaY < 0 ? 1.2 : 1 / 1.2); e.preventDefault(); } }, { passive: false }); // the spyglass
   document.addEventListener('pointerlockchange', () => {
     Input.locked = document.pointerLockElement === renderer.domElement;
     if (!Input.locked) { if (Input.expectUnlock) Input.expectUnlock = false; else if (G.state === 'play' && !G.uiOpen && !G.resting && G.player && !G.player.dead) UI.openPause(); }
@@ -526,19 +533,20 @@ function bindInput() {
   $('title').addEventListener('click', e => {
     const b = e.target.closest('[data-t]'); if (!b || b.disabled) return; SFX.init(); SFX.play('click'); pickMusic(true);
     const t = b.dataset.t;
-    if (t === 'new') { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); } // character creation returns with the stats option
+    if (t === 'new') Survey.chooseStart(() => { if (rpgUI()) Create.open(); else beginNewGame(Create.quick()); }); // where to begin; character creation returns with the stats option
     if (t === 'continue') loadGame();
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { MapView.setZoom(MapView.zoom * (e.deltaY < 0 ? 1.25 : 0.8)); e.preventDefault(); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { if (e.target.closest('#mapsurvey, #mapdebug')) return; e.preventDefault(); const dy = e.deltaY || e.deltaX; if (Survey.sheet && e.shiftKey) { Survey.turn(dy < 0 ? 0.1 : -0.1); return; } MapView.setZoom(MapView.zoom * (dy < 0 ? 1.25 : 0.8)); }, { passive: false });
+  $('mapview').addEventListener('click', e => { const b = e.target.closest('[data-sv]'); if (b && !b.disabled) { SFX.play('click'); Survey.act(b.dataset.sv); } }); // the survey sheet's tools and the debug panel
   // the map: drag to look around it, tap or click a place to travel there
   { let drag = null; const mc = $('mapc');
-    mc.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } });
-    mc.addEventListener('pointermove', e => { if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
+    mc.addEventListener('pointerdown', e => { try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } if (Survey.sheet && Survey.pdown(e)) return; if (!drag) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; });
+    mc.addEventListener('pointermove', e => { if (Survey.sheet && Survey.pmove(e)) return; if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
       const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
-    mc.addEventListener('pointerup', e => { if (drag && !drag.moved && G.area === G.city) MapView.pick(e.clientX, e.clientY); drag = null; });
-    mc.addEventListener('pointercancel', () => { drag = null; });
+    mc.addEventListener('pointerup', e => { if (Survey.sheet && Survey.pup(e)) return; if (!drag || drag.id !== e.pointerId) return; if (!drag.moved && G.area === G.city) { if (Survey.sheet) Survey.tap(e.clientX, e.clientY); else MapView.pick(e.clientX, e.clientY); } drag = null; });
+    mc.addEventListener('pointercancel', e => { Survey.pup(e); if (drag && drag.id === e.pointerId) drag = null; });
     $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }
   $('mapclose').addEventListener('click', () => MapView.close());
   $('backdrop').addEventListener('click', () => { if (performance.now() - UI.openedAt > 350) UI.leave(); });
@@ -565,7 +573,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { Survey, World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();
