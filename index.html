@@ -194,6 +194,7 @@
       <button class="db" data-t="settings">Settings</button>
     </nav>
     <p class="foot">Keyboard and mouse: WASD to move, mouse to look, click to swing, E to interact. On a tablet, touch controls appear on screen.<br>Every texture, sprite and sound is made in code as the game loads.</p>
+    <p class="foot" id="perfnote"></p>
   </div>
 </div>
 <div id="loading">Raising the walls of Aldhaven…</div>
@@ -10791,8 +10792,16 @@ function bindInput() {
   $('travelinfo').addEventListener('click', () => { if (Travel.cur) Travel.stop('You stop.'); else if (Travel.paused) Travel.resume(); });
   addEventListener('resize', () => { resize(); if (G.mapOpen) MapView.draw(); });
 }
+// How fast the browser runs this page's code, timed before anything heavy is built. Safari on the iPad sometimes runs a page
+// with its code compiler off (some 20 times slower, from the first line); this number shows it: about 35 ms on an iPad normally, 150 ms or more then
+function engineCheck() {
+  const t = performance.now(); let s = 0;
+  for (let i = 0; i < 3e6; i++) s += Math.sin(i * 0.001) * Math.sqrt(i);
+  G.engineCheck = { ms: Math.round(performance.now() - t), s };
+}
 function boot(hotData) {
-  loadSettings();
+  const tBoot = performance.now();
+  loadSettings(); engineCheck();
   try {
     renderer = new THREE.WebGLRenderer({ canvas: $('game'), antialias: false, powerPreference: 'high-performance' });
   } catch (e) { $('loading').textContent = 'This game needs WebGL, which is not available in this browser.'; return; }
@@ -10805,6 +10814,7 @@ function boot(hotData) {
   initTextures();
   { const t0 = performance.now(); G.area = buildCity(); populateCity(G.city); G.loadMs = Math.round(performance.now() - t0); } // (timed, for the tools)
   $('loading').hidden = true;
+  { const p = $('perfnote'); if (p) p.textContent = `Loaded in ${((performance.now() - tBoot) / 1000).toFixed(1)} s · engine check ${G.engineCheck.ms} ms`; }
   try { window.claude?.hot?.snapshot?.(() => (G.state === 'play' && G.player && !G.player.dead) ? serialize() : null); } catch (e) { /* not in a live host */ }
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
