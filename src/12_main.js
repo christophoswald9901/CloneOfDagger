@@ -421,11 +421,12 @@ function frame(now) {
     updateEntities(sdt); updateFX(dt); pickMusic(false);
     G.dmgFlash = Math.max(0, G.dmgFlash - dt); G.shake = Math.max(0, G.shake - dt);
     $('dmg').style.opacity = G.dmgFlash * 1.6;
-    if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw();
+    if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw(true); // (the objectives pulse)
     updateWorld(dt);
   }
+  MapView.work(G.state === 'play' ? 3 : 6); // (the map's pictures of the land, made a little each frame from the title screen on: some 1.6 s of work)
   updateTextHUD(dt); Touch.update();
-  if (G.area) {
+  if (G.area && !G.mapOpen) { // (the map covers the whole screen: the world behind it is not drawn while it is open)
     try { renderer.render(G.area.scene, camera); }
     catch (e) { // a hole in the scene graph: drop it, say where it was, and draw again next frame
       const fix = o => { const n = o.children.length; o.children = o.children.filter(Boolean); if (o.children.length !== n) console.warn('scene: dropped', n - o.children.length, 'empty child slot(s) under', o.type, o.name || ''); o.children.forEach(fix); };
@@ -538,13 +539,13 @@ function bindInput() {
     if (t === 'controls') { $('title').hidden = true; UI.openControls(() => { UI.close(true); $('title').hidden = false; }); }
     if (t === 'settings') { $('title').hidden = true; UI.openSettings(() => { UI.close(true); $('title').hidden = false; }); }
   });
-  $('mapview').addEventListener('wheel', e => { if (e.target.closest('#mapsurvey, #mapdebug')) return; e.preventDefault(); const dy = e.deltaY || e.deltaX; if (Survey.sheet && e.shiftKey) { Survey.turn(dy < 0 ? 0.1 : -0.1); return; } MapView.setZoom(MapView.zoom * (dy < 0 ? 1.25 : 0.8)); }, { passive: false });
+  $('mapview').addEventListener('wheel', e => { if (e.target.closest('#mapsurvey, #mapdebug')) return; e.preventDefault(); const dy = e.deltaY || e.deltaX; if (Survey.sheet && e.shiftKey) { Survey.turn(dy < 0 ? 0.1 : -0.1); return; } MapView.setZoom(MapView.zoom * Math.exp(-clamp(dy * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1), -240, 240) * 0.0022)); }, { passive: false }); // (a notch of a wheel zooms by a fifth; a trackpad's many small steps as far in all)
   $('mapview').addEventListener('click', e => { const b = e.target.closest('[data-sv]'); if (b && !b.disabled) { SFX.play('click'); Survey.act(b.dataset.sv); } }); // the survey sheet's tools and the debug panel
   // the map: drag to look around it, tap or click a place to travel there
   { let drag = null; const mc = $('mapc');
     mc.addEventListener('pointerdown', e => { try { mc.setPointerCapture(e.pointerId); } catch (err) { /* ok */ } if (Survey.sheet && Survey.pdown(e)) return; if (!drag) drag = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId }; });
     mc.addEventListener('pointermove', e => { if (Survey.sheet && Survey.pmove(e)) return; if (!drag || drag.id !== e.pointerId) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (!drag.moved && Math.hypot(dx, dy) < 8) return; drag.moved = true;
-      const t = MapView.tf; if (!t) return; MapView.view = [t.cx - dx * t.dpr / t.scale, t.cz - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.draw(); });
+      const t = MapView.tf; if (!t) return; const v = MapView.view || [t.cx, t.cz]; MapView.view = [v[0] - dx * t.dpr / t.scale, v[1] - dy * t.dpr / t.scale]; drag.x = e.clientX; drag.y = e.clientY; MapView.later(); }); // (from the view as moved, which may not be drawn yet)
     mc.addEventListener('pointerup', e => { if (Survey.sheet && Survey.pup(e)) return; if (!drag || drag.id !== e.pointerId) return; if (!drag.moved && G.area === G.city) { if (Survey.sheet) Survey.tap(e.clientX, e.clientY); else MapView.pick(e.clientX, e.clientY); } drag = null; });
     mc.addEventListener('pointercancel', e => { Survey.pup(e); if (drag && drag.id === e.pointerId) drag = null; });
     $('mapdest').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { SFX.play('click'); MapView.go(b.dataset.m); } }); }

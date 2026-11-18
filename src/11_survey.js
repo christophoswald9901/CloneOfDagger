@@ -12,16 +12,20 @@
 const SURVEY_STARTS = [
   { id: 'aldhaven', name: 'Aldhaven', sub: "On Pilgrim's Rise, above the walled port and the bay." },
   { id: 'corrinvale', name: 'Corrinvale', sub: 'In the Grand Square of the canal town, under its belfry.' },
-  { id: 'edge', name: 'The edge of the known map', sub: 'High on the western mountains: the known country below you, the unknown over the crest behind. Your map does not show where you are; find it with the compass and the ruler.' },
+  { id: 'edge', name: 'The edge of the known map', sub: 'High on the western mountains: the known country below you, the unknown beyond the range behind. Your map does not show where you are; find it with the compass and the ruler.' },
 ];
-// the edge start: a flat shoulder of the western home mountains, 1.2 km inside the border, in sight of five landmarks
-// (Mirrormere 4.5 km, Halewood 5 km, Corrinvale 8 km, Greywatch 9 km, the Ninefold Stones 13 km)
-const SURVEY_EDGE = { x: -8800, z: -9000, bearing: 78, map: [-6500, -10000] };
+// the edge start: a flat shoulder of the western home mountains, 1.2 km inside the border, in sight of seven landmarks
+// (the Spindle 1.1 km, Harrow Fell 2.3 km, Mirrormere 4.5 km, Halewood 5 km, Corrinvale 8 km, Greywatch 9 km, the Ninefold Stones 13 km)
+const SURVEY_EDGE = { x: -8800, z: -9000, bearing: 78, map: [-7400, -9800] };
 // where each landmark is sighted: its tower, steeple or keep, not the middle of the place
 const SIGHT_AT = {
   greywatch: S => [S.x - 10, S.z - 12], stones: S => [S.x, S.z], mirrormere: S => [S.x + 274, S.z - 34.6], kestrel: S => [S.x - 24, S.z + 6],
   gullscar: () => [GULL.x, gullCoast(GULL.x) - 34], halewood: () => hallW(0, 0), // (the house itself, at the middle of its own frame)
 };
+// two summits of the western home mountains, known by name and on every map: the Spindle, the sharp horn 1.1 km west-north-west of the edge
+// start, and Harrow Fell, where the ridge north of it ends in a point (stand-in names until the story returns). Each is taken as the top of
+// the ground near where it is given here
+const PEAKS = [{ id: 'spindle', name: 'the Spindle', x: -9821, z: -9452 }, { id: 'harrow', name: 'Harrow Fell', x: -9032, z: -11277 }];
 const fmtBearing = b => { const w = Math.floor(b + 1e-6); return (b - w > 0.25 ? w + '½' : String(w)) + '°'; };
 const wrap360 = a => ((a % 360) + 360) % 360;
 
@@ -32,7 +36,28 @@ const Survey = {
   fresh(start) { const edge = start === 'edge'; return { start, opts: { pos: edge ? 'never' : 'always', unknown: edge ? 'blank' : 'drawn', truth: false, needle: 'swing' }, reads: [], items: [], ruler: null, view: null, home: null }; },
   st() { return G.flags.survey || (G.flags.survey = this.fresh('aldhaven')); }, // (games saved before surveying came in start as Aldhaven's)
   opt(k) { return this.st().opts[k]; },
-  known(x, z) { return homeOut(x, z) <= 0; }, // the known map: the home country, inside the middle of its mountains
+  // the known map: the home country and all of its mountains, out to their outer foot (their middle runs some 350 m beyond the old crest
+  // line and they fall away to nothing within 2.4 km of it, homeFlank and rimHeight in 03_terrain.js)
+  EDGE_FLANK: 2600,
+  known(x, z) { return homeOut(x, z) <= 0 || homeFlank(x, z) < this.EDGE_FLANK; },
+  // its edge, out of the home country's box to the west, north and east, as a line of points (worked out once): far south on the west,
+  // up the west side, round the north-west corner, along the north, round the north-east corner, down the east side, far south again
+  edge() {
+    if (this._edge) return this._edge;
+    const out = (px, pz, dx, dz) => { let t = 0; while (t < 12000 && this.known(px + dx * (t + 100), pz + dz * (t + 100))) t += 100;
+      let a = t, b = t + 100; for (let k = 0; k < 7; k++) { const m = (a + b) / 2; if (this.known(px + dx * m, pz + dz * m)) a = m; else b = m; } return [Math.round(px + dx * a), Math.round(pz + dz * a)]; };
+    const { x0, x1, z0, z1 } = WORLD, P = [], st = 200, far = z1 + 60000, fan = (cx, a0) => { for (let a = a0; a <= a0 + 90; a += 5) { const r = a * Math.PI / 180; P.push(out(cx, z0, Math.cos(r), Math.sin(r))); } };
+    for (let z = z1; z > z0; z -= st) P.push(out(x0, z, -1, 0)); P.unshift([P[0][0], far]); fan(x0, 180);
+    for (let x = x0 + st; x < x1; x += st) P.push(out(x, z0, 0, -1)); fan(x1, 270);
+    for (let z = z0 + st; z <= z1; z += st) P.push(out(x1, z, 1, 0)); P.push([P[P.length - 1][0], far]);
+    return (this._edge = P);
+  },
+  // the named summits, each at the top of its ground
+  peaks() {
+    return this._peaks || (this._peaks = PEAKS.map(p => { let x = p.x, z = p.z, h = terrainRaw(x, z);
+      for (let st = 32; st >= 2; st /= 2) for (let moved = true, n = 0; moved && n < 30; n++) { moved = false; for (const [a, b] of [[st, 0], [-st, 0], [0, st], [0, -st], [st, st], [st, -st], [-st, st], [-st, -st]]) { const v = terrainRaw(x + a, z + b); if (v > h) { h = v; x += a; z += b; moved = true; } } }
+      return { ...p, x: Math.round(x), z: Math.round(z), h: Math.round(h) }; }));
+  },
   // whether the map shows where you are (and the travel panel how far things are)
   showPos() { const o = this.opt('pos'), P = G.player; return o === 'always' || (o === 'known' && !!P && this.known(P.pos.x, P.pos.z)); },
   blank() { return this.opt('unknown') === 'blank'; },
@@ -42,6 +67,7 @@ const Survey = {
     for (const l of G.city.landmarks) if (l.id === 'bell' || l.id === 'lighthouse') out.push({ name: 'Aldhaven, ' + l.name.replace(/^the /, 'the '), x: l.x, z: l.z });
     for (const T of TOWNS) for (const l of T.landmarks) if (l.id === 'belfry' || l.id === 'cathedral') out.push({ name: T.name + ', ' + l.name, x: l.x, z: l.z });
     for (const S of SITES) if (SIGHT_AT[S.id] && (found[S.id] || heard[S.id])) { const [x, z] = SIGHT_AT[S.id](S); out.push({ name: S.name.replace(/^the /, 'the '), x, z }); }
+    for (const p of this.peaks()) out.push({ name: p.name, x: p.x, z: p.z });
     return out;
   },
   // where the map opens when it does not show you: where you last marked yourself, else the ruler, else where you began
@@ -62,13 +88,13 @@ const Survey = {
       found[T.id] = day; setArea(G.city, sq.x, sq.z, Math.atan2(-(bf.x - sq.x), -(bf.z - sq.z))); P.pitch = 0.12; G.lastDistrict = null; s.home = [sq.x, sq.z];
     } else if (start === 'edge') {
       for (const S of SITES) found[S.id] = day; // the known map shows the country's landmarks
-      const E = SURVEY_EDGE; setArea(G.city, E.x, E.z, -E.bearing * Math.PI / 180); P.pitch = -0.05; G.lastDistrict = 'outside'; s.home = E.map; MapView.zoom = 0.06; // (the map opens over the west of the country, not on you)
+      const E = SURVEY_EDGE; setArea(G.city, E.x, E.z, -E.bearing * Math.PI / 180); P.pitch = -0.05; G.lastDistrict = 'outside'; s.home = E.map; MapView.zoom = 0.06; // (the map opens over the west of the country and its mountains, not on you)
     } else { const S = G.city.start; setArea(G.city, S.x, S.z, S.yaw); P.pitch = S.pitch || 0; if (S.y != null) P.pos.y = S.y; G.lastDistrict = 'outside'; s.home = [S.x, S.z]; }
     return start;
   },
   welcome(start) {
     const t = Input.touch;
-    if (start === 'edge') return [`You stand at the edge of the known map. To the east the known country lies below you; over the crest to the west the land is unknown. Your map (${t ? 'Map' : 'M'}) shows the country, but not where you are.`,
+    if (start === 'edge') return [`You stand at the edge of the known map. To the east the known country lies below you; beyond the mountains to the west the land is unknown. Your map (${t ? 'Map' : 'M'}) shows the country, but not where you are. The peaks of the range behind you are on it too: the Spindle, the sharp horn, and Harrow Fell to the north.`,
       `${t ? 'Tap Survey' : 'Press K'} for the compass. Sight a landmark you can find on the map, note its bearing, then lay the ruler through that landmark on the map at that bearing and draw the line. Where two lines cross, you are.`];
     if (start === 'corrinvale') return [`Welcome to Corrinvale. ${t ? 'The buttons at the top open the map and your journal.' : 'M opens the map, J your journal.'}`, `${t ? 'Survey' : 'K'} takes out a compass and a ruler, to find where you are from the landmarks you can see.`];
     return null;
@@ -170,14 +196,14 @@ const Survey = {
   geo(t) { const R = this.st().ruler, d = t.dpr, a = R.a * Math.PI / 180, ux = Math.sin(a), uy = -Math.cos(a);
     return { cx: (t.W / 2 + (R.x - t.cx) * t.scale) / d, cy: (t.H / 2 + (R.z - t.cz) * t.scale) / d, ux, uy, nx: -uy, ny: ux, half: Math.min(440, 0.42 * Math.min(innerWidth, innerHeight)), w: 30 }; },
   brg(ax, ay, bx, by) { return wrap360(Math.atan2(bx - ax, -(by - ay)) * 180 / Math.PI); },
-  turn(d) { const R = this.st().ruler; if (!R) return; R.a = wrap360(Math.round((R.a + d) * 10) / 10); MapView.draw(); this.panelRuler(); },
+  turn(d) { const R = this.st().ruler; if (!R) return; R.a = wrap360(Math.round((R.a + d) * 10) / 10); MapView.draw(true); this.panelRuler(); },
   // the line along the ruler's edge, carried on across the whole sheet (as with a long straight-edge: the landmarks stand kilometres off)
   line() { const t = MapView.tf, R = this.st().ruler; if (!t || !R) return; const L = Math.max(this.geo(t).half * t.dpr / t.scale, 26000), a = R.a * Math.PI / 180, dx = Math.sin(a) * L, dz = -Math.cos(a) * L, r = v => Math.round(v * 10) / 10;
-    this.st().items.push({ k: 'line', ax: r(R.x - dx), az: r(R.z - dz), bx: r(R.x + dx), bz: r(R.z + dz), a: R.a }); SFX.play('click'); MapView.draw(); this.panel(); },
-  undo() { const s = this.st(); if (!s.items.length) return; s.items.pop(); MapView.draw(); this.panel(); },
+    this.st().items.push({ k: 'line', ax: r(R.x - dx), az: r(R.z - dz), bx: r(R.x + dx), bz: r(R.z + dz), a: R.a }); SFX.play('click'); MapView.draw(true); this.panel(); },
+  undo() { const s = this.st(); if (!s.items.length) return; s.items.pop(); MapView.draw(true); this.panel(); },
   // a tap on the sheet: marks where you are, when Mark is armed
   tap(px, py) { if (this.arm !== 'mark') return; const w = MapView.toWorld(px, py), P = G.player; if (!w) return; const r = v => Math.round(v * 10) / 10;
-    this.st().items.push({ k: 'mark', x: r(w[0]), z: r(w[1]), tx: r(P.pos.x), tz: r(P.pos.z), t: Math.round(G.time) }); this.arm = null; SFX.play('click'); MapView.draw(); this.panel(); },
+    this.st().items.push({ k: 'mark', x: r(w[0]), z: r(w[1]), tx: r(P.pos.x), tz: r(P.pos.z), t: Math.round(G.time) }); this.arm = null; SFX.play('click'); MapView.draw(true); this.panel(); },
   hit(px, py) { const t = MapView.tf; if (!t || !this.st().ruler) return null; const g = this.geo(t), dx = px - g.cx, dy = py - g.cy, al = dx * g.ux + dy * g.uy, ac = dx * g.nx + dy * g.ny;
     if (Math.abs(al) > g.half + 8 || ac < -12 || ac > g.w + 12) return null; return Math.abs(al) > g.half - 44 ? 'turn' : 'move'; },
   // pointers on the sheet (true: the ruler took it, the map does not pan)
@@ -196,13 +222,13 @@ const Survey = {
     else if (g0.id === e.pointerId) { if (g0.kind === 'move') { R.x = g0.x0 + (e.clientX - g0.sx) * t.dpr / t.scale; R.z = g0.z0 + (e.clientY - g0.sy) * t.dpr / t.scale; }
       else { const g = this.geo(t); R.a = wrap360(Math.round((this.brg(g.cx, g.cy, e.clientX, e.clientY) - g0.off) * 10) / 10); } }
     else return false;
-    MapView.draw(); this.panelRuler(); return true;
+    MapView.draw(true); this.panelRuler(); return true;
   },
   pup(e) {
     this.ptrs.delete(e.pointerId); const g0 = this.grab; if (!g0) return false;
     if (this.twist && e.pointerId === this.twist.id) { this.twist = null; return true; }
     if (e.pointerId !== g0.id) return false;
-    this.twist = null; this.grab = null; if (g0.kind === 'move') this.snap(); MapView.draw(); this.panelRuler(); return true;
+    this.twist = null; this.grab = null; if (g0.kind === 'move') this.snap(); MapView.draw(true); this.panelRuler(); return true;
   },
   // the pin settles into a landmark dropped near it
   snap() { const R = this.st().ruler, t = MapView.tf; let best = null, bd = 20 * t.dpr; for (const p of this.points()) { const d = Math.hypot(p.x - R.x, p.z - R.z) * t.scale; if (d < bd) { bd = d; best = p; } } if (best) { R.x = best.x; R.z = best.z; } },
@@ -242,16 +268,16 @@ const Survey = {
     if (a === 'line') this.line();
     else if (a === 'mark') { this.arm = this.arm === 'mark' ? null : 'mark'; this.panel(); }
     else if (a === 'undo') this.undo();
-    else if (a === 'clear') { if (performance.now() - this.sure < 3000) { s.items = []; this.sure = 0; MapView.draw(); } else this.sure = performance.now(); this.panel(); }
-    else if (a === 'mid') { const t = MapView.tf; if (t && s.ruler) { s.ruler.x = t.cx; s.ruler.z = t.cz; MapView.draw(); this.panelRuler(); } }
+    else if (a === 'clear') { if (performance.now() - this.sure < 3000) { s.items = []; this.sure = 0; MapView.draw(true); } else this.sure = performance.now(); this.panel(); }
+    else if (a === 'mid') { const t = MapView.tf; if (t && s.ruler) { s.ruler.x = t.cx; s.ruler.z = t.cz; MapView.draw(true); this.panelRuler(); } }
     else if (a === 'sight') MapView.close();
     else if (a === 'away') this.close('You put the compass and the ruler away.');
   },
-  // the unknown land, left blank: paper beyond the edge of the known map
+  // the unknown land, left blank: paper beyond the edge of the known map, which is drawn dashed
   blankOut(x, X, Z, W, H) {
-    const x0 = X(WORLD.x0), z0 = Z(WORLD.z0), x1 = X(WORLD.x1), z1 = Math.max(H, Z(WORLD.z1)) + 10;
-    x.save(); x.fillStyle = '#2b2a20'; x.beginPath(); x.rect(0, 0, W, H); x.rect(x0, z0, x1 - x0, z1 - z0); x.fill('evenodd');
-    x.strokeStyle = 'rgba(200,180,130,0.45)'; x.lineWidth = 2; x.setLineDash([10, 6]); x.beginPath(); x.moveTo(x0, z1); x.lineTo(x0, z0); x.lineTo(x1, z0); x.lineTo(x1, z1); x.stroke(); x.restore();
+    const E = this.edge(), path = () => { x.beginPath(); E.forEach(([px, pz], i) => i ? x.lineTo(X(px), Z(pz)) : x.moveTo(X(px), Z(pz))); };
+    x.save(); x.fillStyle = '#2b2a20'; path(); x.closePath(); x.rect(0, 0, W, H); x.fill('evenodd');
+    x.strokeStyle = 'rgba(200,180,130,0.45)'; x.lineWidth = 2; x.setLineDash([10, 6]); x.lineJoin = 'round'; path(); x.stroke(); x.restore();
   },
   // pencil lines and your marks (under the map's labels), and the landmarks you can sight while the kit is out
   drawMap(x, X, Z, t) {
