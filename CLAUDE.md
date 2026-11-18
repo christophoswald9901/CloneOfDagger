@@ -13,6 +13,18 @@ A world that feels believable when walking through it. Lore and systemic feature
 - Setting and story ideas for when lore comes back are in `docs/SETTING.md`. They are ideas, not decisions, so don't build from them unless asked.
 - The Elder Scrolls is not an inspiration for the setting. On 2026-11-12 its names and lore were replaced throughout (the city is Aldhaven on Merrow Bay; see README.md). Don't bring any back, and don't add Elder Scrolls names, gods, races, guilds or terms. The new names are stand-ins until the story returns; `docs/SETTING.md` lists them.
 
+## The artifact (how the game is played on the iPad)
+
+The user mostly plays the claude.ai artifact **Aldhaven**: https://claude.ai/artifact/8pLohg55wRvT7L5SRkW3tb. After merging to main, republish it so it does not fall behind:
+
+1. `python3 build.py` on main. It writes `dist/artifact/index.html` (a small page) and `dist/artifact/game.js` (the game's code).
+2. With the Artifact tool, read the artifact (`action: "read"`, the small page) and list its files (`scope: "files"`).
+3. Publish to that `url` with `file_path` set to `dist/artifact/index.html` and `files` set to `{"game.js": "dist/artifact/game.js"}`.
+
+The service only overwrites a page the session has read in full, which is why the code lives in `game.js` and not inline: a 1 MB page cannot be read. The older single-page artifact (BQ6Am1KTWupGbby5M5J3vM, built from e2d9e07) is no longer updated.
+
+The title screen shows "Loaded in … s · engine check … ms". On an iPad the engine check is about 35 ms. 150 ms or more means Safari is running the page with its code compiler off (about 20 times slower). In tests over plain http, editing the address and going there triggered it, and a reload or quitting Safari cleared it.
+
 ## Visual work: critic loops
 
 For generated visuals (terrain, flora, transitions), judge results with critic subagents rather than a single pass:
