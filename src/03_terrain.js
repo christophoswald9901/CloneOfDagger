@@ -92,23 +92,152 @@ function wildRelief(x, z) {
   }
   return [h * lerp(0.2, 1, floor) - 9 * (1 - floor), floor];
 }
+// beyond the home country the hills and valleys stand closer together (things are sized to walking time): the same relief at 0.72 of
+// its scale, taking over across the home country's border
+const RELIEF_K = 0.72;
+function wildReliefAt(x, z) {
+  if (LEGACY) return wildRelief(x, z);
+  const w = smoothstep(0, 1500, Math.max(WORLD.x0 - x, x - WORLD.x1, WORLD.z0 - z, 0)); if (w <= 0) return wildRelief(x, z);
+  const b = wildRelief(x / RELIEF_K, z / RELIEF_K); b[0] *= 0.92; if (w >= 1) return b;
+  const a = wildRelief(x, z); return [lerp(a[0], b[0], w), lerp(a[1], b[1], w)];
+}
 // sand on the shore: wide beaches by the city, out along the coast only a strip at the water's edge (low river flats beside it stay green)
 function isBeach(x, z, h) { const w = smoothstep(900, 1500, Math.abs(x)), n = w > 0 ? fbm(x / 45, z / 45, 2, 308) : 0; return h < SEA + lerp(2.4, 3.2, w) + 1.4 * n * w && coastZ(x) - z < lerp(140, 60 + 45 * n, w); }
-// how far inside the play area's land edge a point lies (negative beyond it), along a ragged line
-function rimDist(x, z) { return Math.min(x - WORLD.x0, WORLD.x1 - x, z - WORLD.z0) - 300 + 2400 * fbm(x / 5000 + 3.3, z / 5000, 3, 390 + WSEED * 7) + 500 * fbm(x / 1300, z / 1300, 2, 391) + 120 * fbm(x / 400, z / 400, 2, 392); }
-// the mountains that close the play area: foothills, then a wall of peaks too steep to climb
-function rimHeight(x, z) {
-  const de = rimDist(x, z); if (de > 3600) return 0;
+/* ---------------- the countries: a lattice of valley-countries divided by ranges and hill belts ----------------
+   The home country is the box WORLD (20 x 20 km, on the bay). Beyond it the land goes on without end to the west, east and north (the sea
+   stays to the south) as countries 10 km square, each planned on its own as the player nears it (World, in 03_world.js). A border is a
+   belt of high ground along a lattice line (displaced, so it wanders): a mountain range in some stretches, wooded hills in others; round
+   the home country it is the old mountains, which stand as they did over the whole of it and fall away outside it. Each
+   country drains through one gap in its border to the next country towards the sea, where its river arrives as a great river; roads cross
+   the borders at passes. Everything about a border (its line, its height, its gap and its pass) is a function of the border alone, so the
+   two countries either side agree without knowing each other. */
+const TILE = 10000;
+let LEGACY = 0; // while the home country is planned: the land exactly as it was before the world went on (its plan stays as it was)
+const tileI = x => Math.floor((x - WORLD.x0) / TILE), tileJ = z => Math.min(1, Math.floor((z - WORLD.z0) / TILE));
+const isHomeTile = (i, j) => (i === 0 || i === 1) && (j === 0 || j === 1);
+const odd = i => (i & 1) === 1;
+// which way a country's water leaves it: to the sea (the coastal row and the home country), or through a gap to the country south, west or east
+function drainDir(i, j) {
+  if (j >= 1 || isHomeTile(i, j)) return 'sea';
+  if (j === -1 && i === 0) return 'W'; if (j === -1 && i === 1) return 'E'; // north of the home mountains the water goes round them
+  if (odd(i) && _h2(i, j, 5200 + WSEED) < 0.3) { const d = _h2(i, j, 5201 + WSEED) < 0.5 ? 'W' : 'E', ti = i + (d === 'W' ? -1 : 1); if (!isHomeTile(ti, j) && !(j === -1 && (ti === 0 || ti === 1))) return d; }
+  return 'S';
+}
+// the legacy rim (the home country as planned): how far inside the play area's land edge a point lies (negative beyond it), along a ragged line
+function rimDist0(x, z) { return Math.min(x - WORLD.x0, WORLD.x1 - x, z - WORLD.z0) - 300 + 2400 * fbm(x / 5000 + 3.3, z / 5000, 3, 390 + WSEED * 7) + 500 * fbm(x / 1300, z / 1300, 2, 391) + 120 * fbm(x / 400, z / 400, 2, 392); }
+// how far outside the home country a point lies (negative inside it; the sea side does not count)
+const homeOut = (x, z) => Math.max(WORLD.x0 - x, x - WORLD.x1, WORLD.z0 - z);
+const HOME_FALL = 2000; // the home mountains stand as they always did up to the middle of the range, and fall away to nothing this far beyond it
+// how far beyond the middle of the home mountains a point lies (negative on the home country's side of it; the middle runs 350 m beyond
+// the old crest line, where the range was at its full height)
+function homeFlank(x, z) { return homeOut(x, z) > 9000 ? 1e6 : -rimDist0(x, z) - 350; }
+// how near the border ranges a point is, whichever side of the home mountains it lies on (for the tree line and the bare rock on them)
+function rimNear(x, z) { return LEGACY ? rimDist0(x, z) : homeOut(x, z) <= 0 ? Math.abs(rimDist0(x, z) + 350) - 350 : rimEval(tileI(x), tileJ(z), x, z) - 350; }
+// how far the middle of a border's high ground lies off its lattice line (towards +x for a line running north-south, +z for one running
+// east-west), so the borders wander
+function lineOff(vert, n, x, z) { return 750 * fbm(x / 3800 + n * 13.7, z / 3800 + (vert ? 0 : 31.1), 2, 393 + WSEED * 7); }
+// how far inside its borders a point of country (i, j) lies (negative beyond one): inside the middles of the border belts, and clear of the
+// home mountains' outer flank. RIM notes the nearest border belt and where along it, and how far inside the belts alone (ug)
+const RIM = { vert: 0, n: 0, s: 0, ug: 0, us: 0 };
+function rimEval(i, j, x, z) {
+  const X0 = WORLD.x0 + i * TILE, X1 = X0 + TILE, Z0 = WORLD.z0 + j * TILE, Z1 = Z0 + TILE, far = 6000, hj = j === 0 || j === 1, hi = i === 0 || i === 1; let u = 1e9, ua = 1e9;
+  // (ua: the distance to the nearest belt's middle whichever side of it, which is the same seen from the country across the border)
+  if (x - X0 < far && !(i === 2 && hj)) { const v = x - X0 - lineOff(1, i, x, z), a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 1; RIM.n = i; RIM.s = z; } }
+  if (X1 - x < far && !(i === -1 && hj)) { const v = X1 + lineOff(1, i + 1, x, z) - x, a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 1; RIM.n = i + 1; RIM.s = z; } }
+  if (z - Z0 < far) { const v = z - Z0 - lineOff(0, j, x, z), a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 0; RIM.n = j; RIM.s = x; } }
+  if (j < 1 && Z1 - z < far && !(j === -1 && hi)) { const v = Z1 + lineOff(0, j + 1, x, z) - z, a = Math.abs(v); if (v < u) u = v; if (a < ua) { ua = a; RIM.vert = 0; RIM.n = j + 1; RIM.s = x; } }
+  RIM.ug = ua; RIM.us = u; return Math.min(u, homeFlank(x, z) - HOME_FALL + 350);
+}
+// how far inside its country's border crest a point lies (negative on the crest and beyond): no one settles or lays a way near it
+function rimDist(x, z) { return LEGACY || homeOut(x, z) <= 0 ? rimDist0(x, z) : rimEval(tileI(x), tileJ(z), x, z) - 350; }
+// what a stretch of border holds: the gap its river leaves by (where along the line, and the water's level there) and the pass a road crosses at
+const EDGES = new Map();
+function edgeFeat(vert, n, m) {
+  const key = (vert ? 1 : 2) + ':' + n + ':' + m; let f = EDGES.get(key); if (f) return f;
+  f = { vert, n, m, gap: NaN, pass: NaN, wl: 0, to: null, trade: 0 }; EDGES.set(key, f);
+  // the two countries it lies between: a (west or north) and b (east or south)
+  const a = vert ? [n - 1, m] : [m, n - 1], b = vert ? [n, m] : [m, n], ha = isHomeTile(a[0], a[1]), hb = isHomeTile(b[0], b[1]);
+  if ((ha && hb) || (vert ? m > 1 : n > 1)) return f;
+  const s0 = (vert ? WORLD.z0 : WORLD.x0) + m * TILE, at = s => vert ? [WORLD.x0 + n * TILE, s] : [s, WORLD.z0 + n * TILE];
+  const lo = s0 + 0.22 * TILE, hi = Math.min(s0 + 0.78 * TILE, vert && m === 1 ? -1500 : 1e12); // (a border that runs down to the sea is crossed inland)
+  const leg = LEGACY; LEGACY = 0;
+  const homeEdge = ha || hb, clear = s => homeEdge || homeFlank(...at(s)) > HOME_FALL + 1600; // (a border that runs up to the home mountains is not crossed on their flank)
+  const da = drainDir(a[0], a[1]), db = drainDir(b[0], b[1]), flow = vert ? (da === 'E' ? 1 : db === 'W' ? -1 : 0) : (da === 'S' ? 1 : 0);
+  if (flow) { // the gap: the lowest ground along the line (as it would lie without the border's own height)
+    let best = 1e9; for (let s = lo; s <= hi; s += 100) { if (!clear(s)) continue; const [x, z] = at(s), g = terrainBase(x, z, true) + 5 * _h2(Math.round(s / 100), n, 5210 + WSEED); if (g < best) { best = g; f.gap = s; } }
+    const [gx, gz] = at(f.gap); let g = 1e9; for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) g = Math.min(g, terrainBase(gx + q * 60, gz + r * 60, true));
+    f.to = flow > 0 ? b : a; f.from = flow > 0 ? a : b;
+    // the water's level there: well below the ground (a great river's valley), and never below the level it leaves the next country at
+    const d = drainDir(f.to[0], f.to[1]), [ti, tj] = f.to, nx = d === 'S' ? edgeFeat(0, tj + 1, ti) : d === 'W' ? edgeFeat(1, ti, tj) : d === 'E' ? edgeFeat(1, ti + 1, tj) : null;
+    f.wl = Math.max(SEA + 1.5, g - 47.4, nx ? nx.wl + 0.6 : -1e9);
+  }
+  // the pass: one on each side of the home country (west and east near the coast, north beyond Corrinvale), and on most borders elsewhere
+  const has = homeEdge ? (vert ? m === 1 : m === 0) : _h2(n * 2 + vert, m, 5220 + WSEED) < 0.8;
+  if (has) { let s = lerp(lo, hi, _h2(n * 2 + vert, m, 5221 + WSEED)); if (f.gap === f.gap && Math.abs(s - f.gap) < 2600) s = f.gap + (f.gap - s0 > TILE / 2 ? -2800 : 2800); s = clamp(s, s0 + 1400, Math.min(s0 + TILE - 1400, hi + 400));
+    if (!clear(s)) { let b = NaN, bd = 1e9; for (let t = lo; t <= hi; t += 100) if (clear(t) && !(Math.abs(t - f.gap) < 2600) && Math.abs(t - s) < bd) { bd = Math.abs(t - s); b = t; } s = b; }
+    f.pass = s; 
+    f.trade = homeEdge ? (vert ? 9 : 12) : _h2(n * 2 + vert, m, 5222 + WSEED) < 0.55 ? 10 : 4; } // (how much is carried over it: a high road, or a cart track)
+  LEGACY = leg; return f;
+}
+const edgeAt = () => edgeFeat(RIM.vert, RIM.n, Math.min(RIM.vert ? 1 : 1e9, Math.floor((RIM.s - (RIM.vert ? WORLD.z0 : WORLD.x0)) / TILE)));
+// how near a point of the home mountains (or their outer flank) lies to the line of one of the home country's three passes, in metres along the border
+function homePassD(x, z) {
+  let d = 1e9;
+  if (z > WORLD.z0 - HOME_FALL - 2800) { if (x < WORLD.x0 + 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 0, 1).pass)); if (x > WORLD.x1 - 7500) d = Math.min(d, Math.abs(z - edgeFeat(1, 2, 1).pass)); }
+  if (z < WORLD.z0 + 7500) d = Math.min(d, Math.abs(x - edgeFeat(0, 0, 0).pass));
+  return d;
+}
+// how much of the home mountains' height is left at a point: less in the col of a pass (but not where one of the home rivers runs)
+function homeNotch(x, z) {
+  let k = 1;
+  const cut = (f, s, t) => { const d = (s - f.pass) / 470; if (d * d >= 12) return; let m = 1; const T = f.rd;
+    if (T) { const fi = (s - T.a0) / T.C, fj = (t - T.b0) / T.C, i = Math.floor(fi), j = Math.floor(fj); if (i >= 0 && j >= 0 && i < T.NI - 1 && j < T.NJ - 1) { const u = fi - i, v = fj - j, q = j * T.NI + i, D = T.D; m = smoothstep(130, 430, lerp(lerp(D[q], D[q + 1], u), lerp(D[q + T.NI], D[q + T.NI + 1], u), v)); } }
+    k *= 1 - 0.83 * Math.exp(-d * d) * m; };
+  if (z > WORLD.z0 - HOME_FALL - 2800) { if (x < WORLD.x0 + 7500) cut(edgeFeat(1, 0, 1), z, x); if (x > WORLD.x1 - 7500) cut(edgeFeat(1, 2, 1), z, x); }
+  if (z < WORLD.z0 + 7500) cut(edgeFeat(0, 0, 0), x, z);
+  return k;
+}
+// true within w metres of the line a river (kind 'gap') or a road ('pass') crosses a border by: there the high ground is breached
+function inBreach(x, z, kind, w) {
+  const d = homeOut(x, z); if (d < 7500 && kind === 'pass' && (d <= 0 || homeFlank(x, z) < HOME_FALL + 1000) && homePassD(x, z) < w) return true; if (d <= 0) return false;
+  rimEval(tileI(x), tileJ(z), x, z); const f = edgeAt(); return Math.abs(RIM.s - f[kind]) < w;
+}
+// the high ground of the borders: foothills, then a range of separate peaks with cols between them, falling away again on the far side.
+// Round the home country it is the mountain wall it always was; elsewhere a range in some stretches and a belt of hills in others
+function rimHeight0(x, z) {
+  const de = rimDist0(x, z); if (de > 3600) return 0;
   const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
   const mass = smoothstep(0.2, 0.8, 0.5 + 0.9 * fbm(x / 1800 + sd, z / 1800, 2, 397)); // where the highest peaks stand
   const plinth = smoothstep(3600, 300, de), wall = smoothstep(950, -250, de);
   // the land climbs through foothills to a range of separate peaks with cols between them, and on beyond into the high country
   return plinth * (0.4 + 0.6 * plinth) * 190 * (0.55 + 0.6 * pk) + wall * (280 + 380 * mass) * (0.4 + 0.8 * pk) + wall * 40 * fine + smoothstep(150, -700, de) * 230;
 }
+function rimHeight(x, z) {
+  let h = 0; const d = homeOut(x, z), hf = d < 9000 ? -rimDist0(x, z) - 350 : 1e6;
+  if (hf < 4600) { // the home mountains: as they were on the home country's side (its rivers were planned on them), falling away beyond the middle of the range, a col at each pass
+    const notch = homeNotch(x, z);
+    if (hf <= 0) return rimHeight0(x, z) * notch;
+    const fr = hf + 420 * fbm(x / 1500 + 5.1, z / 1500, 3, 399 + WSEED * 7) * smoothstep(0, 400, hf); // (their outer foot runs in and out)
+    if (fr < HOME_FALL) h = rimHeight0(x, z) * (1 - smoothstep(0, HOME_FALL - 300, fr)) * notch;
+    const P = smoothstep(4600, 1500, hf) * smoothstep(0, 500, hf), sd = WSEED * 1.1; if (P > 0) h = Math.max(h, P * (0.4 + 0.6 * P) * 190 * (0.55 + 0.6 * ridgedMF(x / 900 + sd, z / 900, 5, 395)) * notch); // and foothills below them
+  }
+  if (d <= 0) return h; // (inside the home country's box no other border runs)
+  rimEval(tileI(x), tileJ(z), x, z); const u = RIM.ug; if (u > 5500) return h;
+  // a border is a high range in some stretches and a belt of wooded hills in others, broad here and narrow there
+  const wf = lerp(0.5, 1.35, smoothstep(-0.3, 0.3, fbm(x / 3300 + 2.2, z / 3300, 2, 396 + WSEED * 7))), de = u / wf - 350; if (de > 3600) return h;
+  const f = edgeAt(), s = RIM.s;
+  let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7))) * smoothstep(0, 1500, Math.min(hf, d)); // (a belt that runs up to the home country dies away before it)
+  if (f.gap === f.gap) { const q = (s - f.gap) / 520; if (q * q < 12) amp *= 1 - 0.985 * Math.exp(-q * q); }   // the river's gap
+  if (f.pass === f.pass) { const q = (s - f.pass) / 470; if (q * q < 12) amp *= 1 - 0.83 * Math.exp(-q * q); }  // the pass: a col between two peaks
+  const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
+  const mass = smoothstep(0.2, 0.8, 0.5 + 0.9 * fbm(x / 1800 + sd, z / 1800, 2, 397));
+  const plinth = smoothstep(3600, 300, de), wall = smoothstep(950, -250, de);
+  return Math.max(h, amp * (plinth * (0.4 + 0.6 * plinth) * 190 * (0.55 + 0.6 * pk) + wall * (280 + 380 * mass) * (0.4 + 0.8 * pk) + wall * 40 * fine + smoothstep(150, -350, de) * 230));
+}
 // the raw height before level plots and roads are cut in, and before the rivers have cut their valleys (terrainRaw, in 03_water.js, adds those)
-function terrainBase(x, z) {
+function terrainBase(x, z, noRim) {
   const dIn = SHORE - z; const r0 = Math.hypot(x, z);
-  const wW = smoothstep(800, 1400, r0); const wr = wW > 0 ? wildRelief(x, z) : null;
+  const wW = smoothstep(800, 1400, r0); const wr = wW > 0 ? wildReliefAt(x, z) : null;
   let h = 0.6 + 45 * (1 - Math.exp(-Math.max(0, dIn) / 330));      // the land climbs away from the sea
   h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21);                     // broad swells
   const inside = pointInPoly(x, z, WALL_PTS) && z < SHORE + 2;
@@ -125,7 +254,7 @@ function terrainBase(x, z) {
     h += amp * (hills - 0.42) * (wr ? lerp(1, lerp(0.35, 1, wr[1]), wW) : 1);
   }
   if (wr) h += out * wW * (wr[0] + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior
-  if (r0 > 5500) h += rimHeight(x, z);
+  if (r0 > 5500 && !noRim) h += LEGACY ? rimHeight0(x, z) : rimHeight(x, z);
   if (Math.abs(x - 205) < 700 && Math.abs(z + 220) < 700) h += out * riseHeight(x, z); // it has faded to nothing long before the box ends
   // western downs framing the other side of the bay
   { const dx = x + 300, dz = z + 120; h += out * 30 * Math.exp(-(dx * dx) / (90 * 90) - (dz * dz) / (190 * 190)); }

@@ -39,12 +39,14 @@ const Travel = {
       const own = new Set(Tn.nodes.map((_, i) => b0 + i)); for (const g of Tn.gates) { const j = near(g.ox, g.oz, 90, own); if (j >= 0) link(b0 + g.node, j); } }
     // a second pass: an end that found nothing (it was laid before its neighbour) tries again
     for (let k = 0; k < X.length; k++) if (A[k].length === 1) { const j = near(X[k], Z[k], 40, new Set([k, A[k][0]])); if (j >= 0 && Math.hypot(X[j] - X[k], Z[j] - Z[k]) < 40) link(k, j); }
-    this.graph = { X, Z, A, near };
+    this.graph = { X, Z, A, near }; this.graphRev = World.rev;
   },
+  // (the network is made again when a country has been planned or forgotten: its ways join on at the passes)
+  fresh() { if (!this.graph || this.graphRev !== World.rev) this.buildGraph(); return this.graph; },
   nearestNode(x, z, r = 600) { const g = this.graph; let k = g.near(x, z, r); if (k < 0) k = g.near(x, z, 4000); return k; },
   // the way by road between two points: off the road to the nearest node, along the network, off it again to the goal
   route(x0, z0, x1, z1) {
-    if (!this.graph) this.buildGraph(); const g = this.graph, N = g.X.length;
+    const g = this.fresh(), N = g.X.length;
     const s = this.nearestNode(x0, z0), t = this.nearestNode(x1, z1); if (s < 0 || t < 0) return null;
     const dist = new Float64Array(N).fill(Infinity), prev = new Int32Array(N).fill(-1), heap = [[0, s]]; dist[s] = 0;
     const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
@@ -59,7 +61,7 @@ const Travel = {
   },
   // the road you stand on, onwards in the direction you face, to the next fork or its end
   roadAhead(x, z, yaw) {
-    if (!this.graph) this.buildGraph(); const g = this.graph, k0 = g.near(x, z, 25); if (k0 < 0) return null;
+    const g = this.fresh(), k0 = g.near(x, z, 25); if (k0 < 0) return null;
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw); let best = -1, bs = -0.2;
     for (const j of g.A[k0]) { const dx = g.X[j] - g.X[k0], dz = g.Z[j] - g.Z[k0], l = Math.hypot(dx, dz) || 1, s = (dx * fx + dz * fz) / l; if (s > bs) { bs = s; best = j; } }
     if (best < 0) return null;
@@ -94,6 +96,7 @@ const Travel = {
   k() {
     const c = this.cur; if (!c) return 1; const P = G.player; let k = this.rate();
     const w = Wild.wanted(P.pos.x, P.pos.z); if (w.length) { const d = w[0].d; if (d < 100) k = Math.min(k, 3); else if (d < 200) k = Math.min(k, k * 0.5); }
+    const m = World.missing(P.pos.x, P.pos.z, 1600); if (m.length) k = Math.min(k, m[0].d < 500 ? 2 : k * 0.4); // (the country ahead is still being planned: its ground cannot be laid yet)
     return Math.max(1, k);
   },
   // one frame of travel: dt is real seconds; returns the game seconds that passed
@@ -145,7 +148,7 @@ const Travel = {
     const site = Sites.update(P.pos.x, P.pos.z); if (site && this.cur) { this.stop(`You come upon ${site.name}.`, 'good'); return; }
     const poi = POI.update(P.pos.x, P.pos.z); if (poi && this.cur && poi.kind !== 'village' && poi.kind !== 'hamlet') { this.stop(`You come upon ${poi.name}.`, 'good'); return; } // (a village or a hamlet on the way goes on the map without stopping you)
     if (rpgUI() && nearbyHostiles(35)) { this.stop('Something stirs nearby. You stop.', 'bad'); return; }
-    if (c.mode === 'ahead' && (rimDist(P.pos.x, P.pos.z) < 300)) { this.stop('The mountains rise sheer ahead of you.', undefined, false); }
+    
   },
   banner() {
     const c = this.cur; if (!c) return; const L = c.cum[c.cum.length - 1], left = Math.max(0, L - c.s);
@@ -183,7 +186,7 @@ const Travel = {
     const P = G.player, found = G.flags.found || {}, heard = G.flags.heard || {}, out = [];
     if (!insideCity(P.pos.x, P.pos.z, -5)) { const s = G.city.stops.find(q => q.id === 'market'); out.push({ id: 'city', name: 'Aldhaven', sub: 'the Grand Market', x: s.arrive[0], z: s.arrive[1] }); }
     for (const S of SITES) if (found[S.id] || heard[S.id] || S.kind === 'town') out.push({ id: S.id, name: S.name, sub: found[S.id] ? capFirst(S.blurb.split(',')[0]) : 'heard of, not yet seen', x: S.road[0][0], z: S.road[0][1] });
-    for (const p of POI.list) if (POI.found(p)) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
+    for (const p of POI.known()) out.push({ id: p.id, name: capFirst(p.name), sub: 'found on your travels', x: p.x, z: p.z });
     return out.map(o => ({ ...o, d: Math.hypot(o.x - P.pos.x, o.z - P.pos.z) })).sort((a, b) => a.d - b.d);
   },
 };

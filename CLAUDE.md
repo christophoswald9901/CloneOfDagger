@@ -36,6 +36,15 @@ python3 tools/invariants.py                     # data checks over many seeds (r
 
 Run `tools/invariants.py` after changing the terrain, rivers, tracks or a town generator. It exits non-zero on a failure; read the coordinates it prints before rendering anything.
 
+The world goes on beyond the home country as a lattice of countries planned as the player nears them (`docs/ENDLESS.md`). After changing the terrain, the rivers, the ways or the settlement plan also run:
+
+```bash
+python3 tools/endless.py 0 1 2                  # rivers, roads and ground across the borders of 37 countries a seed
+python3 tools/digest.py tools/out/d.json 0 1 2  # the home country's plan; --diff against an earlier file: it must not change by accident
+```
+
+The home country is planned under `LEGACY = 1` (the land as it was before the world went on), so its rivers, villages and fields stay where they are. Keep it that way: change what lies beyond freely, but a change to the home plan should be a decision, not a side effect.
+
 Other sessions may be running the same tools from other worktrees. If port 8765 is taken, serve this checkout on another port and set `HTTP_PORT` to it, and set `CDP_PORT` (default 9333) to a free port, or the tools will photograph or disturb another session's build.
 
 They need Python `websockets` and `Pillow`, and Chrome or Chromium on PATH (or `$CHROME`). In a fresh container: `pip install websockets pillow`, plus a Chromium package if none is installed. If the sandbox blocks `cdn.jsdelivr.net` (where three.js is loaded from), `tools/cdp.py` intercepts those requests and serves them from an `npm pack` copy in `tools/.npmcache/` (gitignored), so npm registry access is enough. Renders go to `tools/out/`, which is gitignored, so earlier renders exist only on the machine that made them.

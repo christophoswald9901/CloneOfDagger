@@ -30,13 +30,13 @@ const Roads = {
     const dir = rnd.chance(0.5) ? 1 : -1, n = K.pair || rnd.chance(0.15) ? 2 : 1;
     for (let m = 0; m < n; m++) {
       const v = rnd.int(0, 11), rr = new RNG(9100 + ki * 53 + v), g = K.g || (rr.chance(0.5) ? 'f' : 'm'), qq = clamp(q - dir * m * 2, 0, T[ti].length - 1), [x, z] = T[ti][qq];
-      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: `trav${ki}_${v}`, data: { trade: K.trade, ti, q: qq, dir, lane: dir * 0.9 } });
+      const e = spawnNPC(G.city, { name: K.trade === 'A soldier of the road patrol' ? 'Road Warden' : personName(rr, g), look: K.look(rr, g), gender: g, x: x + rr.range(-0.8, 0.8), z: z + rr.range(-0.8, 0.8), role: 'traveller', dialog: 'traveler', speed: K.speed * rr.range(0.92, 1.08), spriteKey: `trav${ki}_${v}`, data: { trade: K.trade, T: T[ti], q: qq, dir, lane: dir * 0.9 } });
       this.list.push(e);
     }
   },
   // a traveller walks the track, keeping to its side of the way, and stops when spoken to or at the end
   step(e, dt) {
-    const D = e.data, T = Wild.tracks[D.ti]; if (!T) { e.moving = false; return; }
+    const D = e.data, T = D.T; if (!T) { e.moving = false; return; }
     if (G.uiOpen && UI.is('dialog')) { e.moving = false; return; }
     const q = clamp(D.q + D.dir * 3, 0, T.length - 1), a = T[Math.max(0, q - 1)], b = T[Math.min(T.length - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     const tx = T[q][0] - (b[1] - a[1]) / l * D.lane, tz = T[q][1] + (b[0] - a[0]) / l * D.lane;

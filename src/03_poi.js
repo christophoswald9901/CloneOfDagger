@@ -16,15 +16,16 @@ const POI = {
   // the villages and hamlets come from the settlement plan (Settle): their houses, greens and fields are laid out there
   hamletNear(x, z, r) { return Settle.near(x, z, r); },
   housesIn(x0, z0, x1, z1) { return Settle.housesIn(x0, z0, x1, z1); },
-  plan() {
-    this.list = []; this.hash = new Map(); const C = this.HC;
-    this.hamlets = Settle.list;
-    for (const H of Settle.list) { const p = { id: H.id, kind: H.kind, name: `the ${H.kind} of ${H.name}`, x: H.x, z: H.z, ang: 0, r: POI_KINDS[H.kind].r, hamlet: H }; this.list.push(p); this.addHash(p); }
-    for (let i = Math.floor(WORLD.x0 / C); i <= Math.floor(WORLD.x1 / C); i++) for (let j = Math.floor(WORLD.z0 / C); j <= Math.floor(WORLD.z1 / C); j++) {
+  // the places of one country (each stands in the country its point lies in)
+  plan(K) {
+    const C = this.HC, home = K.home; if (home) { this.list = []; this.hash = new Map(); }
+    for (const H of K.settle.list) { const p = { id: H.id, kind: H.kind, name: `the ${H.kind} of ${H.name}`, x: H.x, z: H.z, ang: 0, r: POI_KINDS[H.kind].r, hamlet: H, K }; this.list.push(p); this.addHash(p); }
+    for (let i = Math.floor(K.x0 / C); i <= Math.floor(K.x1 / C); i++) for (let j = Math.floor(K.z0 / C); j <= Math.floor(K.z1 / C); j++) {
       if (_h2(i, j, 6001 + WSEED) > 0.42) continue;
       for (let t = 0; t < 4; t++) {
         const x = (i + 0.15 + 0.7 * _h2(i, j, 6002 + t + WSEED)) * C, z = (j + 0.15 + 0.7 * _h2(i, j, 6010 + t + WSEED)) * C;
-        if (Math.hypot(x, z) < 1100 || rimDist(x, z) < 1600 || coastZ(x) - z < 80 || siteWeight(x, z) > 0 || this.hamletNear(x, z, 260)) continue;
+        if (!home && (x < K.x0 || x >= K.x1 || z < K.z0 || z >= K.z1)) continue;
+        if (Math.hypot(x, z) < 1100 || (home ? rimDist(x, z) : rimEval(K.i, K.j, x, z) - 350) < 1600 || coastZ(x) - z < 80 || siteWeight(x, z) > 0 || this.hamletNear(x, z, 260)) continue;
         const h = terrainRaw(x, z); if (h < SEA + 3) continue;
         const sl = Math.hypot(terrainRaw(x + 6, z) - terrainRaw(x - 6, z), terrainRaw(x, z + 6) - terrainRaw(x, z - 6)) / 12; if (sl > 0.22) continue;
         if (riverNear(x, z, 40)) continue;
@@ -36,20 +37,23 @@ const POI = {
         else if (fm > 0.5) kind = u < 0.5 ? 'hut' : 'camp';
         else if (wildHeath(x, z, h) > 0.4) kind = u < 0.5 ? 'dolmen' : u < 0.8 ? 'stone' : 'cairn';
         else kind = u < 0.35 ? 'ruin' : u < 0.55 ? 'oak' : u < 0.7 ? 'camp' : u < 0.85 ? 'well' : 'stone';
-        const p = { id: `p${i}_${j}`, kind, name: POI_KINDS[kind].name, x, z, ang: _h2(i, j, 6030) * Math.PI * 2, r: POI_KINDS[kind].r };
+        const p = { id: `p${i}_${j}`, kind, name: POI_KINDS[kind].name, x, z, ang: _h2(i, j, 6030) * Math.PI * 2, r: POI_KINDS[kind].r, K };
         if (kind === 'cart' || kind === 'shrine') { const tp = Wild.trackPtsNear(x - 90, z - 90, x + 90, z + 90, 2); let bd = 1e9, b = null; for (const q of tp) { const d = Math.hypot(q[0] - x, q[1] - z); if (d < bd) { bd = d; b = q; } } if (b) p.ang = Math.atan2(b[0] - x, b[1] - z); } // facing the way
         this.list.push(p); this.addHash(p); break;
       }
     }
   },
+  forget(K) { this.list = this.list.filter(p => p.K !== K); this.hash = new Map(); for (const p of this.list) this.addHash(p); },
   addHash(p) { const k = Math.floor(p.x / this.HC) * 100003 + Math.floor(p.z / this.HC); let l = this.hash.get(k); if (!l) this.hash.set(k, l = []); l.push(p); },
   near(x, z, r) { const C = this.HC, out = []; for (let i = Math.floor((x - r - 80) / C); i <= Math.floor((x + r + 80) / C); i++) for (let j = Math.floor((z - r - 80) / C); j <= Math.floor((z + r + 80) / C); j++) { const l = this.hash.get(i * 100003 + j); if (l) for (const p of l) if (Math.hypot(p.x - x, p.z - z) < r + p.r) out.push(p); } return out; },
   found(p) { return !!(G.flags.poi && G.flags.poi[p.id]); },
+  // every place found so far: those of the countries that are planned, and those found in countries since left behind (kept by name and place)
+  known() { const out = this.list.filter(p => this.found(p)), far = G.flags.far; if (far) { const have = new Set(out.map(p => p.id)); for (const id in far) if (!have.has(id)) { const [name, x, z, kind] = far[id]; out.push({ id, name, x, z, kind, r: 10 }); } } return out; },
   update(x, z) {
     if (!G.player || G.area !== G.city) return null; let hit = null;
-    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
+    for (const p of this.near(x, z, this.discR)) if (!this.found(p) && Math.hypot(p.x - x, p.z - z) < this.discR + (p.kind === 'hamlet' ? 60 : p.kind === 'village' ? 100 : 0)) { (G.flags.poi || (G.flags.poi = {}))[p.id] = 1; if (p.K && !p.K.home) (G.flags.far || (G.flags.far = {}))[p.id] = [p.name, Math.round(p.x), Math.round(p.z), p.kind]; hit = p; msg(`You come upon ${p.name}.`, 'district'); }
     // the people of the nearest hamlet, about their doors by day
-    const H = (this.hamlets || []).find(h => Math.hypot(h.x - x, h.z - z) < 380);
+    const H = Settle.list.find(h => Math.hypot(h.x - x, h.z - z) < 380);
     if (this.folk && (this.folk.H !== H || this.folk.list[0].removed)) { for (const e of this.folk.list) if (!e.removed) e.remove(); this.folk = null; }
     if (H && H.houses.length && !this.folk) this.folk = { H, list: H.houses.slice(0, H.kind === 'village' ? 7 : 4).map((h, k) => { const r = new RNG(h.seed), g = r.chance(0.5) ? 'f' : 'm', [vx, vz] = xfP(makeXf(h.x, h.z, h.ang), r.range(-2, 2), 7);
       return spawnNPC(G.city, { name: personName(r, g), look: lookByWealth(r, g, 0.7), gender: g, x: vx, z: vz, role: 'wander', wanderR: 7, speed: 1.0, dialog: 'villager', spriteKey: 'ham' + (h.seed % 24), data: { hamlet: H.name } }); }) };

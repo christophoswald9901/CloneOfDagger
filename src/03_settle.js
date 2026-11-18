@@ -30,25 +30,26 @@ class _Heap { constructor() { this.k = []; this.v = []; }
   pop() { const K = this.k, V = this.v, top = V[0], lk = K.pop(), lv = V.pop(), n = K.length; if (n) { let i = 0; for (;;) { let c = 2 * i + 1; if (c >= n) break; if (c + 1 < n && K[c + 1] < K[c]) c++; if (K[c] >= lk) break; K[i] = K[c]; V[i] = V[c]; i = c; } K[i] = lk; V[i] = lv; } return top; }
 }
 
-const Settle = {
+// one country's plan (the facade Settle below answers for all of them)
+const SettleProto = {
   ready: false, list: [], owners: [], farms: [], blocks: [], seeds: [], builds: [], ms: 0,
-  plan() {
-    const t0 = performance.now(), T = LAND.lf, W = Wild, ss = smoothstep, prof = [['start', t0]]; if (!T) return;
+  *planGen() {
+    const K = this.K, home = K.home, t0 = performance.now(), T = K.land.lf, W = K.ways, ss = smoothstep, prof = [['start', t0]]; if (!T) return;
     const { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN } = T, n = NI * NJ, cx = i => X0 + i * C, cz = j => Z0 + j * C;
     const cellOf = (x, z) => { const i = Math.round((x - X0) / C), j = Math.round((z - Z0) / C); return i < 0 || j < 0 || i >= NI || j >= NJ ? -1 : j * NI + i; };
     /* ---- what each 50 m cell of the country is good for ---- */
     const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n); // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
-    for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
+    for (let j = 0; j < NJ; j++) { if (!home && World.due()) yield; for (let i = 0; i < NI; i++) {
       const k = j * NI + i, x = cx(i), z = cz(j), h = H[k];
-      if (h < SEA + 2.5 || x < WORLD.x0 || x > WORLD.x1 || z < WORLD.z0 || z > WORLD.z1 || Math.max(Math.abs(x), Math.abs(z)) < TG.R + 30 || coastZ(x) - z < 60 || rimDist(x, z) < 1000) { EX[k] = 1; continue; }
+      if (h < SEA + 2.5 || x < K.x0 || x > K.x1 || z < K.z0 || z > K.z1 || Math.max(Math.abs(x), Math.abs(z)) < TG.R + 30 || coastZ(x) - z < 60 || (home ? rimDist(x, z) : rimEval(K.i, K.j, x, z) - 350) < 1000) { EX[k] = 1; continue; }
       if (townCore(x, z) > 0 || siteWild(x, z) > 0.05) { EX[k] = 2; continue; }
       const TL = wildTreeLine(x, z), sl = SL[k], expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), wet = WET[k];
       AR[k] = (1 - ss(0.06, 0.16, sl)) * (1 - ss(0.42, 0.8, expo)) * (1 - ss(0.5, 0.85, wet)) * (1 - ss(TL - 110, TL - 45, h)); // the plough: gentle, sheltered, drained, low
       PA[k] = (1 - ss(0.15, 0.3, sl)) * (1 - ss(0.6, 0.95, expo)) * (1 - ss(0.72, 0.95, wet)) * (1 - ss(TL - 50, TL - 5, h));     // the grazing: the slopes beyond
-    }
+    } }
     // how far each cell lies from running water (any stream), and which cells a river too wide to wade runs through
     const SD = new Float32Array(n).fill(1e4), WR = new Uint8Array(n);
-    for (const R of LAND.rivers) for (let q = 0; q < R.P.length; q += 3) { const k = cellOf(R.P[q][0], R.P[q][1]); if (k < 0) continue; SD[k] = 0; if (R.w[q] >= 4.5) WR[k] = 1; }
+    for (const R of K.land.rivers) for (let q = 0; q < R.P.length; q += 3) { const k = cellOf(R.P[q][0], R.P[q][1]); if (k < 0) continue; SD[k] = 0; if (R.w[q] >= 4.5) WR[k] = 1; }
     _chamfer(SD, NI, NJ, C);
     // the good land round each place: the mean of the plough's ground within some 400 m (a village must feed itself)
     const IW = NI + 1, I = new Float64Array(IW * (NJ + 1));
@@ -66,10 +67,10 @@ const Settle = {
     const nearest = (L, x, z) => { let d = 1e9; for (const p of L) { const e = Math.hypot(p[0] - x, p[1] - z); if (e < d) d = e; } return d; };
     const DI = [1, -1, 0, 0, 1, 1, -1, -1], DJ = [0, 0, 1, -1, 1, -1, 1, -1];
     const cityOut = (x, z) => Math.max(Math.abs(x), Math.abs(z)) - TG.R, townOut = (x, z) => { let d = 1e9; for (const Tn of TOWNS) d = Math.min(d, Tn.rectOut(x, z) - Tn.cfg.moat.off - Tn.cfg.moat.w); return d; };
-    prof.push(['cand', performance.now()]);
+    prof.push(['cand', performance.now()]); if (!home) yield;
     /* ---- the places worth settling, best first ---- */
     const cand = [];
-    for (let j = 2; j < NJ - 2; j++) for (let i = 2; i < NI - 2; i++) {
+    for (let j = 2; j < NJ - 2; j++) { if (!home && World.due()) yield; for (let i = 2; i < NI - 2; i++) {
       const k = j * NI + i; if (EX[k] || AR[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
       const x = cx(i), z = cz(j), td = W.trackD(x, z); if (cityOut(x, z) < 1150 || townOut(x, z) < 1150) continue;
       const floor = ss(-3, -14, TPI[k]) * (1 - ss(0.06, 0.16, SL[k])), expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), sd = SD[k];
@@ -79,10 +80,10 @@ const Settle = {
         + 0.45 * (1 - ss(80, 500, nearest(junc, x, z))) + 0.35 * (1 - ss(80, 450, nearest(cross, x, z))) // where ways meet, or cross the water
         + 0.3 * floor - 0.4 * expo + 0.12 * SUN[k] + 0.3 * _h2(i, j, 7300 + WSEED); // the valley floor or its edge, out of the wind, in the sun
       cand.push({ k, x, z, s, td });
-    }
+    } }
     cand.sort((a, b) => b.s - a.s);
     prof.push(['sort', performance.now()]);
-    const list = [], used = new Set(), rng = new RNG(7301 + WSEED * 131);
+    const list = [], used = new Set(), rng = new RNG(7301 + WSEED * 131 + (home ? 0 : Math.floor(_h2(K.i, K.j, 7302) * 1e6)));
     const flatAt = (x, z, r, lim) => { let lo = 1e9, hi = -1e9; for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) { const v = terrainRaw(x + a * r, z + b * r); lo = Math.min(lo, v); hi = Math.max(hi, v); } return hi - lo < lim && lo > SEA + 2.5; };
     const okSpot = (x, z) => !siteZone(x, z, 250) && townCore(x, z) === 0 && !riverNear(x, z, 40) && flatAt(x, z, 10, 9) && !W.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 40);
     // the nearest point of a way (not a lane) to a place
@@ -101,10 +102,10 @@ const Settle = {
       const name = (() => { for (let t = 0; t < 30; t++) { const nm = rng.pick(SETTLE_NAMES[0]) + rng.pick(SETTLE_NAMES[1]); if (!used.has(nm)) { used.add(nm); return nm; } } return 'Newton'; })();
       list.push({ kind, x, z, ti, q, name, id: (kind === 'village' ? 'v' : 'h') + Math.round(x) + '_' + Math.round(z), score: c.s });
     };
-    for (const c of cand) if (cityOut(c.x, c.z) > 1700 && townOut(c.x, c.z) > 1600) place(c, 'village');
+    { let nc = 0; for (const c of cand) { if (!home && World.due()) yield; if (cityOut(c.x, c.z) > 1700 && townOut(c.x, c.z) > 1600) place(c, 'village'); } }
     const sMin = cand.length ? cand[Math.floor(cand.length * 0.6)].s : 0;
-    for (const c of cand) if (c.s > sMin) place(c, 'hamlet');
-    prof.push(['use', performance.now()]);
+    { let nc = 0; for (const c of cand) { if (!home && World.due()) yield; if (c.s > sMin) place(c, 'hamlet'); } }
+    prof.push(['use', performance.now()]); if (!home) yield;
     /* ---- the houses of each place: along its way, a green with a well; a village has its chapel ---- */
     prof.push(['places', performance.now()]);
     /* ---- the lanes: on the 50 m grid, easy grades, round the wide rivers, joining the first way they meet ---- */
@@ -144,16 +145,16 @@ const Settle = {
     // (the nearest first, so a lane from further off can join one laid before it: the lanes grow out from the tracks into the country)
     { const todo = list.filter(S => S.ti < 0);
       for (const S of todo) { S.w = null; for (const r of [600, 1500, 4000]) { const w = wayNear(S.x, S.z, r); if (w) { S.w = w; break; } } }
-      while (todo.length) { let bi = -1, bd = 1e9; todo.forEach((S, q) => { if (S.w && S.w.d < bd) { bd = S.w.d; bi = q; } }); if (bi < 0) { for (const S of todo) S.dead = true; break; }
+      while (todo.length) { if (!home) yield; let bi = -1, bd = 1e9; todo.forEach((S, q) => { if (S.w && S.w.d < bd) { bd = S.w.d; bi = q; } }); if (bi < 0) { for (const S of todo) S.dead = true; break; }
         const S = todo.splice(bi, 1)[0], bw = S.w; delete S.w;
         const r = route([S.x, S.z], [bw.x, bw.z], 7330 + list.indexOf(S), Math.ceil(bd / C) + 10), L = r && addLane(r);
         if (L) { S.ti = W.tracks.length + lanes.indexOf(L); S.own = L; { const want = Math.min(L.length - 3, 2 + Math.round((S.kind === 'village' ? 5 : 3.5) * 7)); S.q = 2; for (let d = 0; d < L.length; d++) { const q = want + (d % 2 ? -1 : 1) * Math.ceil(d / 2); if (q < 2 || q > L.length - 3) continue; if (!riverNear(L[q][0], L[q][1], 30)) { S.q = q; break; } } } // (its middle on dry ground)
           for (const o of todo) for (let q = 0; q < L.length; q += 3) { const d = Math.hypot(L[q][0] - o.x, L[q][1] - o.z); if (!o.w || d < o.w.d) o.w = { d, x: L[q][0], z: L[q][1] }; } } else S.dead = true; } // (a lane laid is a way the others may join)
       for (let q = list.length - 1; q >= 0; q--) if (list[q].dead) list.splice(q, 1); }
-    prof.push(['placeLanes', performance.now()]);
+    prof.push(['placeLanes', performance.now()]); if (!home) yield;
     /* ---- each place's territory: the land nearer to it than to any other, in walking effort ---- */
     const owners = [...list];
-    owners.push({ kind: 'city', x: 0, z: 0 }); for (const Tn of TOWNS) owners.push({ kind: 'town', x: Tn.x, z: Tn.z, town: Tn });
+    if (home) { owners.push({ kind: 'city', x: 0, z: 0 }); for (const Tn of TOWNS) owners.push({ kind: 'town', x: Tn.x, z: Tn.z, town: Tn }); }
     const D = new Float32Array(n).fill(Infinity), OWN = new Int16Array(n).fill(-1), hp = new _Heap();
     const src = (k, o) => { if (k < 0 || H[k] < SEA) return; D[k] = 0; OWN[k] = o; hp.push(0, k); };
     owners.forEach((o, oi) => {
@@ -162,10 +163,10 @@ const Settle = {
       else src(cellOf(o.x, o.z), oi);
     });
     const stepCost = (k, q, len) => { const g = Math.abs(H[q] - H[k]) / len; return len * (1 + (g / 0.1) ** 2 + (EX[q] === 1 ? 3 : 0) + (WR[q] ? 5 : 0)); };
-    while (hp.size) { const k = hp.pop(), d = D[k]; if (d > 3600) continue; const i = k % NI, j = (k - i) / NI;
+    let nt = 0; while (hp.size) { if (!home && World.due()) yield; const k = hp.pop(), d = D[k]; if (d > 3600) continue; const i = k % NI, j = (k - i) / NI;
       for (let e = 0; e < 8; e++) { const a = i + DI[e], b = j + DJ[e]; if (a < 0 || b < 0 || a >= NI || b >= NJ) continue; const q = b * NI + a; if (H[q] < SEA) continue;
         const nd = d + stepCost(k, q, e < 4 ? C : C * 1.4142); if (nd < D[q]) { D[q] = nd; OWN[q] = OWN[k]; hp.push(nd, q); } } }
-    prof.push(['terr', performance.now()]);
+    prof.push(['terr', performance.now()]); if (!home) yield;
     /* ---- what the land is used for: 2 ploughed, 1 grazed, 0 left wild ---- */
     let USE = new Uint8Array(n);
     for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
@@ -179,6 +180,7 @@ const Settle = {
     Object.assign(this, { C, X0, Z0, NI, NJ, USE, UF, OWN, D, owners, list });
     const trackPts = ti => ti < W.tracks.length ? W.tracks[ti] : lanes[ti - W.tracks.length];
     for (const S of list) {
+      if (!home) yield;
       const t = S.own || trackPts(S.ti); if (!t) continue; if (S.own) { S.x = t[S.q][0]; S.z = t[S.q][1]; }
       const r = new RNG(Math.floor(_h2(Math.round(S.x), Math.round(S.z), 7340 + WSEED) * 2147483647)), vil = S.kind === 'village', nH = vil ? r.int(9, 13) : r.int(3, 5), pitch = vil ? 5.5 : 7;
       const frame = q => { const a = t[Math.max(0, q - 1)], b = t[Math.min(t.length - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
@@ -199,7 +201,7 @@ const Settle = {
       }
       for (const h of S.houses) { this.houseHash.add(h, obbAabb(h.o)); HC.add(cellOf(h.x, h.z)); } if (S.chapel) HC.add(cellOf(S.chapel.x, S.chapel.z));
     }
-    prof.push(['houses', performance.now()]);
+    prof.push(['houses', performance.now()]); if (!home) yield;
     /* ---- the farmsteads: within each territory, on good dry ground, a few hundred metres apart; each joined by a lane ---- */
     const farms = [], cap = { village: 8, hamlet: 3, city: 40, town: 24 }, cnt = new Map(), farmHash = new SHash(200);
     const farmOk = (x, z, oi) => {
@@ -211,7 +213,8 @@ const Settle = {
     };
     for (const f of W.endFarms) { const k = cellOf(f.x, f.z), F = { x: f.x, z: f.z, ang: f.ang, end: true, owner: k >= 0 ? OWN[k] : -1 }; farms.push(F); farmHash.add(F, [f.x, f.z, f.x, f.z]); }
     { const order = []; for (let k = 0; k < n; k++) if (USE[k] && OWN[k] >= 0) { const i = k % NI, j = (k - i) / NI, td = W.trackD(cx(i), cz(j)); order.push([_h2(i, j, 7350 + WSEED) - (td > 30 && td < 170 ? 0.45 : 0), k]); } // (those beside a way first: walking it, you pass them) order.sort((a, b) => a[0] - b[0]);
-      for (const [hv, k] of order) {
+      let nf = 0; for (const [hv, k] of order) {
+        if (!home && World.due()) yield;
         const oi = OWN[k], o = owners[oi]; if ((cnt.get(oi) || 0) >= cap[o.kind] || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
         const i = k % NI, j = (k - i) / NI; let x = cx(i) + (_h2(i, j, 7351) - 0.5) * C * 0.8, z = cz(j) + (_h2(i, j, 7352) - 0.5) * C * 0.8;
         const ci = W.ci(x), cj = W.ci(z), x0 = -TG.R + ci * WC, z0 = -TG.R + cj * WC; x = clamp(x, x0 + 34, x0 + WC - 34); z = clamp(z, z0 + 34, z0 + WC - 34); // well inside one chunk, which builds it
@@ -220,24 +223,25 @@ const Settle = {
       } }
     prof.push(['farms', performance.now()]);
     // their lanes, nearest the village first, so the later ones join them
-    for (const F of farms.filter(F => !F.end).sort((a, b) => a.d - b.d)) {
-      const o = owners[F.owner], w = wayNear(F.x, F.z, 170), home = o && (o.kind === 'village' || o.kind === 'hamlet') ? [o.x, o.z] : null;
-      let tx, tz; if (w) { tx = w.x; tz = w.z; } else if (home) { tx = home[0]; tz = home[1]; } else { const w2 = wayNear(F.x, F.z, 1500); if (!w2) { tx = F.x; tz = F.z + 1; } else { tx = w2.x; tz = w2.z; } }
+    let nl = 0; for (const F of farms.filter(F => !F.end).sort((a, b) => a.d - b.d)) {
+      if (!home && World.due()) yield;
+      const o = owners[F.owner], w = wayNear(F.x, F.z, 170), hpt = o && (o.kind === 'village' || o.kind === 'hamlet') ? [o.x, o.z] : null;
+      let tx, tz; if (w) { tx = w.x; tz = w.z; } else if (hpt) { tx = hpt[0]; tz = hpt[1]; } else { const w2 = wayNear(F.x, F.z, 1500); if (!w2) { tx = F.x; tz = F.z + 1; } else { tx = w2.x; tz = w2.z; } }
       const dl = Math.hypot(tx - F.x, tz - F.z) || 1; F.ang = Math.atan2(-(tx - F.x) / dl, -(tz - F.z) / dl) + Math.PI; // its front to the way
       const FX = makeXf(F.x, F.z, F.ang), gate = xfP(FX, 0, 12);
       if (w) { const j = joinPt(gate[0], gate[1], gate[0], gate[1]); F.lane = j && Math.hypot(j[0] - gate[0], j[1] - gate[1]) < 200 ? addLane([gate, j], true) : null; }
-      else { const r = route(gate, home, 7360 + farms.indexOf(F)); F.lane = r ? addLane(r) : null; }
+      else { const r = route(gate, hpt, 7360 + farms.indexOf(F)); F.lane = r ? addLane(r) : null; }
     }
     prof.push(['farmLanes', performance.now()]);
     const kept = farms.filter(F => F.end || F.lane); this.farmHash = new SHash(200);
     for (const F of kept) { F.o = mkObb(F.x, F.z, F.ang, 16, 15); this.farmHash.add(F, [F.x, F.z, F.x, F.z]); }
-    this.farms = kept; this.lanes = lanes;
-    W.addLanes(lanes);
-    prof.push(['addLanes', performance.now()]);
+    this.farms = kept; this.lanes = lanes; if (!home) yield;
+    yield* W.addLanesGen(lanes);
+    prof.push(['addLanes', performance.now()]); if (!home) yield;
     /* ---- the field systems: seeds of furlong lattices over the farmland, each turned to a lane, the contour or the city's fields ---- */
     const seeds = [], seedHash = new SHash(300); let sid = 0;
     { const order = []; for (let k = 0; k < n; k++) if (USE[k]) order.push([_h2(k % NI, Math.floor(k / NI), 7370 + WSEED), k]); order.sort((a, b) => a[0] - b[0]);
-      for (const [, k] of order) { const i = k % NI, j = (k - i) / NI, x = cx(i) + (_h2(i, j, 7371) - 0.5) * C, z = cz(j) + (_h2(i, j, 7372) - 0.5) * C;
+      let ns = 0; for (const [, k] of order) { if (!home && World.due()) yield; const i = k % NI, j = (k - i) / NI, x = cx(i) + (_h2(i, j, 7371) - 0.5) * C, z = cz(j) + (_h2(i, j, 7372) - 0.5) * C;
         if (seedHash.query(x - 300, z - 300, x + 300, z + 300).some(s => Math.hypot(s.x - x, s.z - z) < 290)) continue;
         const fd = W.handFD(x, z), ha = fd < 340 ? W.handAng(x, z) : NaN; let ang;
         if (ha === ha) ang = ha + (_h2(i, j, 7373) - 0.5) * 0.08;
@@ -251,6 +255,7 @@ const Settle = {
     // the lattice: columns of blocks (each a few strips wide) side by side, the blocks of a column end to end, the columns staggered
     const blocks = [], blockHash = new SHash(64), RS = 440;
     for (const S of seeds) {
+      if (!home && World.due()) yield;
       const ca = Math.cos(S.ang), sa = Math.sin(S.ang); let u = -RS - _h2(S.id, 0, 7380) * 30, col = 0;
       while (u < RS) {
         const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = 14 + 8 * _h2(S.id, col, 7382), wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
@@ -262,7 +267,7 @@ const Settle = {
           const k = cellOf(x, z); if (k < 0 || OWN[k] < 0) continue; const past = USE[k] !== 2, ow = owners[OWN[k]], Rp = SETTLE_R[ow.kind][1];
           if (past && _h2(S.id * 977 + col, row, 7385) < 0.55 * ss(0.72, 1.02, D[k] / Rp + 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED))) continue; // the pasture thins out at the edge of the territory
           let nn = nS, pw2 = pw; if (past) { nn = Math.max(1, Math.round(wc / (32 + 12 * _h2(S.id, col, 7386)))); pw2 = wc / nn - 2.4; } // hedged pasture: fewer, wider closes
-          Object.assign(o, { id: blocks.length, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < 0.45, wall: past && H[k] > 70 });
+          Object.assign(o, { id: blocks.length, st: this, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < 0.45, wall: past && H[k] > 70 });
           blocks.push(o); blockHash.add(o, obbAabb(o));
         }
         u += wc; col++;
@@ -271,20 +276,22 @@ const Settle = {
     this.blocks = blocks; this.blockHash = blockHash; this.stripCache = new Map();
     prof.push(['blocks', performance.now()]);
     // how farmed each place is, from the blocks themselves (25 m), with the commons round each village
-    { const C2 = 25, X1 = WORLD.x0 - 400, Z1 = WORLD.z0 - 400, N2 = Math.ceil((WORLD.x1 - WORLD.x0 + 800) / C2) + 1, M2 = Math.ceil((WORLD.z1 - WORLD.z0 + 800) / C2) + 1, CU = new Float32Array(N2 * M2);
-      for (const o of blocks) { const [a0, b0, a1, b1] = obbAabb(o), v = o.past ? 0.72 : 0.92;
+    if (!home) yield;
+    { const C2 = 25, X1 = K.x0 - 400, Z1 = K.z0 - 400, N2 = Math.ceil((K.x1 - K.x0 + 800) / C2) + 1, M2 = Math.ceil((K.z1 - K.z0 + 800) / C2) + 1, CU = new Float32Array(N2 * M2);
+      let nb = 0; for (const o of blocks) { if (!home && World.due()) yield; const [a0, b0, a1, b1] = obbAabb(o), v = o.past ? 0.72 : 0.92;
         for (let j = Math.max(0, Math.floor((b0 - 32 - Z1) / C2)); j <= Math.min(M2 - 1, Math.ceil((b1 + 32 - Z1) / C2)); j++) for (let i = Math.max(0, Math.floor((a0 - 32 - X1) / C2)); i <= Math.min(N2 - 1, Math.ceil((a1 + 32 - X1) / C2)); i++) {
           const d = padDist({ o }, X1 + i * C2, Z1 + j * C2), c = v * (1 - ss(4, 30, d)); if (c > CU[j * N2 + i]) CU[j * N2 + i] = c; } }
       for (const S of list) { const R = S.kind === 'village' ? 260 : 150; for (let j = Math.max(0, Math.floor((S.z - R - Z1) / C2)); j <= Math.min(M2 - 1, Math.ceil((S.z + R - Z1) / C2)); j++) for (let i = Math.max(0, Math.floor((S.x - R - X1) / C2)); i <= Math.min(N2 - 1, Math.ceil((S.x + R - X1) / C2)); i++) {
         const c = 0.55 * (1 - ss(R * 0.4, R, Math.hypot(X1 + i * C2 - S.x, Z1 + j * C2 - S.z))); if (c > CU[j * N2 + i]) CU[j * N2 + i] = c; } } // the green, the crofts and the commons round the houses
       this.cu = { C: C2, X0: X1, Z0: Z1, NI: N2, NJ: M2, CU }; }
-    prof.push(['cult', performance.now()]); this.classifyWays(); prof.push(['ways', performance.now()]); this.prof = prof.slice(1).map(([k, t], q) => k + ':' + Math.round(t - prof[q][1])).join(' '); this.ready = true; this.ms = Math.round(performance.now() - t0);
+    prof.push(['cult', performance.now()]); this.prof = prof.slice(1).map(([k, t], q) => k + ':' + Math.round(t - prof[q][1])).join(' '); this.ready = true; this.ms = Math.round(performance.now() - t0);
   },
   /* ---- the kinds of way: every village and hamlet sends its people to the nearer market town (Aldhaven or a town) along the ways,
      and the two towns trade with each other; a way that carries much of it is a high road, a lane that carries a village's is a cart
      track, the rest stay lanes. Lanes and tracks on a slope wear down into hollow ways. ---- */
-  classifyWays() {
-    const t0 = performance.now(), TT = Wild.tracks, off = []; let N = 0; for (const T of TT) { off.push(N); N += T.length; }
+  classifyWays() { const g = this.classifyGen(); while (!g.next().done); },
+  *classifyGen() {
+    const t0 = performance.now(), K = this.K, Wy = K.ways, TT = Wy.tracks, off = []; let N = 0; for (const T of TT) { off.push(N); N += T.length; }
     const X = new Float32Array(N), Z = new Float32Array(N), TI = new Int32Array(N), HC = 32, hash = new Map(), hk = (x, z) => Math.floor(x / HC) * 100003 + Math.floor(z / HC);
     TT.forEach((T, ti) => { for (let q = 0; q < T.length; q++) { const k = off[ti] + q; X[k] = T[q][0]; Z[k] = T[q][1]; TI[k] = ti; const h = hk(X[k], Z[k]); let l = hash.get(h); if (!l) hash.set(h, l = []); l.push(k); } });
     const nearNodes = (x, z, r, f) => { for (let i = Math.floor((x - r) / HC); i <= Math.floor((x + r) / HC); i++) for (let j = Math.floor((z - r) / HC); j <= Math.floor((z + r) / HC); j++) { const l = hash.get(i * 100003 + j); if (l) for (const k of l) if (Math.hypot(X[k] - x, Z[k] - z) < r) f(k); } };
@@ -295,14 +302,18 @@ const Settle = {
       const relax = (k, j) => { const nd = dist[k] + Math.hypot(X[j] - X[k], Z[j] - Z[k]) + 0.01; if (nd < dist[j]) { dist[j] = nd; prev[j] = k; hp.push(nd, j); } };
       while (hp.size) { const k = hp.pop(); if (k > 0 && TI[k - 1] === TI[k]) relax(k, k - 1); if (k < N - 1 && TI[k + 1] === TI[k]) relax(k, k + 1); const l = links.get(k); if (l) for (const j of l) relax(k, j); }
       return { dist, prev }; };
-    const cityS = [], townS = []; TT.forEach((T, ti) => { if (!T.lane && Math.max(Math.abs(T[0][0]), Math.abs(T[0][1])) < TG.R + 220) cityS.push(off[ti]); });
-    for (const Tn of TOWNS) for (const g of Tn.gates) nearNodes(g.ox, g.oz, 260, k => { if (!TT[TI[k]].lane) townS.push(k); });
-    const C = walk(cityS), Tw = townS.length ? walk(townS) : null, WT = new Float32Array(N);
+    const cityS = [], townS = [];
+    if (K.home) { TT.forEach((T, ti) => { if (!T.lane && Math.max(Math.abs(T[0][0]), Math.abs(T[0][1])) < TG.R + 220) cityS.push(off[ti]); });
+      for (const Tn of TOWNS) for (const g of Tn.gates) nearNodes(g.ox, g.oz, 260, k => { if (!TT[TI[k]].lane) townS.push(k); }); }
+    else nearNodes(Wy.centre[0], Wy.centre[1], 120, k => { if (!TT[TI[k]].lane) cityS.push(k); }); // (a country's own market is the meeting place at its middle)
+    yield; const C = walk(cityS); yield; const Tw = townS.length ? walk(townS) : null, WT = new Float32Array(N);
     const carry = (prev, k, w) => { for (let n = 0; k >= 0 && n < N; k = prev[k], n++) WT[k] += w; };
     for (const S of this.list) { if (S.ti < 0 || !TT[S.ti]) continue; const k = off[S.ti] + clamp(S.q, 0, TT[S.ti].length - 1), dc = C.dist[k], dt = Tw ? Tw.dist[k] : Infinity; if (!isFinite(dc) && !isFinite(dt)) continue;
       carry(dc <= dt ? C.prev : Tw.prev, k, S.kind === 'village' ? 3 : 1); }
-    for (const S of SITES) if (S.track >= 0 && TT[S.track] && isFinite(C.dist[off[S.track]])) carry(C.prev, off[S.track], 1); // (the landmarks draw a few visitors from the city)
+    if (K.home) for (const S of SITES) if (S.track >= 0 && TT[S.track] && isFinite(C.dist[off[S.track]])) carry(C.prev, off[S.track], 1); // (the landmarks draw a few visitors from the city)
+    TT.forEach((T, ti) => { if (T.pass && isFinite(C.dist[off[ti]])) carry(C.prev, off[ti], T.pass.trade); }); // the trade over each pass with the next country: the same on both sides of it
     if (townS.length) { let bk = -1, bd = Infinity; for (const k of townS) if (C.dist[k] < bd) { bd = C.dist[k]; bk = k; } if (bk >= 0) carry(C.prev, bk, 12); } // the city and the towns trade along one way
+    yield;
     // the kind of each point of each way, with no stretch of high road shorter than some 150 m
     const ROAD = 9, km = [0, 0, 0, 0]; this.milestones = [];
     TT.forEach((T, ti) => {
@@ -313,16 +324,17 @@ const Settle = {
       // a milestone every mile or so along a high road, on its left hand
       let run = 0; for (let q = 1; q < L - 1; q++) { if (cls[q] !== WAY.road) { run = 0; continue; } run += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]); if (run < 1400) continue; run = 0;
         const [ax, az] = T[q - 1], [bx, bz] = T[q + 1], l = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / l, nz = (bx - ax) / l, x = T[q][0] + nx * 3.6, z = T[q][1] + nz * 3.6;
-        if (!riverNear(x, z, 12) && !Wild.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 8)) this.milestones.push({ x, z, ang: Math.atan2(bx - ax, bz - az), seed: ti * 977 + q }); }
+        if (!riverNear(x, z, 12) && !Wy.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 8)) this.milestones.push({ x, z, ang: Math.atan2(bx - ax, bz - az), seed: ti * 977 + q }); }
     });
-    for (const b of Wild.bridges) { const T = TT[b.ti]; if (T.cls && T.cls[clamp(b.q, 0, T.length - 1)] === WAY.road) b.stone = true; } // the high roads cross the rivers on stone
+    for (const b of Wy.bridges) { const T = TT[b.ti]; if (T.cls && T.cls[clamp(b.q, 0, T.length - 1)] === WAY.road) b.stone = true; } // the high roads cross the rivers on stone
+    yield;
     // hollow ways: where a lane or a track climbs a slope its bed has worn down below the fields, a metre or two, between banks;
     // not at its ends, its meetings, a crossing, a yard or among houses, where it comes up to the level of the ground
     const jh = new SHash(48); for (const p of junc) jh.add(p, [p[0], p[1], p[0], p[1]]);
-    const calm = (x, z) => jh.query(x - 45, z - 45, x + 45, z + 45).some(p => Math.hypot(p[0] - x, p[1] - z) < 45) || this.list.some(S => Math.hypot(S.x - x, S.z - z) < 170) || this.farmHash.query(x - 50, z - 50, x + 50, z + 50).length > 0 || riverNear(x, z, 45) || Wild.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 50);
+    const calm = (x, z) => jh.query(x - 45, z - 45, x + 45, z + 45).some(p => Math.hypot(p[0] - x, p[1] - z) < 45) || this.list.some(S => Math.hypot(S.x - x, S.z - z) < 170) || this.farmHash.query(x - 50, z - 50, x + 50, z + 50).length > 0 || riverNear(x, z, 45) || Wy.bridges.some(b => Math.hypot(b.x - x, b.z - z) < b.half + 50);
     let sunk = 0;
     TT.forEach((T, ti) => {
-      const L = T.length, H = Wild.trackH[ti]; if (!H || L < 30 || !T.cls) return; let any = false; const sk = new Float32Array(L);
+      const L = T.length, H = Wy.trackH[ti]; if (!H || L < 30 || !T.cls) return; let any = false; const sk = new Float32Array(L);
       for (let q = 12; q < L - 12; q++) { const c = T.cls[q]; if (c === WAY.road) continue; const g = Math.abs(H[Math.min(L - 1, q + 5)] - H[Math.max(0, q - 5)]) / 30; if (g < 0.045) continue;
         sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g); any = true; }
       if (!any) return;
@@ -358,12 +370,12 @@ const Settle = {
   // a yard or a house is in the way, and ending where another field system takes over. The same whichever chunk asks.
   strips(o) {
     let out = this.stripCache.get(o.id); if (out) return out;
-    out = []; const W = Wild, ss = smoothstep, S = o.seed, step = 4, NS = Math.max(2, Math.round(2 * o.hz / step)), dv = 2 * o.hz / NS;
+    out = []; const W = this.K.ways, LD = this.K.land, ss = smoothstep, S = o.seed, step = 4, NS = Math.max(2, Math.round(2 * o.hz / step)), dv = 2 * o.hz / NS;
     const [bx0, bz0, bx1, bz1] = obbAabb(o), m = 30, segs = [];
     for (const T of W.tracks) { if (T.box && (T.box[0] > bx1 + m || T.box[2] < bx0 - m || T.box[1] > bz1 + m || T.box[3] < bz0 - m)) continue;
       for (let q = 1; q < T.length; q++) { const [ax, az] = T[q - 1], [cx, cz] = T[q]; if (Math.max(ax, cx) < bx0 - m || Math.min(ax, cx) > bx1 + m || Math.max(az, cz) < bz0 - m || Math.min(az, cz) > bz1 + m) continue; const k = T.cls ? T.cls[q] : T.lane ? WAY.lane : WAY.track; segs.push([ax, az, cx, cz, [11, 13, 6, 6][k] + (T.sink && T.sink[q] > 0.3 ? 2.5 : 0)]); } }
-    if (LAND.wh) { const WH = LAND.wh, CC = WH.C; for (let i = Math.floor((bx0 - m) / CC); i <= Math.floor((bx1 + m) / CC); i++) for (let j = Math.floor((bz0 - m) / CC); j <= Math.floor((bz1 + m) / CC); j++) { const l = WH.get((i + 4096) * 8192 + j + 4096); if (!l) continue;
-      for (let q = 0; q < l.length; q += 2) { const R = LAND.rivers[l[q]], p = l[q + 1]; segs.push([...R.P[p - 1], ...R.P[p], R.w[p] / 2 + 18]); } } }
+    if (LD.wh) { const WH = LD.wh, CC = WH.C; for (let i = Math.floor((bx0 - m) / CC); i <= Math.floor((bx1 + m) / CC); i++) for (let j = Math.floor((bz0 - m) / CC); j <= Math.floor((bz1 + m) / CC); j++) { const l = WH.get((i + 4096) * 8192 + j + 4096); if (!l) continue;
+      for (let q = 0; q < l.length; q += 2) { const R = LD.rivers[l[q]], p = l[q + 1]; segs.push([...R.P[p - 1], ...R.P[p], R.w[p] / 2 + 18]); } } }
     const HF = W.handHash.query(bx0 - 10, bz0 - 10, bx1 + 10, bz1 + 10), FM = this.farmHash.query(bx0 - 40, bz0 - 40, bx1 + 40, bz1 + 40), HS = this.houseHash.query(bx0 - 20, bz0 - 20, bx1 + 20, bz1 + 20);
     const PO = POI.list.length ? POI.near((bx0 + bx1) / 2, (bz0 + bz1) / 2, Math.hypot(bx1 - bx0, bz1 - bz0) / 2 + 20).filter(p => p.kind !== 'hamlet' && p.kind !== 'village') : [], GR = this.list.filter(V => V.green && Math.abs(V.x - o.x) < 400 && Math.abs(V.z - o.z) < 400);
     const BU = this.builds.filter(b => Math.abs(b.x - o.x) < 300 && Math.abs(b.z - o.z) < 300), sited = siteZone(o.x, o.z, Math.max(o.hx, o.hz) + 40), towned = TOWNS.some(Tn => Math.abs(o.x - Tn.x) < 3200 && Math.abs(o.z - Tn.z) < 3200);
@@ -398,4 +410,27 @@ const Settle = {
     this.stripCache.set(o.id, out); if (this.stripCache.size > 3000) this.stripCache.delete(this.stripCache.keys().next().value);
     return out;
   },
+};
+function makeSettle(K) { const S = Object.create(SettleProto); return Object.assign(S, { K, list: [], owners: [], farms: [], blocks: [], seeds: [], builds: [], milestones: [] }); }
+// the settlement of every planned country: what the chunks, the far ground and the map ask of it
+const Settle = {
+  get home() { return World.home.settle; },
+  get ready() { const S = World.home.settle; return !!(S && S.ready); }, get ms() { return World.home.settle.ms; }, get prof() { return World.home.settle.prof; }, get wayKm() { return World.home.settle.wayKm; },
+  // the home country, at load: its plan as it always was
+  plan() { const K = World.home, S = K.settle = makeSettle(K); homePlan(() => { const g = S.planGen(); while (!g.next().done); });
+},
+  // the home country's roads out through the passes, and the kinds of way (after the places are planned, so they are where they always were)
+  finishHome() { const K = World.home, o = World.only; World.only = K; try { K.ways.homePasses(); K.settle.classifyWays(); } finally { World.only = o; } },
+  of(x, z) { const K = World.only || World.at(x, z); return K && K.settle && K.settle.ready ? K.settle : null; },
+  each(x0, z0, x1, z1, m, f) { if (World.only) { const S = World.only.settle; if (S && S.blockHash) f(S); return; } for (const K of World.inBox(x0, z0, x1, z1, m)) if (K.settle && K.settle.ready) f(K.settle); },
+  get list() { return World.only ? (World.only.settle ? World.only.settle.list : []) : World.all('places'); },
+  get farms() { return World.all('farms'); }, get builds() { return World.all('builds'); }, get milestones() { return World.all('milestones'); }, get blocks() { return World.all('blocks'); }, get lanes() { return World.home.settle.lanes; },
+  ufAt(x, z) { const S = this.of(x, z); return S ? S.ufAt(x, z) : 0; },
+  cultAt(x, z) { const S = this.of(x, z); return S ? S.cultAt(x, z) : 0; },
+  blockAt(x, z) { const S = this.of(x, z); return S ? S.blockAt(x, z) : null; },
+  blocksIn(x0, z0, x1, z1) { let out = null; this.each(x0, z0, x1, z1, 500, S => { const l = S.blocksIn(x0, z0, x1, z1); out = out ? out.concat(l) : l; }); return out || []; },
+  farmsIn(x0, z0, x1, z1) { let out = null; this.each(x0, z0, x1, z1, 500, S => { const l = S.farmsIn(x0, z0, x1, z1); out = out ? out.concat(l) : l; }); return out || []; },
+  housesIn(x0, z0, x1, z1) { let out = null; this.each(x0, z0, x1, z1, 500, S => { const l = S.housesIn(x0, z0, x1, z1); out = out ? out.concat(l) : l; }); return out || []; },
+  near(x, z, r) { let hit = false; this.each(x - r, z - r, x + r, z + r, 700, S => { if (!hit && S.near(x, z, r)) hit = true; }); return hit; },
+  cropOf(o, k) { return o.st.cropOf(o, k); }, cropAt(o, x, z, fine) { return o.st.cropAt(o, x, z, fine); }, strips(o) { return o.st.strips(o); },
 };

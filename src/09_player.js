@@ -26,11 +26,11 @@ function recalcDerived(p) {
   const newFat = p.attr.END + p.attr.STR; p.fat += Math.max(0, newFat - p.maxFat); p.maxFat = newFat;
 }
 function playerAC() { const p = G.player; let ac = 0; for (const s of ['body', 'head', 'shield']) if (p.equip[s]) ac += p.equip[s].ac; return ac + Math.floor((p.attr.AGI - 50) / 12); }
-// out in the country nobody walks up a sheer rock face, and the mountains at the edge of the world turn everyone back:
-// a step is refused (or slides along) if it climbs ground steeper than about 50°, or goes on into the high peaks
+// out in the country nobody walks up a sheer rock face: a step is refused (or slides along) if it climbs ground steeper than about 50°
+// (the ranges between the countries are crossed at their passes and through the river gaps)
 function wildFooting(p, ox, oz) {
-  const g0 = terrainH(ox, oz), r0 = rimDist(ox, oz);
-  const bad = (x, z) => { const r = rimDist(x, z); if (r < -40 && r < r0) return true; const g = terrainH(x, z);
+  const g0 = terrainH(ox, oz);
+  const bad = (x, z) => { const g = terrainH(x, z);
     if (Math.abs(x - SITES[2].x) < 300 && Math.abs(z - SITES[2].z) < 300 && g < MERE.wl - 0.5 && g < g0) return true; // the deep water of the mere
     if (hallWet(x, z) && !hallWet(ox, oz)) return true; // the long water and the fountain at Halewood
     for (const T of TOWNS) if (g < T.wl() - 0.3 && g < g0 - 0.05 && T.inside(x, z, 40) && groundAt(G.area, x, z, 0.3, p.pos.y) < T.wl() + 0.3) return true; // a town's moat and canal: not to be waded into (but a bridge over it is walked on)
