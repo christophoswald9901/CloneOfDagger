@@ -1,4 +1,4 @@
-"""Walk the Long Ridge: along its crest from end to end, off its side at the culvert and back, up both flights of steps, then over it by fast travel.
+"""Walk the Giant's Ridge: along its crest from end to end, off its side at the culvert and back, up both flights of steps, then over it by fast travel.
 Reports how far the walker strayed from the crest line, whether they ever stood below the crest while on it (fell through or off),
 whether the landmark was found, and whether the journey by road went over the crest: python3 tools/ridgewalk.py [seed]"""
 import asyncio, json, os, sys

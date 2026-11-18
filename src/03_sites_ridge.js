@@ -1,5 +1,5 @@
 /* =====================================================================
-   The Long Ridge (a working name): a great bank of earth that carries the
+   The Giant's Ridge: a great bank of earth that carries the
    west road level across a wooded valley in the foothills west of
    Aldhaven, some 2 km long and up to 34 m above the valley floor. A
    seventh fixed landmark: its line, the height of its crest and the lie of
@@ -131,7 +131,7 @@ function ridgeSetup() {
   // the country's tracks take over from both (kept exactly as laid: the road runs down the middle of the crest)
   const e0 = ridgeAt(0), e1 = ridgeAt(L.len), crest = ev.map(p => p.slice()); crest.push([e1.x + e1.tx * 30, e1.z + e1.tz * 30]);
   const out = [[e0.x, e0.z], [e0.x - e0.tx * 30, e0.z - e0.tz * 30], [e0.x - e0.tx * 60, e0.z - e0.tz * 60]];
-  SITES.push({ id: 'ridge', name: 'the Long Ridge', kind: 'bank', x: C0.x, z: C0.z, rc: 130, rb: 380, discR: 300, box: R.box, late: true, exact: true, wayKind: WAY.road,
+  SITES.push({ id: 'ridge', name: "the Giant's Ridge", kind: 'bank', x: C0.x, z: C0.z, rc: 130, rb: 380, discR: 300, box: R.box, late: true, exact: true, wayKind: WAY.road,
     blurb: 'a great bank of earth that carries the road level across a wooded valley, thirty metres above its floor',
     dist: ridgeZoneD, road: [[C0.x, C0.z]], roads: [crest, out], forest: ridgeForest, keep: ridgeKeep, earth: ridgeEarth });
   SITE_H.ridge = ridgeH; R.setupMs = performance.now() - t0;

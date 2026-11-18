@@ -229,6 +229,25 @@ const WaysProto = {
   handFD(x, z) { return Wild.handFD(x, z); }, handAng(x, z) { return Wild.handAng(x, z); }, get handHash() { return Wild.handHash; }, ci(v) { return Wild.ci(v); },
 };
 function makeWays(K) { const W = Object.create(WaysProto); return Object.assign(W, { K, tracks: [], bridges: [], trackH: [], trackEnds: [], endFarms: [], tD: null, rivers: K.land.rivers }); }
+// The home country's ways were graded on the land as it was (LEGACY). Since then the cols of its three passes have been cut into the
+// mountains and the ranges fall away beyond their crest, so near them a way could stand on a wall high above the lowered ground. Where the
+// land now lies otherwise, each way takes its grade from the land as it lies (the difference smoothed as the grade was, its bridges kept
+// at their decks, a landmark's own stretch as it was laid). Its line stays where it is.
+function regradeHome() {
+  const W = World.home.ways, t0 = performance.now(), ST = 16; let n = 0, most = 0; // (the difference sampled every 48 m: it changes over hundreds)
+  const may = (x, z) => { if (homeOut(x, z) > -50) return true; const r = rimDist0(x, z); return r < 400 || (r < 3650 && homePassD(x, z) < 1700 && Math.hypot(x, z) > 5450); }; // (nowhere else does the land differ: the cols lie where the old mountains stood)
+  W.tracks.forEach((T, ti) => {
+    const H = W.trackH[ti], L = T.length; if (!H || L < 2) return; const m = Math.ceil((L - 1) / ST) + 1, D = new Float32Array(m); let any = false;
+    for (let k = 0; k < m; k++) { const [x, z] = T[Math.min(L - 1, k * ST)]; if (!may(x, z)) continue; const d = terrainRaw(x, z) - homePlan(() => terrainRaw(x, z)); if (Math.abs(d) > 0.05) { D[k] = d; any = true; } }
+    if (!any) return;
+    let dl = new Float32Array(L); for (let q = 0; q < L; q++) { const f = q / ST, k = Math.min(m - 2, Math.floor(f)); dl[q] = lerp(D[k], D[k + 1], clamp(f - k, 0, 1)); }
+    for (let it = 0; it < 4; it++) { const o = new Float32Array(L); for (let q = 0; q < L; q++) { let a = 0; for (let k = -6; k <= 6; k++) a += dl[clamp(q + k, 0, L - 1)]; o[q] = a / 13; } dl = o; }
+    for (const b of W.bridges) if (b.ti === ti) for (let q = 0; q < L; q++) { const d = Math.abs(q - b.q) * 3; if (d < b.half + 12) dl[q] *= smoothstep(b.half, b.half + 12, d); }
+    if (T.fixedN) for (let q = 0; q < L; q++) dl[q] *= smoothstep(T.fixedN - 1, T.fixedN + 20, q);
+    for (let q = 0; q < L; q++) { H[q] += dl[q]; most = Math.max(most, Math.abs(dl[q])); } n++;
+  });
+  W.regrade = { ways: n, most: +most.toFixed(1), ms: Math.round(performance.now() - t0) };
+}
 // while the home country is planned: the land as it was, and only its own plan in sight
 function homePlan(fn) { const l = LEGACY, o = World.only; LEGACY = 1; World.only = World.home; try { return fn(); } finally { LEGACY = l; World.only = o; } }
 
