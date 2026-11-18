@@ -32,7 +32,7 @@ class CDP:
         url = url.replace(':8765/', f':{HTTP_PORT}/')  # another worktree's server may hold 8765
         prof = f'{PROFILE}{self.port}'; os.makedirs(prof, exist_ok=True)
         self.proc = subprocess.Popen([CHROME, '--headless=new', f'--remote-debugging-port={self.port}', '--use-angle=swiftshader',
-                                      '--enable-unsafe-swiftshader', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',
+                                      '--enable-unsafe-swiftshader', '--mute-audio', '--no-first-run', '--no-default-browser-check', f'--window-size={w},{h}',  # muted: the user works beside these runs
                                       *(['--no-sandbox'] if os.getuid() == 0 else []),  # containers run as root; Chrome refuses its sandbox there
                                       f'--user-data-dir={prof}', 'about:blank'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         pages = []
