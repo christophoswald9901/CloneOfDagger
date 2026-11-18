@@ -325,6 +325,7 @@ const SettleProto = {
     TT.forEach((T, ti) => {
       const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (K.home ? _h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75 : _h2(ti, L, 7500 + WSEED) < regionP(T[L >> 1][0], T[L >> 1][1], RP.green));
       for (let q = 0; q < L; q++) { const w = WT[off[ti] + q]; cls[q] = !T.lane ? (w >= ROAD ? WAY.road : WAY.track) : w >= 2.5 ? WAY.track : green ? WAY.green : WAY.lane; }
+      if (T.fixedN) { const S = SITES.find(s => s.id === T.site); if (S && S.wayKind != null) for (let q = 0; q < T.fixedN; q++) cls[q] = S.wayKind; } // a landmark's own way is of the kind it was built as
       for (let q = 0; q < L;) { if (cls[q] !== WAY.road) { q++; continue; } let e = q; while (e < L && cls[e] === WAY.road) e++; if (e - q < 50) for (let k = q; k < e; k++) cls[k] = WAY.track; q = e; }
       T.cls = cls; for (let q = 1; q < L; q++) km[cls[q]] += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]) / 1000;
       // a milestone every mile or so along a high road, on its left hand
