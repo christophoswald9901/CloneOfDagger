@@ -694,6 +694,11 @@ function buildCity() {
     if (wild > 0) f += wild * (0.22 * fbm(x / 520 + WSEED * 1.7, z / 520, 3, 78) - 0.06 * smoothstep(90, 150, h - 0.6 * (wildTreeLine(x, z) - 150)) - 0.9 * smoothstep(wildTreeLine(x, z) - 35, wildTreeLine(x, z), h));
     // ...and with its shape: woods hang on the valley sides and in the shelter below the hills, the open tops are bare, the wet floors are meadow
     if (wild > 0) { const L = landAt(x, z); f = lerp(f, 0.7 * f + 0.4 * L.side + 0.12 * (1 - L.expo) - 0.15 - 0.75 * smoothstep(0.4, 0.85, L.expo) - 0.4 * L.wet * (1 - L.side) - 0.08 * L.sun, wild); }
+    // ...and with the kind of country: beech hangers on the steep sides of the downs and little else there, carr in blocks on the wet fen,
+    // the moor bare but for its cloughs, the weald wooded wherever it is not farmed
+    if (wild > 0) { const rw = regionW(x, z); if (rw) { const L = landAt(x, z);
+      f += regionMix(rw, RP.wood) + rw[RG.downs] * 0.95 * smoothstep(0.15, 0.27, L.sl) + rw[RG.fen] * (0.75 * smoothstep(0.08, 0.3, fbm(x / 240 + WSEED, z / 240, 2, 573)) * smoothstep(0.3, 0.7, L.wet) - 3 * mereAt(x, z))
+        + rw[RG.moor] * 0.55 * L.floor * (1 - smoothstep(60, 220, riverD(x, z))) + rw[RG.weald] * 0.16 * fbm(x / 130, z / 130, 2, 574); } }
     f -= 1.1 * wildCult(x, z); // farmed land: the woods are cleared back to copses
     if (wild > 0) { const rd = riverD(x, z); if (rd < 90) f = Math.max(f, wild * (0.42 * (1 - smoothstep(10, 60, rd)) * smoothstep(-0.05, 0.3, fbm(x / 90 + 9, z / 90, 2, 79)) - 0.08)); } // alder and willow carr in a broken line along the rivers, farmed valley or not
     const m = smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd), st = r > 1500 ? siteAt(x, z) : null;
@@ -738,6 +743,13 @@ function buildCity() {
       const shade = L.side * open * Math.max(0, -L.sun); r *= 1 - 0.1 * shade; g *= 1 - 0.03 * shade; b *= 1 + 0.05 * shade;
       const TLm = wildTreeLine(x, z), moor = Math.max(smoothstep(0.35, 0.8, L.expo + 0.25 * mot), smoothstep(TLm - 90, TLm - 10, h + 20 * mot)) * open * (1 - lush); r = lerp(r, 1.27, moor * 0.6); g = lerp(g, 0.94, moor * 0.6); b = lerp(b, 0.7, moor * 0.6);
       r *= 1 + open * (0.11 * mot + 0.04 * mot2); g *= 1 + open * (0.035 * mot + 0.03 * mot2); b *= 1 - open * 0.09 * mot; }
+    if (outK > 0) { const rw = regionW(x, z); if (rw) { // the turf of each kind of country: pale and short on the chalk, dark and sedgy in the fen, tawny on the moor, deep green in the weald
+      const k = outK * (1 - 0.75 * fm0), L = landAt(x, z), mt = fbm(x / 210, z / 210, 2, 575);
+      r *= lerp(1, regionMix(rw, RP.tr), k); g *= lerp(1, regionMix(rw, RP.tg), k); b *= lerp(1, regionMix(rw, RP.tb), k);
+      const sedge = rw[RG.fen] * k * smoothstep(-0.05, 0.3, mt) * smoothstep(0.3, 0.7, L.wet); r = lerp(r, 1.12, sedge * 0.55); g = lerp(g, 0.94, sedge * 0.55); b = lerp(b, 0.6, sedge * 0.55); // beds of sedge and reed, tawny among the green
+      const peat = rw[RG.moor] * k * smoothstep(0.35, 0.75, L.wet + 0.25 * mt); r = lerp(r, 0.78, peat * 0.6); g = lerp(g, 0.74, peat * 0.6); b = lerp(b, 0.62, peat * 0.6); // the dark of the bog
+      const chalk = rw[RG.downs] * outK * smoothstep(0.3, 0.5, L.sl + 0.06 * mt) * (1 - fm0); r = lerp(r, 1.5, chalk * 0.35); g = lerp(g, 1.42, chalk * 0.35); b = lerp(b, 1.2, chalk * 0.35); // the chalk shows through on the steepest of the scarp
+    } }
     { const hw = wildHeath(x, z, h) * (1 - fm); if (hw > 0) { r = lerp(r, h > 70 ? 1.02 : 1.12, hw * 0.92); g = lerp(g, h > 70 ? 0.72 : 0.82, hw * 0.92); b = lerp(b, h > 70 ? 0.84 : 0.58, hw * 0.92); } } // heather purples the uplands, bracken browns the lower heath
     if (Math.max(Math.abs(x), Math.abs(z)) <= TG.R) { const bare = smoothstep(118, 165, h); r = lerp(r, 1.05, bare); g = lerp(g, 1.0, bare); b = lerp(b, 1.02, bare); } // thin turf and bare rock above the tree line
     else { const TL = wildTreeLine(x, z), turf = smoothstep(TL - 20, TL + 70, h), bare = smoothstep(TL + 110, TL + 230, h); r = lerp(lerp(r, 1.1, turf * 0.7), 1.02, bare); g = lerp(lerp(g, 0.97, turf * 0.7), 0.98, bare); b = lerp(lerp(b, 0.74, turf * 0.7), 0.96, bare); } // out in the country: tawny alpine turf, then bare stone

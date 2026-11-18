@@ -942,6 +942,41 @@ function drawTree(kind, seed) {
     if (B) for (let i = 0; i < 5; i++) { x.fillStyle = rng.chance(0.5) ? '#d8d0b8' : '#7a2a24'; x.fillRect(rng.int(9, 23), rng.int(6, 13), 1, 1); } // blossom or haws
     noiseImg(x, 32, 20, 0.2, rng); outline(c, [14, 22, 10]); return c;
   }
+  if (kind === 'beech') { // a tall smooth grey bole under a broad dome of fresh green
+    const [c, x] = cnv(56, 84);
+    x.fillStyle = '#7c786c'; x.fillRect(25, 40, 6, 44); x.fillStyle = '#96928a'; x.fillRect(28, 40, 2, 44); x.fillStyle = '#7c786c'; x.fillRect(23, 80, 10, 4);
+    pxLine(x, 27, 50, 15, 34, '#7c786c', 2); pxLine(x, 29, 48, 42, 32, '#7c786c', 2); pxLine(x, 28, 44, 28, 24, '#7c786c', 2);
+    for (let i = 0; i < 34; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 28 + Math.cos(a) * r * 20, 27 + Math.sin(a) * r * 17, rng.int(5, 9), '#2f5122'); }
+    for (let i = 0; i < 24; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 26 + Math.cos(a) * r * 17, 23 + Math.sin(a) * r * 14, rng.int(3, 6), '#4a7a2c'); }
+    for (let i = 0; i < 14; i++) pxCircle(x, 24 + rng.range(-12, 9), 17 + rng.range(-8, 7), rng.int(1, 3), '#74a23e');
+    noiseImg(x, 56, 84, 0.15, rng); outline(c, [14, 22, 10]); return c;
+  }
+  if (kind === 'willow') { // a pollard: a short thick bole, a round mop of grey-green withies hanging over
+    const [c, x] = cnv(48, 48);
+    x.fillStyle = '#54442e'; x.fillRect(20, 28, 8, 20); x.fillStyle = '#6a583c'; x.fillRect(24, 28, 3, 20); x.fillStyle = '#54442e'; x.fillRect(18, 26, 12, 4); x.fillRect(18, 45, 12, 3);
+    for (let i = 0; i < 22; i++) { const a = rng.range(0, 6.283), r = Math.sqrt(rng.next()); pxCircle(x, 24 + Math.cos(a) * r * 17, 17 + Math.sin(a) * r * 11, rng.int(4, 7), '#4c683e'); }
+    for (let i = 0; i < 26; i++) { const px = rng.int(5, 43), top = rng.int(8, 22), len = rng.int(7, 15); for (let y = top; y < Math.min(40, top + len); y++) { x.fillStyle = y - top < 3 ? '#8aa66a' : (i % 2 ? '#6a8a52' : '#5a7a48'); x.fillRect(px + Math.round((y - top) * (px < 24 ? -0.12 : 0.12)), y, 1, 1); } }
+    for (let i = 0; i < 12; i++) pxCircle(x, 22 + rng.range(-12, 10), 12 + rng.range(-5, 5), rng.int(1, 3), '#9cb87c');
+    noiseImg(x, 48, 48, 0.14, rng); outline(c, [16, 24, 12]); return c;
+  }
+  if (kind === 'birch') { // a slight white stem, a thin airy head
+    const [c, x] = cnv(36, 76);
+    x.fillStyle = '#d6d2c4'; x.fillRect(17, 30, 3, 46); x.fillStyle = '#b8b4a6'; x.fillRect(19, 30, 1, 46); for (let i = 0; i < 9; i++) { x.fillStyle = '#2a2622'; x.fillRect(17 + rng.int(0, 1), rng.int(34, 74), 2, 1); }
+    pxLine(x, 18, 40, 11, 28, '#8a8478', 1); pxLine(x, 18, 36, 26, 24, '#8a8478', 1);
+    for (let i = 0; i < 20; i++) pxCircle(x, 18 + rng.range(-11, 11), 21 + rng.range(-15, 13), rng.int(3, 5), '#44702e');
+    for (let i = 0; i < 16; i++) pxCircle(x, 17 + rng.range(-9, 8), 17 + rng.range(-12, 9), rng.int(2, 3), '#6c9a3c');
+    for (let i = 0; i < 60; i++) { x.fillStyle = rng.chance(0.5) ? '#8ab44c' : '#3a5e28'; x.fillRect(rng.int(4, 31), rng.int(4, 40), 1, 1); }
+    for (let i = 0; i < 26; i++) x.clearRect(rng.int(5, 30), rng.int(5, 38), 2, 2); // light through it
+    noiseImg(x, 36, 76, 0.14, rng); outline(c, [14, 22, 10]); return c;
+  }
+  if (kind === 'thorn') { // an old hawthorn, bent over by the wind: its head swept to one side
+    const [c, x] = cnv(44, 36);
+    pxLine(x, 12, 35, 15, 24, '#4a3a28', 3); pxLine(x, 15, 24, 22, 16, '#4a3a28', 2); pxLine(x, 22, 16, 32, 13, '#4a3a28', 1);
+    for (let i = 0; i < 16; i++) { const t = rng.next(); pxCircle(x, 16 + t * 20 + rng.range(-3, 3), 14 - t * 3 + rng.range(-4, 3), rng.int(3, 6) * (1 - 0.4 * t), '#2e4020'); }
+    for (let i = 0; i < 12; i++) { const t = rng.next(); pxCircle(x, 17 + t * 19 + rng.range(-3, 3), 11 - t * 3 + rng.range(-3, 2), rng.int(2, 3), '#4a5e2a'); }
+    for (let i = 0; i < 8; i++) { x.fillStyle = '#62763a'; x.fillRect(rng.int(14, 38), rng.int(5, 12), 1, 1); }
+    noiseImg(x, 44, 36, 0.18, rng); outline(c, [14, 20, 10]); return c;
+  }
   // oak
   const [c, x] = cnv(48, 80);
   x.fillStyle = '#4a3220'; x.fillRect(21, 44, 6, 36); x.fillStyle = '#5c4028'; x.fillRect(24, 44, 2, 36); x.fillStyle = '#4a3220'; x.fillRect(19, 76, 10, 4);
@@ -2175,6 +2210,155 @@ const POI = {
 };
 
 /* =====================================================================
+   Regions: the character of the land, which changes on a long walk.
+   One field over the whole world says what kind of country a place is:
+   the heartland (the home country's own mixed farmland and woods), chalk
+   downs, fen, moor or the wooded weald. It is a function of position
+   alone (a warped cellular field on a lattice of its own size, turned
+   against the lattice of the countries), so every country's plan reads
+   the same answer and the regions run across the borders as they like:
+   a region may lie in several countries, and a country may hold several.
+   Everything that gives a region its look reads this one field: the
+   shape of the ground, its streams, woods, heath and farmland, the colour
+   of the turf, the trees, the fields and what bounds them, how people
+   settle, what they build with and what their roads are like.
+   The home country is heartland throughout and keeps its plan: the
+   regions begin beyond its box, on the outer flank of its mountains.
+   ===================================================================== */
+const RG = { heart: 0, downs: 1, fen: 2, moor: 3, weald: 4 }, RG_N = 5, RG_KEYS = ['heart', 'downs', 'fen', 'moor', 'weald'];
+const REGION = {
+  cell: 5600,                              // the lattice the regions grow from: a region is one cell or a few run together (some 15 to 60 minutes' walk across)
+  rot: 0.47,                               // turned against the countries' lattice (radians)
+  jitter: 0.86,                            // how far a cell's middle strays from its lattice point (of a cell)
+  warp: 950,                               // the edges wander by this much (metres)
+  share: [0.15, 0.22, 0.17, 0.22, 0.24],   // how much of the world each kind takes
+  edge: [1500, 620, 380, 1700, 1400],      // how broad the change into each kind is (metres): the fen and the downs have an edge, the others shade off
+  fade: 1500,                              // beyond the home country's box the regions come in over this distance
+  home: 0,                                 // the home country's own kind
+  meres: false,                            // open water in the fen's hollows: the hollows and their place in the plan are written, the water is not drawn yet, so they are off
+};
+// what each kind does, in the order of RG (heart, downs, fen, moor, weald)
+const RP = {
+  relief:  [1,    0.3,   0,     1.15,  0.7],   // the broad uplands and ranges of the country, of their full height
+  lift:    [0,    8,     -8,    24,    0],     // the whole of it raised or let down (metres)
+  knoll:   [1,    0.3,   0.03,  0.7,   1.75],  // the small close hills
+  swell:   [1,    1,     0.12,  1,     1],     // the broad swells of the ground
+  rim:     [1,    0.7,   0.4,   1.1,   0.85],  // the height of a border range where it runs through
+  stream:  [1,    5,     0.55,  0.7,   0.8],   // the land a stream must drain before it runs (of 1.6 km2): the chalk swallows its water, the fen and the moor shed it
+  incise:  [1,    1,     0.06,  0.75,  1],     // how deep a river has cut its valley
+  meander: [1,    1,     0.22,  1,     1],     // how far its line wanders
+  wetK:    [0,    -0.3,  0.75,  0.32,  0],     // wet ground added (on the flat) or taken away
+  wood:    [0,    -0.4,  -0.3,  -0.75, 0.3],   // more or less woodland
+  heath:   [0,    -1,    -1,    0.9,   -0.08], // more or less heath
+  conif:   [0,    -0.8,  -0.9,  0.3,   -0.55], // pine against broadleaf
+  plough:  [1,    0.95,  0.9,   0.15,  0.72],  // how much of the good land is ploughed
+  graze:   [1,    1.2,   1,     0.7,   1],     // and grazed
+  field:   [1,    1.9,   1.5,   1.2,   0.72],  // the size of a field
+  openF:   [0.45, 0.85,  0.7,   0,     0.1],   // how many furlongs lie open (no hedge between their strips)
+  village: [1,    1,     0.8,   0,     0.3],   // how readily people gather into villages
+  hamlet:  [1,    0.35,  0.5,   0.8,   1.5],   // and into hamlets
+  farms:   [1,    0.4,   0.6,   0.8,   1.5],   // how many farmsteads stand out in the fields
+  spread:  [1,    1.25,  1.1,   0.85,  0.85],  // how far a place's fields reach
+  green:   [0.5,  0.85,  0.3,   0.85,  0.3],   // how many of the farm lanes are green lanes
+  sunk:    [1,    1.1,   0,     0.6,   1.6],   // how deep the ways have worn into the slopes
+  // the colour of the open turf (multipliers on the colour it would have in the heartland)
+  tr: [1, 1.22, 0.8, 1.12, 0.84], tg: [1, 1.1, 0.95, 0.91, 1.02], tb: [1, 0.84, 0.76, 0.8, 0.8],
+};
+// what bounds a field in each kind: a hedge, a dry-stone wall, or nothing that stands (a ditch, a baulk of grass)
+const RG_BOUND = ['hedge', 'none', 'none', 'wall', 'hedge'];
+// what people build with: [walls of a house (one picked), its roofs (one picked), the tint of the roof, walls of a barn, roof of a barn]
+const RG_BUILD = [
+  { walls: ['timber2', 'timber2', 'stone', 'plaster', 'plaster'], roofs: ['roofThatch', 'roofThatch', 'roofThatch', 'roofSlate'], tint: [1, 0.95, 0.86], barn: 'wood', barnRoof: 'roofBrown' },
+  { walls: ['stoneLight', 'stoneLight', 'plaster', 'plaster'], roofs: ['roofThatch'], tint: [1.08, 1.0, 0.84], barn: 'stoneLight', barnRoof: 'roofThatch' },        // chalk and flint under pale thatch
+  { walls: ['brick', 'brick', 'timber', 'wood'], roofs: ['roofRed', 'roofRed', 'roofThatch'], tint: [0.92, 0.84, 0.74], barn: 'wood', barnRoof: 'roofThatch' },       // brick and tarred board, pantiles and dark reed
+  { walls: ['stone'], roofs: ['roofSlate'], tint: [0.9, 0.92, 0.98], barn: 'stone', barnRoof: 'roofSlate' },                                                           // grey stone and slate
+  { walls: ['timber', 'timber', 'timber2', 'brick'], roofs: ['roofBrown', 'roofBrown', 'roofRed'], tint: [1, 0.92, 0.84], barn: 'wood', barnRoof: 'roofBrown' },      // oak frames and tile
+];
+
+REGION.c = Math.cos(REGION.rot); REGION.s = Math.sin(REGION.rot);
+const regionKindOf = (i, j) => { let u = _h2(i, j, 552 + WSEED * 57); const S = REGION.share; for (let k = 0; k < RG_N; k++) { if (u < S[k]) return k; u -= S[k]; } return RG_N - 1; };
+// the weights of the kinds at a point, worked out afresh (regionW keeps them on a grid)
+const _rgD = new Float32Array(9), _rgK = new Uint8Array(9), _rgU = new Float32Array(9);
+function regionRaw(x, z, out) {
+  const R = REGION, s = WSEED * 57;
+  const wx = x + R.warp * fbm(x / 3100 + 1.7, z / 3100, 2, 540 + s) + 0.26 * R.warp * fbm(x / 760, z / 760, 2, 542 + s), wz = z + R.warp * fbm(x / 3100, z / 3100 + 5.3, 2, 541 + s) + 0.26 * R.warp * fbm(x / 760 + 3.9, z / 760, 2, 543 + s);
+  const u = (wx * R.c + wz * R.s) / R.cell, v = (-wx * R.s + wz * R.c) / R.cell, iu = Math.floor(u), iv = Math.floor(v);
+  let n = 0, f1 = 1e9;
+  for (let b = -1; b <= 1; b++) for (let a = -1; a <= 1; a++) { const ci = iu + a, cj = iv + b, su = ci + 0.5 + R.jitter * (_h2(ci, cj, 550 + s) - 0.5), sv = cj + 0.5 + R.jitter * (_h2(ci, cj, 551 + s) - 0.5), d = Math.hypot(u - su, v - sv) * R.cell;
+    _rgD[n] = d; _rgK[n] = regionKindOf(ci, cj); if (d < f1) f1 = d; n++; }
+  // how broad the change is here: the breadth of the kinds about, by a first even blend (so it varies smoothly from place to place)
+  let su = 0, sb = 0; for (let q = 0; q < 9; q++) { const t = 1 - (_rgD[q] - f1) / 1300, w = t > 0 ? t * t : 0; su += w; sb += w * R.edge[_rgK[q]]; }
+  const B = sb / su; out.fill(0); let sum = 0;
+  for (let q = 0; q < 9; q++) { const t = 1 - (_rgD[q] - f1) / B; if (t <= 0) continue; const w = t * t; out[_rgK[q]] += w; sum += w; }
+  for (let k = 0; k < RG_N; k++) out[k] /= sum;
+  return out;
+}
+// the field on a grid of 80 m (tiles of 16 x 16 cells, made as they are asked for): the weights change over hundreds of metres, so
+// reading them from the grid loses nothing, and the ground is asked for millions of times
+const RT_C = 80, RT_N = 16, RT_S = RT_C * RT_N, _RT = new Map(); let _rtI = NaN, _rtJ = NaN, _rtT = null;
+function regionTile(ti, tj) {
+  const key = (ti + 32768) * 65536 + tj + 32768; let T = _RT.get(key); if (T) return T;
+  const S = RT_N + 1, w = new Float32Array(RG_N); T = new Float32Array(S * S * RG_N);
+  for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) { regionRaw(ti * RT_S + i * RT_C, tj * RT_S + j * RT_C, w); T.set(w, (j * S + i) * RG_N); }
+  if (_RT.size > 1600) _RT.delete(_RT.keys().next().value);
+  _RT.set(key, T); return T;
+}
+// the weights of the kinds at a point: an array of RG_N numbers that sum to 1 (shared: read it at once), or null where the land is the
+// home country's own kind and nothing else (the whole of the home country, and all of it while the home country is planned)
+const _rw = new Float32Array(RG_N); let _rwx = NaN, _rwz = NaN, _rwOk = false;
+function regionW(x, z) {
+  if (LEGACY) return null; const ho = homeOut(x, z); if (ho <= 0) return null;
+  if (x === _rwx && z === _rwz) return _rw;
+  const fx = x / RT_C, fz = z / RT_C, ti = Math.floor(fx / RT_N), tj = Math.floor(fz / RT_N);
+  if (ti !== _rtI || tj !== _rtJ) { _rtT = regionTile(ti, tj); _rtI = ti; _rtJ = tj; }
+  const lx = fx - ti * RT_N, lz = fz - tj * RT_N, i = Math.min(RT_N - 1, Math.floor(lx)), j = Math.min(RT_N - 1, Math.floor(lz)), u = lx - i, v = lz - j, S = RT_N + 1, T = _rtT;
+  const k0 = (j * S + i) * RG_N, k1 = k0 + RG_N, k2 = k0 + S * RG_N, k3 = k2 + RG_N, a = (1 - u) * (1 - v), b = u * (1 - v), c = (1 - u) * v, d = u * v;
+  for (let q = 0; q < RG_N; q++) _rw[q] = T[k0 + q] * a + T[k1 + q] * b + T[k2 + q] * c + T[k3 + q] * d;
+  if (ho < REGION.fade) { const k = smoothstep(0, REGION.fade, ho); for (let q = 0; q < RG_N; q++) _rw[q] *= k; _rw[REGION.home] += 1 - k; }
+  _rwx = x; _rwz = z; return _rw;
+}
+// a property of the land at a point: the kinds' values of it, mixed by their weights
+function regionMix(w, a) { return w ? w[0] * a[0] + w[1] * a[1] + w[2] * a[2] + w[3] * a[3] + w[4] * a[4] : a[REGION.home]; }
+function regionP(x, z, a) { return regionMix(regionW(x, z), a); }
+// how much of one kind a place is (0..1)
+function regionIs(x, z, k) { const w = regionW(x, z); return w ? w[k] : k === REGION.home ? 1 : 0; }
+// the kind that leads at a place, and one kind picked by the weights with a draw u in 0..1 (so houses, walls and lanes change over
+// a border one by one, not all at a line)
+function regionKind(x, z) { const w = regionW(x, z); if (!w) return REGION.home; let b = 0; for (let k = 1; k < RG_N; k++) if (w[k] > w[b]) b = k; return b; }
+function regionPick(x, z, u) { const w = regionW(x, z); if (!w) return REGION.home; for (let k = 0; k < RG_N; k++) { if (u < w[k]) return k; u -= w[k]; } return RG_N - 1; }
+
+/* ---------- the shape each kind gives the ground (metres, added to the country's own relief) ---------- */
+// a tor: a knoll of piled rock on the open moor. One may stand in each cell of a lattice of 560 m: [x, z, size] or null
+const TOR_C = 560;
+function torNear(x, z) {
+  const i = Math.floor(x / TOR_C), j = Math.floor(z / TOR_C), s = WSEED * 57; if (_h2(i, j, 580 + s) > 0.42) return null;
+  return [(i + 0.22 + 0.56 * _h2(i, j, 581 + s)) * TOR_C, (j + 0.22 + 0.56 * _h2(i, j, 582 + s)) * TOR_C, 0.7 + 0.6 * _h2(i, j, 583 + s)];
+}
+// the level a fen lies at (its ground is within a metre of it): the plain's own level, let down to that of the valley floors
+function fenBase(x, z) { return 0.6 + 45 * (1 - Math.exp(-Math.max(0, SHORE - z) / 330)) + 70 * smoothstep(1500, 14000, coastZ(x) - z) + RP.lift[RG.fen]; }
+// a mere: a sheet of shallow open water in a hollow of the fen, 0 (none) .. 1 (its middle). Only well inland, where the fen is level
+function mereAt(x, z) { if (!REGION.meres) return 0; const w = regionW(x, z); if (!w || w[RG.fen] < 0.86 || coastZ(x) - z < 14200) return 0; return smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, w[RG.fen]); }
+const MERE_DEPTH = 1.9, MERE_LEVEL = -0.75; // the bed of a mere below the fen's level, and its water
+function regionShape(x, z, w) {
+  let h = 0; const s = WSEED * 57;
+  { const k = w[RG.downs]; if (k > 0.004) { // downs: broad whale-backed hills of chalk, dry valleys winding into them, a scarp along part of their edge
+    let d = 46 * smoothstep(-0.5, 0.5, fbm(x / 1250 + s, z / 1250, 2, 560)) + 8 * fbm(x / 500, z / 500, 2, 561);
+    d -= 15 * (1 - smoothstep(0.012, 0.1, Math.abs(fbm(x / 820 + 3.1, z / 820 + s, 2, 562)))) * smoothstep(6, 30, d); // the coombes
+    const sc = smoothstep(0.3, 0.62, 0.5 + 0.9 * fbm(x / 4300 + 9.1, z / 4300, 2, 563 + s));                              // where the edge is a scarp, and where it shades off
+    h += lerp(k, smoothstep(0.36, 0.6, k), sc) * (d + 14); } }
+  { const k = w[RG.fen]; if (k > 0.004) { // fen: level, with low islands of firm ground and shallow meres
+    let f = 6.5 * smoothstep(0.26, 0.5, fbm(x / 820 + s, z / 820, 2, 570)) + 0.3 * fbm(x / 85, z / 85, 2, 572);
+    if (REGION.meres && k > 0.86 && coastZ(x) - z > 14200) f -= (MERE_DEPTH + 0.3) * smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, k);
+    h += k * f; } }
+  { const k = w[RG.moor]; if (k > 0.004) { // moor: high, broad-backed, rough underfoot; tors on its tops
+    let m = 17 * fbm(x / 880 + s, z / 880, 3, 565) + 4.5 * fbm(x / 170, z / 170, 2, 566) + 1.3 * fbm(x / 36, z / 36, 2, 567);
+    if (k > 0.5) { const t = torNear(x, z); if (t) { const d = Math.hypot(x - t[0], z - t[1]) / (30 * t[2]); if (d < 2.4) m += 7.5 * t[2] * Math.exp(-d * d) * smoothstep(0.5, 0.75, k); } }
+    h += k * m; } }
+  { const k = w[RG.weald]; if (k > 0.004) h -= k * 7 * (1 - smoothstep(0.01, 0.075, Math.abs(fbm(x / 430 + s, z / 430, 2, 569)))); } // weald: steep little stream valleys (ghylls) between its close hills
+  return h;
+}
+
+/* =====================================================================
    Settlement: where the people of the generated country live and farm,
    planned once for the whole country at load (after the rivers, the lie
    of the land and the tracks). Villages and hamlets stand where people
@@ -2214,7 +2398,7 @@ const SettleProto = {
     const { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN } = T, n = NI * NJ, cx = i => X0 + i * C, cz = j => Z0 + j * C;
     const cellOf = (x, z) => { const i = Math.round((x - X0) / C), j = Math.round((z - Z0) / C); return i < 0 || j < 0 || i >= NI || j >= NJ ? -1 : j * NI + i; };
     /* ---- what each 50 m cell of the country is good for ---- */
-    const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n); // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
+    const EX = new Uint8Array(n), AR = new Float32Array(n), PA = new Float32Array(n), AR0 = home ? AR : new Float32Array(n); // (AR0: the land as it lies, before the custom of the country is counted) // EX 1: no one lives or farms here (sea, mountains, the city's own ground), 2: kept as it is (a landmark's or a town's ground)
     for (let j = 0; j < NJ; j++) { if (!home && World.due()) yield; for (let i = 0; i < NI; i++) {
       const k = j * NI + i, x = cx(i), z = cz(j), h = H[k];
       if (h < SEA + 2.5 || x < K.x0 || x > K.x1 || z < K.z0 || z > K.z1 || Math.max(Math.abs(x), Math.abs(z)) < TG.R + 30 || coastZ(x) - z < 60 || (home ? rimDist(x, z) : rimEval(K.i, K.j, x, z) - 350) < 1000) { EX[k] = 1; continue; }
@@ -2222,6 +2406,7 @@ const SettleProto = {
       const TL = wildTreeLine(x, z), sl = SL[k], expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), wet = WET[k];
       AR[k] = (1 - ss(0.06, 0.16, sl)) * (1 - ss(0.42, 0.8, expo)) * (1 - ss(0.5, 0.85, wet)) * (1 - ss(TL - 110, TL - 45, h)); // the plough: gentle, sheltered, drained, low
       PA[k] = (1 - ss(0.15, 0.3, sl)) * (1 - ss(0.6, 0.95, expo)) * (1 - ss(0.72, 0.95, wet)) * (1 - ss(TL - 50, TL - 5, h));     // the grazing: the slopes beyond
+      if (!home) { AR0[k] = AR[k]; const rw = regionW(x, z); if (rw) { AR[k] *= regionMix(rw, RP.plough); PA[k] = Math.min(1, PA[k] * regionMix(rw, RP.graze)); if (rw[RG.fen] > 0.8 && mereAt(x, z) > 0.05) { EX[k] = 1; AR[k] = PA[k] = 0; } } } // the kind of country: sheepwalk on the chalk, little plough on the moor, none in a mere
     } }
     // how far each cell lies from running water (any stream), and which cells a river too wide to wade runs through
     const SD = new Float32Array(n).fill(1e4), WR = new Uint8Array(n);
@@ -2247,7 +2432,7 @@ const SettleProto = {
     /* ---- the places worth settling, best first ---- */
     const cand = [];
     for (let j = 2; j < NJ - 2; j++) { if (!home && World.due()) yield; for (let i = 2; i < NI - 2; i++) {
-      const k = j * NI + i; if (EX[k] || AR[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
+      const k = j * NI + i; if (EX[k] || AR0[k] < 0.5 || SL[k] > 0.09 || WET[k] > 0.5) continue;
       const x = cx(i), z = cz(j), td = W.trackD(x, z); if (cityOut(x, z) < 1150 || townOut(x, z) < 1150) continue;
       const floor = ss(-3, -14, TPI[k]) * (1 - ss(0.06, 0.16, SL[k])), expo = clamp(0.62 * ss(4, 30, TPI[k]) + 0.5 * ss(10, 90, TPL[k]), 0, 1), sd = SD[k];
       const s = 1.5 * meanAR(i, j, 8) + 0.4 * AR[k]
@@ -2266,6 +2451,8 @@ const SettleProto = {
     const wayPt = (x, z, r) => { const w = wayNear(x, z, r); if (!w) return null; const s2 = wayHash.query(w.x - 1, w.z - 1, w.x + 1, w.z + 1).find(s => s[4] === w.ti); const t = W.tracks[w.ti]; return t.lane ? null : { ti: ways.indexOf(t), q: s2 ? s2[5] : 1, d: w.d }; };
     const tiOf = t => W.tracks.indexOf(t);
     const place = (c, kind) => {
+      // (the custom of the country: villages or scattered hamlets, close set or far apart)
+      if (!home) { const rw = regionW(c.x, c.z); if (rw && _h2(Math.round(c.x / 50), Math.round(c.z / 50), 7303 + WSEED) >= regionMix(rw, kind === 'village' ? RP.village : RP.hamlet)) return; }
       const far = kind === 'village' ? 1900 : 1100; if (list.some(o => Math.hypot(o.x - c.x, o.z - c.z) < (o.kind === 'village' && kind === 'village' ? far : 1100))) return;
       let x = c.x, z = c.z, ti = -1, q = -1;
       const wp = wayPt(x, z, kind === 'village' ? 230 : 110);
@@ -2329,7 +2516,7 @@ const SettleProto = {
       for (let q = list.length - 1; q >= 0; q--) if (list[q].dead) list.splice(q, 1); }
     prof.push(['placeLanes', performance.now()]); if (!home) yield;
     /* ---- each place's territory: the land nearer to it than to any other, in walking effort ---- */
-    const owners = [...list];
+    const owners = [...list]; for (const o of list) o.spread = home ? 1 : regionP(o.x, o.z, RP.spread);
     if (home) { owners.push({ kind: 'city', x: 0, z: 0 }); for (const Tn of TOWNS) owners.push({ kind: 'town', x: Tn.x, z: Tn.z, town: Tn }); }
     const D = new Float32Array(n).fill(Infinity), OWN = new Int16Array(n).fill(-1), hp = new _Heap();
     const src = (k, o) => { if (k < 0 || H[k] < SEA) return; D[k] = 0; OWN[k] = o; hp.push(0, k); };
@@ -2346,8 +2533,8 @@ const SettleProto = {
     /* ---- what the land is used for: 2 ploughed, 1 grazed, 0 left wild ---- */
     let USE = new Uint8Array(n);
     for (let j = 0; j < NJ; j++) for (let i = 0; i < NI; i++) {
-      const k = j * NI + i; if (EX[k] || OWN[k] < 0) continue; const o = owners[OWN[k]], [Rf, Rp] = SETTLE_R[o.kind], x = cx(i), z = cz(j);
-      const nz = 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED), d1 = D[k] / Rf + nz, d2 = D[k] / Rp + nz;
+      const k = j * NI + i; if (EX[k] || OWN[k] < 0) continue; const o = owners[OWN[k]], [Rf, Rp] = SETTLE_R[o.kind], x = cx(i), z = cz(j), sp = o.spread || 1;
+      const nz = 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED), d1 = D[k] / (Rf * sp) + nz, d2 = D[k] / (Rp * sp) + nz;
       if (d1 < 1 && AR[k] > 0.3 + 0.5 * ss(0.5, 1, d1)) USE[k] = 2; else if (d2 < 1 && PA[k] > 0.3 + 0.45 * ss(0.55, 1, d2)) USE[k] = 1;
     }
     { const U2 = USE.slice(); for (let j = 1; j < NJ - 1; j++) for (let i = 1; i < NI - 1; i++) { const k = j * NI + i; let f = 0, a = 0; for (let e = 0; e < 8; e++) { const u = USE[k + DJ[e] * NI + DI[e]]; if (u) { f++; if (u === 2) a++; } }
@@ -2391,7 +2578,8 @@ const SettleProto = {
     { const order = []; for (let k = 0; k < n; k++) if (USE[k] && OWN[k] >= 0) { const i = k % NI, j = (k - i) / NI, td = W.trackD(cx(i), cz(j)); order.push([_h2(i, j, 7350 + WSEED) - (td > 30 && td < 170 ? 0.45 : 0), k]); } // (those beside a way first: walking it, you pass them) order.sort((a, b) => a[0] - b[0]);
       let nf = 0; for (const [hv, k] of order) {
         if (!home && World.due()) yield;
-        const oi = OWN[k], o = owners[oi]; if ((cnt.get(oi) || 0) >= cap[o.kind] || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
+        const oi = OWN[k], o = owners[oi]; if (o.fcap === undefined) o.fcap = home ? cap[o.kind] : Math.round(cap[o.kind] * regionP(o.x, o.z, RP.farms));
+        if ((cnt.get(oi) || 0) >= o.fcap || (AR[k] < 0.45 && PA[k] < 0.6)) continue;
         const i = k % NI, j = (k - i) / NI; let x = cx(i) + (_h2(i, j, 7351) - 0.5) * C * 0.8, z = cz(j) + (_h2(i, j, 7352) - 0.5) * C * 0.8;
         const ci = W.ci(x), cj = W.ci(z), x0 = -TG.R + ci * WC, z0 = -TG.R + cj * WC; x = clamp(x, x0 + 34, x0 + WC - 34); z = clamp(z, z0 + 34, z0 + WC - 34); // well inside one chunk, which builds it
         if (!farmOk(x, z, oi)) continue;
@@ -2425,7 +2613,7 @@ const SettleProto = {
           if (w && _h2(i, j, 7374) < 0.75) ang = w.ang + (_h2(i, j, 7375) < 0.6 ? Math.PI / 2 : 0); // the strips run off the lane, or along it
           else if (Math.hypot(gx, gz) > 0.03) ang = Math.atan2(gz, -gx);                          // along the contour
           else ang = 1.6 * fbm(x / 1400, z / 1400, 1, 368); }
-        const S = { id: sid++, x, z, ang, owner: OWN[k], grow: smoothstep(120, 900, fd) }; seeds.push(S); seedHash.add(S, [x, z, x, z]); } }
+        const S = { id: sid++, x, z, ang, owner: OWN[k], grow: smoothstep(120, 900, fd), fs: home ? 1 : regionP(x, z, RP.field), openF: home ? 0.45 : regionP(x, z, RP.openF) }; seeds.push(S); seedHash.add(S, [x, z, x, z]); } }
     this.seeds = seeds; this.seedHash = seedHash;
     prof.push(['seeds', performance.now()]);
     // the lattice: columns of blocks (each a few strips wide) side by side, the blocks of a column end to end, the columns staggered
@@ -2434,16 +2622,18 @@ const SettleProto = {
       if (!home && World.due()) yield;
       const ca = Math.cos(S.ang), sa = Math.sin(S.ang); let u = -RS - _h2(S.id, 0, 7380) * 30, col = 0;
       while (u < RS) {
-        const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = 14 + 8 * _h2(S.id, col, 7382), wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
+        const nS = 3 + Math.floor(_h2(S.id, col, 7381) * 5), pw = (14 + 8 * _h2(S.id, col, 7382)) * S.fs, wc = nS * (pw + 2.4), uc = u + (wc - 2.4) / 2;
         let v = -RS - _h2(S.id, col, 7383) * 80, row = 0;
         while (v < RS) {
-          const pl = 48 + 34 * _h2(S.id * 131 + col, row, 7384), vc = v + pl / 2, x = S.x + uc * ca + vc * sa, z = S.z - uc * sa + vc * ca; v += pl + 2.4; row++;
+          const pl = (48 + 34 * _h2(S.id * 131 + col, row, 7384)) * S.fs, vc = v + pl / 2, x = S.x + uc * ca + vc * sa, z = S.z - uc * sa + vc * ca; v += pl + 2.4; row++;
           if (this.seedAt(x, z) !== S) continue;
           const o = mkObb(x, z, S.ang, (wc - 2.4) / 2, pl / 2); let good = this.ufAt(x, z) > 0.3 ? 1 : 0; for (const [px, pz] of obbCorners(o)) if (this.ufAt(px, pz) > 0.3) good++; if (good < 3) continue;
-          const k = cellOf(x, z); if (k < 0 || OWN[k] < 0) continue; const past = USE[k] !== 2, ow = owners[OWN[k]], Rp = SETTLE_R[ow.kind][1];
+          const k = cellOf(x, z); if (k < 0 || OWN[k] < 0) continue; const past = USE[k] !== 2, ow = owners[OWN[k]], Rp = SETTLE_R[ow.kind][1] * (ow.spread || 1);
           if (past && _h2(S.id * 977 + col, row, 7385) < 0.55 * ss(0.72, 1.02, D[k] / Rp + 0.22 * fbm(x / 450, z / 450, 2, 7310 + WSEED))) continue; // the pasture thins out at the edge of the territory
-          let nn = nS, pw2 = pw; if (past) { nn = Math.max(1, Math.round(wc / (32 + 12 * _h2(S.id, col, 7386)))); pw2 = wc / nn - 2.4; } // hedged pasture: fewer, wider closes
-          Object.assign(o, { id: blocks.length, st: this, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < 0.45, wall: past && H[k] > 70 });
+          let nn = nS, pw2 = pw; if (past) { nn = Math.max(1, Math.round(wc / ((32 + 12 * _h2(S.id, col, 7386)) * S.fs))); pw2 = wc / nn - 2.4; } // hedged pasture: fewer, wider closes
+          Object.assign(o, { id: blocks.length, st: this, n: nn, pw: pw2, past, seed: S, owner: OWN[k], grow: S.grow, open: !past && S.grow > 0.35 && _h2(S.id, col * 31 + row, 7387) < S.openF, wall: past && H[k] > 70 });
+          // what bounds the fields is the custom of the country: hedges, dry-stone walls, or nothing that stands (the fen's ditches, the open downland)
+          { const rw = home ? null : regionW(x, z); if (rw) { const bk = RG_BOUND[regionPick(x, z, _h2(S.id * 53 + col, row, 7388))]; o.wall = bk === 'wall'; o.nob = bk === 'none'; o.rk = regionKind(x, z); } }
           blocks.push(o); blockHash.add(o, obbAabb(o));
         }
         u += wc; col++;
@@ -2493,7 +2683,7 @@ const SettleProto = {
     // the kind of each point of each way, with no stretch of high road shorter than some 150 m
     const ROAD = 9, km = [0, 0, 0, 0]; this.milestones = [];
     TT.forEach((T, ti) => {
-      const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (_h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75);
+      const L = T.length, cls = new Uint8Array(L), green = T.lane && !T.spur && !this.list.some(S => S.own === T) && (K.home ? _h2(ti, L, 7500 + WSEED) < 0.5 || terrainRaw(T[L >> 1][0], T[L >> 1][1]) > 75 : _h2(ti, L, 7500 + WSEED) < regionP(T[L >> 1][0], T[L >> 1][1], RP.green));
       for (let q = 0; q < L; q++) { const w = WT[off[ti] + q]; cls[q] = !T.lane ? (w >= ROAD ? WAY.road : WAY.track) : w >= 2.5 ? WAY.track : green ? WAY.green : WAY.lane; }
       for (let q = 0; q < L;) { if (cls[q] !== WAY.road) { q++; continue; } let e = q; while (e < L && cls[e] === WAY.road) e++; if (e - q < 50) for (let k = q; k < e; k++) cls[k] = WAY.track; q = e; }
       T.cls = cls; for (let q = 1; q < L; q++) km[cls[q]] += Math.hypot(T[q][0] - T[q - 1][0], T[q][1] - T[q - 1][1]) / 1000;
@@ -2512,12 +2702,15 @@ const SettleProto = {
     TT.forEach((T, ti) => {
       const L = T.length, H = Wy.trackH[ti]; if (!H || L < 30 || !T.cls) return; let any = false; const sk = new Float32Array(L);
       for (let q = 12; q < L - 12; q++) { const c = T.cls[q]; if (c === WAY.road) continue; const g = Math.abs(H[Math.min(L - 1, q + 5)] - H[Math.max(0, q - 5)]) / 30; if (g < 0.045) continue;
-        sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g); any = true; }
-      if (!any) return;
+        sk[q] = (c === WAY.track ? 1.3 : 2.1) * smoothstep(0.045, 0.11, g) * (K.home ? 1 : regionP(T[q][0], T[q][1], RP.sunk)); any = true; }
+      // through the fen a way runs on a causeway, raised above the wet (a negative sinking)
+      let cw = null; if (!K.home) for (let q = 0; q < L; q += 4) { const f = regionIs(T[q][0], T[q][1], RG.fen); if (f > 0.55 && !riverNear(T[q][0], T[q][1], 40)) { if (!cw) cw = new Float32Array(L); const v = (c0 => c0 === WAY.road ? 1.1 : c0 === WAY.green ? 0.45 : 0.8)(T.cls[q]) * smoothstep(0.55, 0.85, f); for (let k = q; k < Math.min(L, q + 4); k++) cw[k] = v; } }
+      if (!any && !cw) return;
       for (let q = 0; q < L; q += 3) if (sk[q] > 0 || sk[Math.min(L - 1, q + 1)] > 0 || sk[Math.min(L - 1, q + 2)] > 0) { if (calm(T[q][0], T[q][1])) for (let k = Math.max(0, q - 3); k <= Math.min(L - 1, q + 5); k++) sk[k] = -1; }
       for (let q = 0; q < L; q++) if (sk[q] < 0) sk[q] = 0;
       const out = new Float32Array(L); for (let q = 0; q < L; q++) { let a = 0, n = 0; for (let k = -9; k <= 9; k++) { const v = sk[clamp(q + k, 0, L - 1)]; a += v; n++; } out[q] = a / n * Math.min(1, q / 12, (L - 1 - q) / 12); } // (in and out of it gradually)
-      let m = 0; for (let q = 0; q < L; q++) m = Math.max(m, out[q]); if (m > 0.2) { T.sink = out; for (let q = 1; q < L; q++) if (out[q] > 0.6) sunk += 3; }
+      if (cw) for (let q = 0; q < L; q++) { let a = 0; for (let k = -6; k <= 6; k++) a += cw[clamp(q + k, 0, L - 1)]; if (out[q] < 0.05) out[q] = -a / 13 * Math.min(1, q / 10, (L - 1 - q) / 10); }
+      let m = 0; for (let q = 0; q < L; q++) m = Math.max(m, Math.abs(out[q])); if (m > 0.2) { T.sink = out; for (let q = 1; q < L; q++) if (out[q] > 0.6) sunk += 3; }
     });
     this.wayKm = { road: Math.round(km[1]), track: Math.round(km[0]), lane: Math.round(km[2]), green: Math.round(km[3]), hollow: Math.round(sunk / 1000), ms: Math.round(performance.now() - t0) };
   },
@@ -2578,7 +2771,7 @@ const SettleProto = {
         if (s <= NS && ok[s]) { if (s0 < 0) s0 = s; continue; }
         if (s0 >= 0) { const a = -o.hz + s0 * dv, b = -o.hz + (s - 1) * dv, len = b - a;
           if (len >= Math.max(2.2 * o.pw, 26)) { const [x, z] = xfP(o, lx, (a + b) / 2), f = mkObb(x, z, o.ang, o.pw / 2, len / 2); let sl = 0; for (let q = s0 + 1; q < s; q++) sl = Math.max(sl, Math.abs(hs[q] - hs[q - 1]) / dv);
-            Object.assign(f, { id: o.id * 64 + k * 8 + Math.min(7, seg++), blk: o.id, k, grow: o.grow, key: sl > 0.14 ? 'fMeadow' : this.cropOf(o, k), nofill: o.past && sl > 0.19, past: o.past || sl > 0.14, wall: o.wall, open: o.open }); out.push(f); } }
+            Object.assign(f, { id: o.id * 64 + k * 8 + Math.min(7, seg++), blk: o.id, k, grow: o.grow, key: sl > 0.14 ? 'fMeadow' : this.cropOf(o, k), nofill: o.past && sl > 0.19, past: o.past || sl > 0.14, wall: o.wall, open: o.open, nob: o.nob, rk: o.rk || 0 }); out.push(f); } }
         s0 = -1;
       }
     }
@@ -3423,7 +3616,7 @@ function edgeFeat(vert, n, m) {
     f.to = flow > 0 ? b : a; f.from = flow > 0 ? a : b;
     // the water's level there: well below the ground (a great river's valley), and never below the level it leaves the next country at
     const d = drainDir(f.to[0], f.to[1]), [ti, tj] = f.to, nx = d === 'S' ? edgeFeat(0, tj + 1, ti) : d === 'W' ? edgeFeat(1, ti, tj) : d === 'E' ? edgeFeat(1, ti + 1, tj) : null;
-    f.wl = Math.max(SEA + 1.5, g - 47.4, nx ? nx.wl + 0.6 : -1e9);
+    f.wl = Math.max(SEA + 1.5, g - 0.6 - 46.8 * regionP(gx, gz, RP.incise), nx ? nx.wl + 0.6 : -1e9); // (a great river's valley is as deep as the country it runs through lets it cut: hardly at all in a fen)
   }
   // the pass: one on each side of the home country (west and east near the coast, north beyond Corrinvale), and on most borders elsewhere
   const has = homeEdge ? (vert ? m === 1 : m === 0) : _h2(n * 2 + vert, m, 5220 + WSEED) < 0.8;
@@ -3481,6 +3674,7 @@ function rimHeight(x, z) {
   const wf = lerp(0.5, 1.35, smoothstep(-0.3, 0.3, fbm(x / 3300 + 2.2, z / 3300, 2, 396 + WSEED * 7))), de = u / wf - 350; if (de > 3600) return h;
   const f = edgeAt(), s = RIM.s;
   let amp = lerp(0.12, 1, smoothstep(-0.05, 0.4, fbm(x / 8000 + 7.7, z / 8000, 2, 394 + WSEED * 7))) * smoothstep(0, 1500, Math.min(hf, d)); // (a belt that runs up to the home country dies away before it)
+  amp *= regionP(x, z, RP.rim);                                                                                  // (low through the fen, high over the moor)
   if (f.gap === f.gap) { const q = (s - f.gap) / 520; if (q * q < 12) amp *= 1 - 0.985 * Math.exp(-q * q); }   // the river's gap
   if (f.pass === f.pass) { const q = (s - f.pass) / 470; if (q * q < 12) amp *= 1 - 0.83 * Math.exp(-q * q); }  // the pass: a col between two peaks
   const sd = WSEED * 1.1, pk = ridgedMF(x / 900 + sd, z / 900, 5, 395), fine = ridgedMF(x / 260 + sd, z / 260, 3, 398);
@@ -3492,8 +3686,9 @@ function rimHeight(x, z) {
 function terrainBase(x, z, noRim) {
   const dIn = SHORE - z; const r0 = Math.hypot(x, z);
   const wW = smoothstep(800, 1400, r0); const wr = wW > 0 ? wildReliefAt(x, z) : null;
+  const rw = wr ? regionW(x, z) : null;                             // the kind of country this is (null: the home country's own)
   let h = 0.6 + 45 * (1 - Math.exp(-Math.max(0, dIn) / 330));      // the land climbs away from the sea
-  h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21);                     // broad swells
+  h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21) * (rw ? regionMix(rw, RP.swell) : 1); // broad swells
   const inside = pointInPoly(x, z, WALL_PTS) && z < SHORE + 2;
   const wd = inside ? 0 : wallDist(x, z);
   const out = smoothstep(4, 75, wd);
@@ -3501,13 +3696,13 @@ function terrainBase(x, z, noRim) {
   h += 16 * Math.exp(-(x * x + (z + 128) * (z + 128)) / (42 * 42)); // the castle knoll
   // hills beyond the walls, bigger towards the horizon
   const far = smoothstep(330, 700, Math.hypot(x, z));
-  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)); // out in the country the big shapes carry the relief, the knolls calm down
+  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)) * (rw ? regionMix(rw, RP.knoll) : 1); // out in the country the big shapes carry the relief, the knolls calm down
   if (amp > 0.01) {
     const wx = x + 40 * fbm(x / 300, z / 300, 2, 23), wz = z + 40 * fbm(x / 300 + 5, z / 300, 2, 24);
     const hills = 0.6 * ridgeNoise(wx / 230, wz / 230, 4, 25) + 0.4 * (fbm(wx / 150, wz / 150, 4, 26) * 0.5 + 0.5);
     h += amp * (hills - 0.42) * (wr ? lerp(1, lerp(0.35, 1, wr[1]), wW) : 1);
   }
-  if (wr) h += out * wW * (wr[0] + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior
+  if (wr) h += out * wW * ((rw ? wr[0] * regionMix(rw, RP.relief) + regionMix(rw, RP.lift) + regionShape(x, z, rw) : wr[0]) + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
   if (r0 > 5500 && !noRim) h += LEGACY ? rimHeight0(x, z) : rimHeight(x, z);
   if (Math.abs(x - 205) < 700 && Math.abs(z + 220) < 700) h += out * riseHeight(x, z); // it has faded to nothing long before the box ends
   // western downs framing the other side of the bay
@@ -4018,7 +4213,9 @@ function* planLandGen(K) {
   for (let t = 0; t < on; t++) { const k = order[t]; out[k] = k === outK ? 1 : sea[k] ? sea[k] : out[rec[k]]; }
   const tFlood = performance.now();
   const Amin = 1.6e6 / (C * C);                                  // a river once 1.6 km² of land drains to it
-  const ch = k => k >= 0 && !sea[k] && A[k] >= Amin && out[k] === 1;
+  // (more land than that on the chalk, which swallows its water; less in the fen and on the moor: the kind of country at each cell)
+  let AK = null; if (!home) { AK = new Float32Array(n); for (let k = 0; k < n; k++) { const i = k % NI; AK[k] = regionP(X0 + i * C, Z0 + (k - i) / NI * C, RP.stream); } yield; }
+  const ch = k => k >= 0 && !sea[k] && A[k] >= (AK ? Amin * AK[k] : Amin) && out[k] === 1;
   const main = new Int32Array(n).fill(-1), dHead = new Int32Array(n).fill(-1), dNext = new Int32Array(n).fill(-1);
   for (let t = 0; t < on; t++) { const k = order[t]; if (!ch(k) || k === outK) continue; const r = rec[k]; dNext[k] = dHead[r]; dHead[r] = k; if (main[r] < 0 || A[k] > A[main[r]]) main[r] = k; }
   const widthOf = a => Math.min(16, 1.2 + 1.6 * Math.sqrt(a * C * C / 1e6));
@@ -4051,7 +4248,8 @@ function* planLandGen(K) {
   for (const R of rivers) {
     if (R.parent >= 0 && !built[R.parent]) continue;
     if (!home) yield;
-    let V = R.hand ? smoothPath(R.cells, 3) : smoothPath(R.gin || R.gout ? [...(R.gin ? R.cells.slice(0, 2) : []), ...simplifyPath(R.cells.slice(R.gin ? 2 : 0, R.gout ? -2 : undefined), 28), ...(R.gout ? R.cells.slice(-2) : [])] : simplifyPath(R.cells, 28), 4); // the grid's staircase straightened first, so the bends come out broad (not so far that it leaves its valley)
+    const mid = R.cells[R.cells.length >> 1], mk0 = home ? 1 : regionP(mid[0], mid[1], RP.meander), eps = mk0 < 0.6 ? 95 : 28; // (through a fen a river runs in long straight reaches, like a cut drain)
+    let V = R.hand ? smoothPath(R.cells, 3) : smoothPath(R.gin || R.gout ? [...(R.gin ? R.cells.slice(0, 2) : []), ...simplifyPath(R.cells.slice(R.gin ? 2 : 0, R.gout ? -2 : undefined), eps), ...(R.gout ? R.cells.slice(-2) : [])] : simplifyPath(R.cells, eps), mk0 < 0.6 ? 2 : 4); // the grid's staircase straightened first, so the bends come out broad (not so far that it leaves its valley)
     if (R.parent >= 0) { // run on into the parent river's line, where it meets it
       const Pv = built[R.parent].V, [ex, ez] = V[V.length - 1]; let bq = 0, bd = 1e9; for (let q = 0; q < Pv.length; q++) { const d = Math.hypot(Pv[q][0] - ex, Pv[q][1] - ez); if (d < bd) { bd = d; bq = q; } }
       const PP = rivers[R.parent].out.P; let jp = Pv[bq], jd = 1e9; for (const p of PP) { const d = Math.hypot(p[0] - Pv[bq][0], p[1] - Pv[bq][1]); if (d < jd) { jd = d; jp = p; } }
@@ -4060,7 +4258,8 @@ function* planLandGen(K) {
     V = resampleEven(V, 20);
     const L = V.length, nrm = V.map((_, q) => { const a = V[Math.max(0, q - 1)], b = V[Math.min(L - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
     const sd = rng.next() * 100;
-    if (!R.hand) V = V.map((p, q) => { const off = 66 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
+    const mk = home ? null : V.map(p => regionP(p[0], p[1], RP.meander)), ik = home ? null : V.map(p => regionP(p[0], p[1], RP.incise));
+    if (!R.hand) V = V.map((p, q) => { const off = 66 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6) * (mk ? mk[q] : 1); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
     // width from the land drained, at each point of the line (by its share of the way down)
     const w = V.map((_, q) => widthOf(R.area[Math.min(R.area.length - 1, Math.round(q / (L - 1) * (R.area.length - 1)))]) * (R.hand || R.gin ? 1 : lerp(0.45, 1, Math.min(1, q * 20 / 400)))); // a spring's trickle at first
     if (R.gout) for (let q = 0; q < L; q++) w[q] = lerp(16, w[q], smoothstep(0, 900, (L - 1 - q) * 20)); // (at a gap it is a great river, whatever it drained: the next country takes it up as one)
@@ -4069,13 +4268,13 @@ function* planLandGen(K) {
     const gb = V.map(([x, z], q) => { if (q % 2 && q < L - 1) return null; const [nx, nz] = nrm[q]; let g = Infinity; for (const f of [-0.5, 0, 0.5]) g = Math.min(g, terrainBase(x + nx * Fw[q] * f, z + nz * Fw[q] * f)); return g; }); // every other point, the rest between
     for (let q = 1; q < L - 1; q += 2) gb[q] = (gb[q - 1] + gb[q + 1]) / 2;
     // larger rivers have worn deeper valleys into the land
-    const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500))); // (a young stream has hardly cut in)
+    const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500)) * (ik ? ik[q] : 1)); // (a young stream has hardly cut in)
     const wl = [], drop = R.gin ? 0.0003 : 0.03; // (a great river that has come in through a gap falls little from there on)
     for (let q = 0; q < L; q++) { const g = gb[q] - 0.6 - inc[q]; wl.push(q ? Math.min(wl[q - 1] - drop, g) : R.gin ? R.gin.f.wl : g); }
     // (where two great rivers come into one country they meet at one level: each comes down to a little under the lower of the gaps' levels within its first 600 m)
     if (R.gin && gaps.ins.length > 1) { const lo = Math.min(...gaps.ins.map(g => g.f.wl)) - 0.25; for (let q = 0; q < L; q++) wl[q] = Math.min(wl[q], lerp(wl[0], lo, smoothstep(0, 600, q * 20))); }
     for (let q = 0; q < L; q++) wl[q] = Math.max(wl[q], SEA);
-    if (R.gout) { const E = R.gout.f.wl; for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + 0.08 * (L - 1 - q)); } // it leaves at the gap's own level
+    if (R.gout) { const E = R.gout.f.wl, fall = Math.max(0.08, R.gin ? 1.2 * (wl[0] - E) / Math.max(1, L - 1) : 0); for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + fall * (L - 1 - q)); } // it leaves at the gap's own level (and comes down to it from the level it came in at, however far above that lies: a fen's river stands high, a moor's has cut deep)
     if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + (R.gin ? drop : 0.01)); }
     // how far the ground must come down where the river runs through higher ground (a gorge through a ridge), and how far round that reaches
     const cut0 = gb.map((g, q) => Math.max(0, g - (wl[q] + 0.5))), cut = cut0.slice();
@@ -4087,7 +4286,7 @@ function* planLandGen(K) {
     const P0 = resampleEven(V, 4), PL = P0.length, Pw = [], Pwl = [];
     for (let q = 0; q < PL; q++) { const f = q / (PL - 1) * (L - 1), a = Math.floor(f), b = Math.min(L - 1, a + 1), u = f - a; Pw.push(lerp(w[a], w[b], u) * (1 + 0.34 * fbm(q * 4 / 110 + sd * 0.7, 9.1, 2, 383) * Math.min(1, R.gin ? q / 30 : 1, R.gout ? (PL - 1 - q) / 30 : 1))); Pwl.push(lerp(wl[a], wl[b], u)); } // wider in the pools, narrower at the riffles
     const pn = P0.map((_, q) => { const a = P0[Math.max(0, q - 1)], b = P0[Math.min(PL - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
-    const P = P0.map((p, q) => { const off = (4 + Pw[q] * 1.7) * fbm(q * 4 / 150 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
+    const P = P0.map((p, q) => { const off = (4 + Pw[q] * 1.7) * fbm(q * 4 / 150 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10) * (mk ? mk[Math.min(L - 1, Math.round(q / (PL - 1) * (L - 1)))] : 1); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
     const xs = P.map(p => p[0]), zs = P.map(p => p[1]), pad = 30;
     R.out = { P, w: Pw, wl: Pwl, end: R.end, hand: !!R.hand, gin: !!R.gin, gout: !!R.gout, box: [Math.min(...xs) - pad, Math.min(...zs) - pad, Math.max(...xs) + pad, Math.max(...zs) + pad] };
   }
@@ -4137,6 +4336,8 @@ function* planLandform(K, A, ANI, ANJ, AX0, AZ0, AC) {
     const a = gather(X0 + i * C, Z0 + j * C), run = smoothstep(Math.log(5), Math.log(110), Math.log(a + 1)) * (1 - smoothstep(0.14, 0.4, sl)); // water gathering from above, where the ground is not too steep to hold it
     const hollow = smoothstep(-1.5, -10, TPI[k]) * (1 - smoothstep(0.03, 0.11, sl));                                                    // and flat ground lying below what is round it
     WET[k] = h <= SEA ? 0 : clamp(0.85 * run + 0.55 * hollow, 0, 1);
+    if (!home && h > SEA) { const wk = regionP(X0 + i * C, Z0 + j * C, RP.wetK); // the fen is wet wherever it is not an island, the moor boggy on its flats; the chalk is dry
+      if (wk > 0) WET[k] = clamp(WET[k] + wk * (1 - smoothstep(0.035, 0.1, sl)) * (1 - smoothstep(1.2, 3.5, TPI[k])), 0, 1); else if (wk < 0) WET[k] *= 1 + wk; }
     SUN[k] = sl > 1e-4 ? (-gx * lx - gz * lz) / sl * smoothstep(0.02, 0.12, sl) : 0;
   } }
   K.land.lf = { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN };
@@ -4186,6 +4387,7 @@ const WILD = {
 // sprite pools: texture (tree kind + seed, or s:simple[:frame]), width, height, trunk height for a collider (0: none), near-only
 const WILD_KINDS = {
   oak0: ['oak', 10, 6, 10, 9], oak1: ['oak', 11, 6, 10, 9], oak2: ['oak', 12, 6, 10, 9], pine: ['pine', 20, 5, 12, 11], dead: ['dead', 30, 5.4, 9, 8],
+  beech: ['beech', 70, 7.2, 11, 10], willow: ['willow', 71, 6.4, 6.4, 5], birch: ['birch', 72, 4.4, 9.5, 8.5], thorn: ['thorn', 73, 4.2, 3.4, 0],
   cypress: ['cypress', 40, 2.1, 7, 6.5], grove: ['grove', 60, 9.5, 7, 8], bush: ['bush', 50, 2.4, 1.5, 0], bushB: ['bushB', 51, 2.4, 1.5, 0], sheep: ['s:sheep', 0, 1.4, 1.0, 0],
   flowers0: ['s:flowers:0', 0, 0.8, 0.4, 0, true], flowers1: ['s:flowers:1', 0, 0.8, 0.4, 0, true], flowers2: ['s:flowers:2', 0, 0.8, 0.4, 0, true], flowers3: ['s:flowers:3', 0, 0.8, 0.4, 0, true],
   tufts: ['s:tuft', 0, 0.95, 0.55, 0, true], fern: ['s:fern', 0, 1.3, 0.65, 0, true], reeds: ['s:reeds', 0, 1.1, 1.3, 0, true],
@@ -4637,7 +4839,7 @@ const Wild = {
       for (const [ax, az, bx, bz, ha, hb2, sh, sa, sb] of trackSegs) {
         const a0 = Math.max(0, Math.floor((Math.min(ax, bx) - 8 - x0) / WCELL) + B), a1 = Math.min(S - 1, Math.ceil((Math.max(ax, bx) + 8 - x0) / WCELL) + B);
         const b0 = Math.max(0, Math.floor((Math.min(az, bz) - 8 - z0) / WCELL) + B), b1 = Math.min(S - 1, Math.ceil((Math.max(az, bz) + 8 - z0) / WCELL) + B);
-        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), d = q.d - sh, k = b * S + a; if (d < best[k]) { best[k] = d; tgt[k] = lerp(ha, hb2, q.t) - 0.05; const s2 = lerp(sa, sb, q.t); sk[k] = s2 > 0 ? s2 * (1 - smoothstep(1.4, 6.2, q.d)) : 0; } }
+        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), d = q.d - sh, k = b * S + a; if (d < best[k]) { best[k] = d; tgt[k] = lerp(ha, hb2, q.t) - 0.05; const s2 = lerp(sa, sb, q.t); sk[k] = s2 > 0 ? s2 * (1 - smoothstep(1.4, 6.2, q.d)) : s2 < 0 ? s2 * (1 - smoothstep(sh + 1.2, sh + 7.5, q.d)) : 0; } }
       }
       for (let k = 0; k < S * S; k++) if (best[k] < 11) Hb[k] = lerp(Hb[k], tgt[k], 1 - smoothstep(2.4, 11, best[k])) - sk[k]; // a hollow way: its bed sunk between steep banks
     }
@@ -4795,13 +4997,14 @@ const Wild = {
     if (farm) {
       const FX = makeXf(farm.x, farm.z, farm.ang, farm.y), saved = this.area.colliders; this.area.colliders = [];
       gb.setXf(...xfP(FX, -4, 3), farm.ang, farm.y);
-      makeBuilding(this.area, gb, frng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: frng.pick(['timber2', 'timber2', 'stone', 'plaster']), roof: 'gable', roofKey: 'roofThatch', roofTint: [1, 0.95, 0.85], doorT: 0.5, found: 0.8, chimney: 1 });
+      const fk = regionPick(farm.x, farm.z, _h2(Math.round(farm.x), Math.round(farm.z), 591)), FB = RG_BUILD[fk]; // built as the country builds
+      makeBuilding(this.area, gb, frng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: fk ? frng.pick(FB.walls) : frng.pick(['timber2', 'timber2', 'stone', 'plaster']), roof: 'gable', roofKey: fk ? FB.roofs[Math.floor(_h2(Math.round(farm.x), Math.round(farm.z), 592) * FB.roofs.length)] : 'roofThatch', roofTint: fk ? FB.tint : [1, 0.95, 0.85], doorT: 0.5, found: 0.8, chimney: 1 });
       gb.setXf(...xfP(FX, 6, -5), farm.ang + Math.PI / 2, farm.y);
-      makeBuilding(this.area, gb, frng, { fp: { x0: -6, z0: -4.5, x1: 6, z1: 4.5 }, h: 5.2, style: 'wood', roof: 'gable', roofKey: 'roofBrown', roofTint: [0.85, 0.8, 0.75], doorT: 0.5, doorW: 2.6, doorH: 3.2, doorKey: 'doorDark', winRate: 0.2, found: 0.8, chimney: 0 });
+      makeBuilding(this.area, gb, frng, { fp: { x0: -6, z0: -4.5, x1: 6, z1: 4.5 }, h: 5.2, style: FB.barn, roof: 'gable', roofKey: FB.barnRoof, roofTint: fk ? FB.tint.map(v => v * 0.88) : [0.85, 0.8, 0.75], doorT: 0.5, doorW: 2.6, doorH: 3.2, doorKey: 'doorDark', winRate: 0.2, found: 0.8, chimney: 0 });
       gb.xf = null; c.cols.push(...this.area.colliders); this.area.colliders = saved;
       drapePatch(gb, 'gDirt', FX, -13, -12, 13, 12, { cell: 4, lift: 0.04 });
       for (let k = 0; k < 5; k++) { const [hx, hz] = xfP(FX, frng.range(-10, 10), frng.range(6, 11)); fl.hay.push([hx, this.heightAt(hx, hz), hz, frng.range(0.8, 1.2)]); }
-      for (const [lx, lz] of [[-14, -9], [14, 10], [-13, 12]]) { const [tx, tz] = xfP(FX, lx, lz); const th = this.heightAt(tx, tz); fl[frng.pick(['oak0', 'oak1', 'pine'])].push([tx, th - 0.15, tz, frng.range(0.9, 1.15)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); }
+      for (const [lx, lz] of [[-14, -9], [14, 10], [-13, 12]]) { const [tx, tz] = xfP(FX, lx, lz); const th = this.heightAt(tx, tz); fl[[null, 'beech', 'willow', 'thorn', null][fk] ? (frng.next(), [null, 'beech', 'willow', 'thorn', null][fk]) : frng.pick(['oak0', 'oak1', 'pine'])].push([tx, th - 0.15, tz, frng.range(0.9, 1.15)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); }
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
     for (const T of TOWNS) if (T.buildChunk(x0, z0, WC, gb, c.cols, fl, blocks)) yield; // a town's houses, walls and streets in this square
@@ -4809,15 +5012,16 @@ const Wild = {
     for (const h of POI.housesIn(x0 - 12, z0 - 12, x0 + WC + 12, z0 + WC + 12)) { blocks.push(mkObb(h.x, h.z, h.ang, 7, 6.5));
       if (h.x < x0 || h.x >= x0 + WC || h.z < z0 || h.z >= z0 + WC) continue;
       const hr = new RNG(h.seed), cs = obbCorners(mkObb(h.x, h.z, h.ang, 4.6, 3.6)), y = Math.min(...cs.map(([a, b]) => this.heightAt(a, b))), top = Math.max(...cs.map(([a, b]) => this.heightAt(a, b))), saved = this.area.colliders; this.area.colliders = [];
-      gb.setXf(h.x, h.z, h.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -4.5, z0: -3.5, x1: 4.5, z1: 3.5 }, stories: hr.chance(0.25) ? 2 : 1, style: hr.pick(['timber2', 'timber2', 'stone', 'plaster', 'plaster']), roof: 'gable', roofKey: hr.chance(0.7) ? 'roofThatch' : 'roofSlate', roofTint: [1, 0.95, 0.86], doorT: 0.5, found: top - y + 0.8, chimney: 0.9, wealth: 0.8 }); gb.xf = null;
+      const hk = regionPick(h.x, h.z, _h2(h.seed, 3, 593)), HB = RG_BUILD[hk]; // each house built as its country builds
+      gb.setXf(h.x, h.z, h.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -4.5, z0: -3.5, x1: 4.5, z1: 3.5 }, stories: hr.chance(0.25) && hk !== RG.moor ? 2 : 1, style: hr.pick(HB.walls), roof: 'gable', roofKey: hk ? (hr.next(), HB.roofs[Math.floor(_h2(h.seed, 4, 594) * HB.roofs.length)]) : hr.chance(0.7) ? 'roofThatch' : 'roofSlate', roofTint: HB.tint, doorT: 0.5, found: top - y + 0.8, chimney: 0.9, wealth: 0.8 }); gb.xf = null;
       c.cols.push(...this.area.colliders); this.area.colliders = saved;
       const [gx, gz] = xfP(makeXf(h.x, h.z, h.ang), 0, -9); if (hr.chance(0.7)) drapePatch(gb, hr.chance(0.5) ? 'fGreens' : 'fPlowed', makeXf(gx, gz, h.ang), -4, -3, 4, 3, { cell: 3, lift: 0.05, uvFrame: true }); // a garden behind
-      for (let k = 0; k < 2; k++) { const [tx, tz] = xfP(makeXf(h.x, h.z, h.ang), hr.range(-9, 9) + (k ? 7 : -7), hr.range(-14, -8)); const th = this.heightAt(tx, tz); fl[hr.pick(['oak0', 'oak1', 'oak2'])].push([tx, th - 0.15, tz, hr.range(0.8, 1.1)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); } }
+      for (let k = 0; k < 2; k++) { const [tx, tz] = xfP(makeXf(h.x, h.z, h.ang), hr.range(-9, 9) + (k ? 7 : -7), hr.range(-14, -8)); const th = this.heightAt(tx, tz); fl[[null, 'beech', 'willow', 'birch', null][hk] ? (hr.next(), [null, 'beech', 'willow', 'birch', null][hk]) : hr.pick(['oak0', 'oak1', 'oak2'])].push([tx, th - 0.15, tz, hr.range(0.8, 1.1)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); } }
     for (const H of Settle.list) { const [wx, wz] = H.well; if (wx < x0 || wx >= x0 + WC || wz < z0 || wz >= z0 + WC) continue; POI.build({ kind: 'well', x: wx, z: wz, ang: 0, r: 4 }, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
       if (H.green) { const [gx, gz, gr] = H.green; drapeDisc(gb, 'gGrass', gx, gz, gr, { segs: 18, rings: 3, lift: 0.04 }); blocks.push(mkObb(gx, gz, 0, gr * 0.7, gr * 0.7)); } else drapeDisc(gb, 'gGrass', H.x, H.z, 6, { segs: 12, rings: 2, lift: 0.04 }); } // a village's green
     for (const b of Settle.builds) { if (b.x < x0 || b.x >= x0 + WC || b.z < z0 || b.z >= z0 + WC) continue; // a village's chapel: stone and slate, a bell-cote on its west gable
       const hr = new RNG(b.seed), cs = obbCorners(b.o), y = Math.min(...cs.map(([a, q]) => this.heightAt(a, q))), top = Math.max(...cs.map(([a, q]) => this.heightAt(a, q))), saved = this.area.colliders; this.area.colliders = [];
-      gb.setXf(b.x, b.z, b.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -7.5, z0: -4.6, x1: 7.5, z1: 4.6 }, h: 5.6, style: 'stone', roof: 'gable', roofKey: 'roofSlate', roofTint: [0.95, 0.95, 1], doorT: 0.5, found: top - y + 0.8, chimney: 0, winRate: 0.5, wealth: 0.7 });
+      gb.setXf(b.x, b.z, b.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -7.5, z0: -4.6, x1: 7.5, z1: 4.6 }, h: 5.6, style: ['stone', 'stoneLight', 'brick', 'stone', 'stone'][regionKind(b.x, b.z)], roof: 'gable', roofKey: ['roofSlate', 'roofSlate', 'roofRed', 'roofSlate', 'roofBrown'][regionKind(b.x, b.z)], roofTint: [0.95, 0.95, 1], doorT: 0.5, found: top - y + 0.8, chimney: 0, winRate: 0.5, wealth: 0.7 });
       gb.box(-8.1, 5.0, -0.7, -6.7, 9.6, 0.7, { side: 'stone', top: 'roofSlate' }, 2, 2); gb.box(-8.25, 9.6, -0.85, -6.55, 9.9, 0.85, 'roofSlate', 1, 1); gb.xf = null;
       c.cols.push(...this.area.colliders); this.area.colliders = saved; blocks.push(mkObb(b.x, b.z, b.ang, 10, 8)); }
     // the farmed strips laid from here (each drawn by the chunk its middle lies in; it may reach a little into the chunks beside), hedged all round
@@ -4833,8 +5037,8 @@ const Wild = {
       // its hedges: the long side towards the next strip of the block is shared (drawn by one of the two), the ends likewise between rows;
       // near the city, as there, not every side is hedged; further out the fields are closed in
       // every field is closed in (a gate aside); the side shared with the next strip of the block is drawn once
-      const sides = [[1, o.hz, true], [1, o.hx, false], [-1, o.hz, true], [-1, o.hx, false]], wall = o.wall;
-      for (const [sx, len, along] of sides) {
+      const sides = [[1, o.hz, true], [1, o.hx, false], [-1, o.hz, true], [-1, o.hx, false]], wall = o.wall, weald = o.rk === RG.weald;
+      if (!o.nob) for (const [sx, len, along] of sides) {
         const pieces = Math.max(1, Math.ceil(2 * len / 3.5)), gate = hr.chance(0.4) ? hr.int(0, pieces - 1) : -1;
         // one kind of hedge throughout, as round the city: clipped near it, then (some 200 m on) taller, more uneven and grown over with bushes; one height to a hedge
         const hh0 = hr.range(1.0, 1.35) + smoothstep(0.25, 1, g) * hr.range(0, 0.4), hw = 0.6 + g * hr.range(0, 0.15);
@@ -4851,7 +5055,7 @@ const Wild = {
           gb.setXf(mx, mz, ha, y); gb.box(-hw, -0.5, -L / 2 - 0.2, hw, Math.max(top, hh), L / 2 + 0.2, { side: 'hedge', top: 'hedge' }, 2, 2, { skip: 'ns' }); gb.xf = null;
           if (hr.chance(0.3 + g * 0.6)) { const n2 = 1 + Math.floor((0.5 + g * 2) * hr.next()); for (let b = 0; b < n2; b++) { const f = hr.next(), x = lerp(ax, bx, f), z = lerp(az, bz, f); fl[hr.chance(0.5) ? 'bush' : 'bushB'].push([x, y + Math.max(top, hh) - 0.55, z, hr.range(0.55, 0.85)]); } } // a few bushes break the top
           const e = L / 2 + 0.8; c.cols.push({ x0: mx - e, z0: mz - e, x1: mx + e, z1: mz + e, y0: y - 1, y1: y + Math.max(top, hh), o: { x: mx, z: mz, c: Math.cos(ha), s: Math.sin(ha), hx: 0.6, hz: L / 2 + 0.2 } });
-          if (hr.chance(0.055)) { const th = this.heightAt(mx, mz); (hr.chance(0.25 - 0.15 * g) ? fl.cypress : hr.chance(0.5) ? fl.oak0 : fl.oak1).push([mx, th - 0.15, mz, hr.range(0.8, 1.15)]); c.cols.push({ x0: mx - 0.35, z0: mz - 0.35, x1: mx + 0.35, z1: mz + 0.35, y0: th - 1, y1: th + 8 }); } // a hedgerow tree
+          if (hr.chance(weald ? 0.17 : 0.055)) { const th = this.heightAt(mx, mz); (hr.chance(0.25 - 0.15 * g) && !o.rk ? fl.cypress : hr.chance(0.5) ? fl.oak0 : fl.oak1).push([mx, th - 0.15, mz, hr.range(0.8, 1.15)]); c.cols.push({ x0: mx - 0.35, z0: mz - 0.35, x1: mx + 0.35, z1: mz + 0.35, y0: th - 1, y1: th + 8 }); } // a hedgerow tree
         }
       }
       if (o.key === 'fMeadow' && hr.chance(o.past ? 0.75 : 0.5)) { const n2 = hr.int(3, 9); for (let k = 0; k < n2; k++) { const [sx, sz] = xfP(o, hr.range(-o.hx + 2, o.hx - 2), hr.range(-o.hz + 2, o.hz - 2)); fl.sheep.push([sx, this.heightAt(sx, sz), sz, hr.range(0.85, 1.1)]); } }
@@ -4863,7 +5067,8 @@ const Wild = {
       const T = run.T, sunk = T.sink ? T.sink[run.qs[q]] : 0, hollow = sunk > 0.6, cu = wildCult(mx, mz); // (a hollow way has a hedge on each bank, fields or not, unless it runs through a wood)
       if (blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || townCore(mx, mz) > 0 || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // not across a cottage's front
       if (hollow ? E.forestMask(mx, mz, this.heightAt(mx, mz)) > 0.4 : (cu < 0.35 || !near.some(f => circleObb(mx, mz, 16, f)))) continue; // only where fields border the way
-      const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, wall = this.heightAt(mx, mz) > 70;
+      const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, bk = regionW(mx, mz) ? RG_BOUND[regionPick(mx, mz, _h2(Math.round(mx / 40), Math.round(mz / 40), 595))] : null, wall = bk ? bk === 'wall' : this.heightAt(mx, mz) > 70;
+      if (bk === 'none' && !hollow) continue; // (the fen and the open downland: nothing stands beside the way)
       for (const sd of [-1, 1]) {
         if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < (hollow ? -0.2 : 0.25 - cu * 0.5)) continue; // with gaps and field gates
         const off = hollow ? 6.4 : [3.9, 4.7, 3.2, 3.2][run.cls], px = mx + nx * off * sd, pz = mz + nz * off * sd, y = this.heightAt(px, pz), hh = wall ? 0.95 : rng.range(1.2, 1.6);
@@ -4892,7 +5097,7 @@ const Wild = {
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 13 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.5 * (1 - 0.5 * smoothstep(6, 13, e)) * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
-          if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
+          if (rng.chance(0.45)) tree(regionW(x, z) ? (rng.chance(0.75) ? 'willow' : 'oak' + rng.int(0, 2)) : rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
         let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
@@ -5102,7 +5307,7 @@ function wildRockiness(x, z, h, slope, apron = 0) {
   return [qr, (1 - qr) * Math.max(alpine, apron)];
 }
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
-function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, 0.6 * fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365) + (L => 0.95 * (L.expo - 0.3) - 0.45 * L.wet + 0.08 * L.sun)(landAt(x, z))) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
+function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, 0.6 * fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365) + (L => 0.95 * (L.expo - 0.3) - 0.45 * L.wet + 0.08 * L.sun)(landAt(x, z)) + regionP(x, z, RP.heath)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
 // small woods standing in open country (the copses of the plant rules), for the ground tint under them
 function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)) * (1 - townCore(x, z)); }
 
@@ -5123,11 +5328,16 @@ function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = fa
     if (r2 < (edge ? 0.3 : 0.07) + alp * 0.25) return { kind: 'bush', s: 0.7 + r3 * 0.7 };
     // each stand has a leading species: pine on high and north-facing ground, broadleaf in the lowlands, mixed between
     const L = landAt(x, z), conif = 1.1 * fbm(x / 260 + WS * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp + 0.7 * L.expo - 0.7 * L.floor - 0.3 * L.sun - 0.5 * L.wet + 0.1; // pine on the high, open and shaded ground, broadleaf in the valleys and by the water // stands of one kind or the other, few mixed
-    let kind;
-    if (conif > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
-    else if (conif < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
+    let kind; const rw = fixed ? null : regionW(x, z), cf = rw ? conif + regionMix(rw, RP.conif) : conif;
+    if (cf > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
+    else if (cf < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
     else kind = r2 < 0.55 ? 'oak' : r2 < 0.95 ? 'pine' : 'dead';
-    if (kind === 'oak') kind = m > 0.75 && r3 > 0.55 && h < 95 ? 'grove' : 'oak' + (Math.floor(r3 * 3) % 3); // deep woods read as one canopy
+    // each kind of country has its tree: beech on the chalk, willow and alder in the fen, birch and thorn on the moor, oak in the weald
+    const u4 = rw ? (r3 * 7.13) % 1 : 1;
+    if (rw && u4 < rw[RG.downs]) { if (kind !== 'dead') kind = 'beech'; }
+    else if (rw && u4 < rw[RG.downs] + rw[RG.fen]) kind = kind === 'dead' ? 'dead' : 'willow';
+    else if (rw && u4 < rw[RG.downs] + rw[RG.fen] + rw[RG.moor]) { if (kind === 'oak') kind = r2 * 13 % 1 < 0.7 ? 'birch' : 'thorn'; }
+    else if (kind === 'oak') kind = m > 0.75 && r3 > 0.55 && h < 95 ? 'grove' : 'oak' + (Math.floor(r3 * 3) % 3); // deep woods read as one canopy
     // old trees and young ones: saplings crowd the edges of the woods
     let s = 0.62 + Math.pow(r3, 0.6) * 0.66; if (edge && r3 < 0.35) s *= 0.6; if (kind === 'pine' && alp > 0.3) s *= 0.72;
     return { kind, s };
@@ -6097,6 +6307,11 @@ function buildCity() {
     if (wild > 0) f += wild * (0.22 * fbm(x / 520 + WSEED * 1.7, z / 520, 3, 78) - 0.06 * smoothstep(90, 150, h - 0.6 * (wildTreeLine(x, z) - 150)) - 0.9 * smoothstep(wildTreeLine(x, z) - 35, wildTreeLine(x, z), h));
     // ...and with its shape: woods hang on the valley sides and in the shelter below the hills, the open tops are bare, the wet floors are meadow
     if (wild > 0) { const L = landAt(x, z); f = lerp(f, 0.7 * f + 0.4 * L.side + 0.12 * (1 - L.expo) - 0.15 - 0.75 * smoothstep(0.4, 0.85, L.expo) - 0.4 * L.wet * (1 - L.side) - 0.08 * L.sun, wild); }
+    // ...and with the kind of country: beech hangers on the steep sides of the downs and little else there, carr in blocks on the wet fen,
+    // the moor bare but for its cloughs, the weald wooded wherever it is not farmed
+    if (wild > 0) { const rw = regionW(x, z); if (rw) { const L = landAt(x, z);
+      f += regionMix(rw, RP.wood) + rw[RG.downs] * 0.95 * smoothstep(0.15, 0.27, L.sl) + rw[RG.fen] * (0.75 * smoothstep(0.08, 0.3, fbm(x / 240 + WSEED, z / 240, 2, 573)) * smoothstep(0.3, 0.7, L.wet) - 3 * mereAt(x, z))
+        + rw[RG.moor] * 0.55 * L.floor * (1 - smoothstep(60, 220, riverD(x, z))) + rw[RG.weald] * 0.16 * fbm(x / 130, z / 130, 2, 574); } }
     f -= 1.1 * wildCult(x, z); // farmed land: the woods are cleared back to copses
     if (wild > 0) { const rd = riverD(x, z); if (rd < 90) f = Math.max(f, wild * (0.42 * (1 - smoothstep(10, 60, rd)) * smoothstep(-0.05, 0.3, fbm(x / 90 + 9, z / 90, 2, 79)) - 0.08)); } // alder and willow carr in a broken line along the rivers, farmed valley or not
     const m = smoothstep(-0.06, 0.34, f) * smoothstep(55, 120, wd), st = r > 1500 ? siteAt(x, z) : null;
@@ -6141,6 +6356,13 @@ function buildCity() {
       const shade = L.side * open * Math.max(0, -L.sun); r *= 1 - 0.1 * shade; g *= 1 - 0.03 * shade; b *= 1 + 0.05 * shade;
       const TLm = wildTreeLine(x, z), moor = Math.max(smoothstep(0.35, 0.8, L.expo + 0.25 * mot), smoothstep(TLm - 90, TLm - 10, h + 20 * mot)) * open * (1 - lush); r = lerp(r, 1.27, moor * 0.6); g = lerp(g, 0.94, moor * 0.6); b = lerp(b, 0.7, moor * 0.6);
       r *= 1 + open * (0.11 * mot + 0.04 * mot2); g *= 1 + open * (0.035 * mot + 0.03 * mot2); b *= 1 - open * 0.09 * mot; }
+    if (outK > 0) { const rw = regionW(x, z); if (rw) { // the turf of each kind of country: pale and short on the chalk, dark and sedgy in the fen, tawny on the moor, deep green in the weald
+      const k = outK * (1 - 0.75 * fm0), L = landAt(x, z), mt = fbm(x / 210, z / 210, 2, 575);
+      r *= lerp(1, regionMix(rw, RP.tr), k); g *= lerp(1, regionMix(rw, RP.tg), k); b *= lerp(1, regionMix(rw, RP.tb), k);
+      const sedge = rw[RG.fen] * k * smoothstep(-0.05, 0.3, mt) * smoothstep(0.3, 0.7, L.wet); r = lerp(r, 1.12, sedge * 0.55); g = lerp(g, 0.94, sedge * 0.55); b = lerp(b, 0.6, sedge * 0.55); // beds of sedge and reed, tawny among the green
+      const peat = rw[RG.moor] * k * smoothstep(0.35, 0.75, L.wet + 0.25 * mt); r = lerp(r, 0.78, peat * 0.6); g = lerp(g, 0.74, peat * 0.6); b = lerp(b, 0.62, peat * 0.6); // the dark of the bog
+      const chalk = rw[RG.downs] * outK * smoothstep(0.3, 0.5, L.sl + 0.06 * mt) * (1 - fm0); r = lerp(r, 1.5, chalk * 0.35); g = lerp(g, 1.42, chalk * 0.35); b = lerp(b, 1.2, chalk * 0.35); // the chalk shows through on the steepest of the scarp
+    } }
     { const hw = wildHeath(x, z, h) * (1 - fm); if (hw > 0) { r = lerp(r, h > 70 ? 1.02 : 1.12, hw * 0.92); g = lerp(g, h > 70 ? 0.72 : 0.82, hw * 0.92); b = lerp(b, h > 70 ? 0.84 : 0.58, hw * 0.92); } } // heather purples the uplands, bracken browns the lower heath
     if (Math.max(Math.abs(x), Math.abs(z)) <= TG.R) { const bare = smoothstep(118, 165, h); r = lerp(r, 1.05, bare); g = lerp(g, 1.0, bare); b = lerp(b, 1.02, bare); } // thin turf and bare rock above the tree line
     else { const TL = wildTreeLine(x, z), turf = smoothstep(TL - 20, TL + 70, h), bare = smoothstep(TL + 110, TL + 230, h); r = lerp(lerp(r, 1.1, turf * 0.7), 1.02, bare); g = lerp(lerp(g, 0.97, turf * 0.7), 0.98, bare); b = lerp(lerp(b, 0.74, turf * 0.7), 0.96, bare); } // out in the country: tawny alpine turf, then bare stone
@@ -10819,7 +11041,7 @@ function boot(hotData) {
   if (hotData && hotData.v && hotData.player) { loadGame(hotData); }
   else toTitle();
   requestAnimationFrame(frame);
-  window.__game = { World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
+  window.__game = { RG, RG_N, RG_KEYS, REGION, RP, regionW, regionRaw, regionKind, regionIs, mereAt, torNear, fenBase, World, RIM, homeOut, inBreach, homePassD, terrainLegacy: (x, z) => homePlan(() => terrainRaw(x, z)), homePlan, EDGES, rimDist, rimDist0, edgeFeat, rimEval, drainDir, tileI, tileJ, Settle, obbCorners, landAt, wildHeath, HALL, hallW, hallL, hallWet, siteWild, TOWNS, Music, Wild, LAND, SITES, Sites, siteWeight, coastZ, Travel, POI, Roads, terrainRaw, terrainBase, riverNear, routeWild, wildCult, G, UI, Quests, SFX, Input, MapView, loadGame, saveGame, beginNewGame, setArea, tryEnter, enterBuilding, spawnEnemy, interact, startAttack, startCast, carriageRoutes, travelBy, Touch, districtAt, setFlying, settings, terrainH, groundAt, collide, keepAshore, insideCity, toggleSheathe, THREE, camera: () => camera, renderer: () => renderer };
 }
 const _start = (data) => boot(data);
 const _hot = (() => { try { return window.claude && window.claude.hot; } catch (e) { return null; } })();

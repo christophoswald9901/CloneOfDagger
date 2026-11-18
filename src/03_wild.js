@@ -30,6 +30,7 @@ const WILD = {
 // sprite pools: texture (tree kind + seed, or s:simple[:frame]), width, height, trunk height for a collider (0: none), near-only
 const WILD_KINDS = {
   oak0: ['oak', 10, 6, 10, 9], oak1: ['oak', 11, 6, 10, 9], oak2: ['oak', 12, 6, 10, 9], pine: ['pine', 20, 5, 12, 11], dead: ['dead', 30, 5.4, 9, 8],
+  beech: ['beech', 70, 7.2, 11, 10], willow: ['willow', 71, 6.4, 6.4, 5], birch: ['birch', 72, 4.4, 9.5, 8.5], thorn: ['thorn', 73, 4.2, 3.4, 0],
   cypress: ['cypress', 40, 2.1, 7, 6.5], grove: ['grove', 60, 9.5, 7, 8], bush: ['bush', 50, 2.4, 1.5, 0], bushB: ['bushB', 51, 2.4, 1.5, 0], sheep: ['s:sheep', 0, 1.4, 1.0, 0],
   flowers0: ['s:flowers:0', 0, 0.8, 0.4, 0, true], flowers1: ['s:flowers:1', 0, 0.8, 0.4, 0, true], flowers2: ['s:flowers:2', 0, 0.8, 0.4, 0, true], flowers3: ['s:flowers:3', 0, 0.8, 0.4, 0, true],
   tufts: ['s:tuft', 0, 0.95, 0.55, 0, true], fern: ['s:fern', 0, 1.3, 0.65, 0, true], reeds: ['s:reeds', 0, 1.1, 1.3, 0, true],
@@ -481,7 +482,7 @@ const Wild = {
       for (const [ax, az, bx, bz, ha, hb2, sh, sa, sb] of trackSegs) {
         const a0 = Math.max(0, Math.floor((Math.min(ax, bx) - 8 - x0) / WCELL) + B), a1 = Math.min(S - 1, Math.ceil((Math.max(ax, bx) + 8 - x0) / WCELL) + B);
         const b0 = Math.max(0, Math.floor((Math.min(az, bz) - 8 - z0) / WCELL) + B), b1 = Math.min(S - 1, Math.ceil((Math.max(az, bz) + 8 - z0) / WCELL) + B);
-        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), d = q.d - sh, k = b * S + a; if (d < best[k]) { best[k] = d; tgt[k] = lerp(ha, hb2, q.t) - 0.05; const s2 = lerp(sa, sb, q.t); sk[k] = s2 > 0 ? s2 * (1 - smoothstep(1.4, 6.2, q.d)) : 0; } }
+        for (let b = b0; b <= b1; b++) for (let a = a0; a <= a1; a++) { const q = segDist(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, ax, az, bx, bz), d = q.d - sh, k = b * S + a; if (d < best[k]) { best[k] = d; tgt[k] = lerp(ha, hb2, q.t) - 0.05; const s2 = lerp(sa, sb, q.t); sk[k] = s2 > 0 ? s2 * (1 - smoothstep(1.4, 6.2, q.d)) : s2 < 0 ? s2 * (1 - smoothstep(sh + 1.2, sh + 7.5, q.d)) : 0; } }
       }
       for (let k = 0; k < S * S; k++) if (best[k] < 11) Hb[k] = lerp(Hb[k], tgt[k], 1 - smoothstep(2.4, 11, best[k])) - sk[k]; // a hollow way: its bed sunk between steep banks
     }
@@ -639,13 +640,14 @@ const Wild = {
     if (farm) {
       const FX = makeXf(farm.x, farm.z, farm.ang, farm.y), saved = this.area.colliders; this.area.colliders = [];
       gb.setXf(...xfP(FX, -4, 3), farm.ang, farm.y);
-      makeBuilding(this.area, gb, frng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: frng.pick(['timber2', 'timber2', 'stone', 'plaster']), roof: 'gable', roofKey: 'roofThatch', roofTint: [1, 0.95, 0.85], doorT: 0.5, found: 0.8, chimney: 1 });
+      const fk = regionPick(farm.x, farm.z, _h2(Math.round(farm.x), Math.round(farm.z), 591)), FB = RG_BUILD[fk]; // built as the country builds
+      makeBuilding(this.area, gb, frng, { fp: { x0: -5, z0: -3.5, x1: 5, z1: 3.5 }, stories: 1, style: fk ? frng.pick(FB.walls) : frng.pick(['timber2', 'timber2', 'stone', 'plaster']), roof: 'gable', roofKey: fk ? FB.roofs[Math.floor(_h2(Math.round(farm.x), Math.round(farm.z), 592) * FB.roofs.length)] : 'roofThatch', roofTint: fk ? FB.tint : [1, 0.95, 0.85], doorT: 0.5, found: 0.8, chimney: 1 });
       gb.setXf(...xfP(FX, 6, -5), farm.ang + Math.PI / 2, farm.y);
-      makeBuilding(this.area, gb, frng, { fp: { x0: -6, z0: -4.5, x1: 6, z1: 4.5 }, h: 5.2, style: 'wood', roof: 'gable', roofKey: 'roofBrown', roofTint: [0.85, 0.8, 0.75], doorT: 0.5, doorW: 2.6, doorH: 3.2, doorKey: 'doorDark', winRate: 0.2, found: 0.8, chimney: 0 });
+      makeBuilding(this.area, gb, frng, { fp: { x0: -6, z0: -4.5, x1: 6, z1: 4.5 }, h: 5.2, style: FB.barn, roof: 'gable', roofKey: FB.barnRoof, roofTint: fk ? FB.tint.map(v => v * 0.88) : [0.85, 0.8, 0.75], doorT: 0.5, doorW: 2.6, doorH: 3.2, doorKey: 'doorDark', winRate: 0.2, found: 0.8, chimney: 0 });
       gb.xf = null; c.cols.push(...this.area.colliders); this.area.colliders = saved;
       drapePatch(gb, 'gDirt', FX, -13, -12, 13, 12, { cell: 4, lift: 0.04 });
       for (let k = 0; k < 5; k++) { const [hx, hz] = xfP(FX, frng.range(-10, 10), frng.range(6, 11)); fl.hay.push([hx, this.heightAt(hx, hz), hz, frng.range(0.8, 1.2)]); }
-      for (const [lx, lz] of [[-14, -9], [14, 10], [-13, 12]]) { const [tx, tz] = xfP(FX, lx, lz); const th = this.heightAt(tx, tz); fl[frng.pick(['oak0', 'oak1', 'pine'])].push([tx, th - 0.15, tz, frng.range(0.9, 1.15)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); }
+      for (const [lx, lz] of [[-14, -9], [14, 10], [-13, 12]]) { const [tx, tz] = xfP(FX, lx, lz); const th = this.heightAt(tx, tz); fl[[null, 'beech', 'willow', 'thorn', null][fk] ? (frng.next(), [null, 'beech', 'willow', 'thorn', null][fk]) : frng.pick(['oak0', 'oak1', 'pine'])].push([tx, th - 0.15, tz, frng.range(0.9, 1.15)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); }
       blocks.push(mkObb(farm.x, farm.z, farm.ang, 16, 15));
     }
     for (const T of TOWNS) if (T.buildChunk(x0, z0, WC, gb, c.cols, fl, blocks)) yield; // a town's houses, walls and streets in this square
@@ -653,15 +655,16 @@ const Wild = {
     for (const h of POI.housesIn(x0 - 12, z0 - 12, x0 + WC + 12, z0 + WC + 12)) { blocks.push(mkObb(h.x, h.z, h.ang, 7, 6.5));
       if (h.x < x0 || h.x >= x0 + WC || h.z < z0 || h.z >= z0 + WC) continue;
       const hr = new RNG(h.seed), cs = obbCorners(mkObb(h.x, h.z, h.ang, 4.6, 3.6)), y = Math.min(...cs.map(([a, b]) => this.heightAt(a, b))), top = Math.max(...cs.map(([a, b]) => this.heightAt(a, b))), saved = this.area.colliders; this.area.colliders = [];
-      gb.setXf(h.x, h.z, h.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -4.5, z0: -3.5, x1: 4.5, z1: 3.5 }, stories: hr.chance(0.25) ? 2 : 1, style: hr.pick(['timber2', 'timber2', 'stone', 'plaster', 'plaster']), roof: 'gable', roofKey: hr.chance(0.7) ? 'roofThatch' : 'roofSlate', roofTint: [1, 0.95, 0.86], doorT: 0.5, found: top - y + 0.8, chimney: 0.9, wealth: 0.8 }); gb.xf = null;
+      const hk = regionPick(h.x, h.z, _h2(h.seed, 3, 593)), HB = RG_BUILD[hk]; // each house built as its country builds
+      gb.setXf(h.x, h.z, h.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -4.5, z0: -3.5, x1: 4.5, z1: 3.5 }, stories: hr.chance(0.25) && hk !== RG.moor ? 2 : 1, style: hr.pick(HB.walls), roof: 'gable', roofKey: hk ? (hr.next(), HB.roofs[Math.floor(_h2(h.seed, 4, 594) * HB.roofs.length)]) : hr.chance(0.7) ? 'roofThatch' : 'roofSlate', roofTint: HB.tint, doorT: 0.5, found: top - y + 0.8, chimney: 0.9, wealth: 0.8 }); gb.xf = null;
       c.cols.push(...this.area.colliders); this.area.colliders = saved;
       const [gx, gz] = xfP(makeXf(h.x, h.z, h.ang), 0, -9); if (hr.chance(0.7)) drapePatch(gb, hr.chance(0.5) ? 'fGreens' : 'fPlowed', makeXf(gx, gz, h.ang), -4, -3, 4, 3, { cell: 3, lift: 0.05, uvFrame: true }); // a garden behind
-      for (let k = 0; k < 2; k++) { const [tx, tz] = xfP(makeXf(h.x, h.z, h.ang), hr.range(-9, 9) + (k ? 7 : -7), hr.range(-14, -8)); const th = this.heightAt(tx, tz); fl[hr.pick(['oak0', 'oak1', 'oak2'])].push([tx, th - 0.15, tz, hr.range(0.8, 1.1)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); } }
+      for (let k = 0; k < 2; k++) { const [tx, tz] = xfP(makeXf(h.x, h.z, h.ang), hr.range(-9, 9) + (k ? 7 : -7), hr.range(-14, -8)); const th = this.heightAt(tx, tz); fl[[null, 'beech', 'willow', 'birch', null][hk] ? (hr.next(), [null, 'beech', 'willow', 'birch', null][hk]) : hr.pick(['oak0', 'oak1', 'oak2'])].push([tx, th - 0.15, tz, hr.range(0.8, 1.1)]); c.cols.push({ x0: tx - 0.35, z0: tz - 0.35, x1: tx + 0.35, z1: tz + 0.35, y0: th - 1, y1: th + 9 }); } }
     for (const H of Settle.list) { const [wx, wz] = H.well; if (wx < x0 || wx >= x0 + WC || wz < z0 || wz >= z0 + WC) continue; POI.build({ kind: 'well', x: wx, z: wz, ang: 0, r: 4 }, gb, c.cols, fl, blocks, (x, z) => this.heightAt(x, z));
       if (H.green) { const [gx, gz, gr] = H.green; drapeDisc(gb, 'gGrass', gx, gz, gr, { segs: 18, rings: 3, lift: 0.04 }); blocks.push(mkObb(gx, gz, 0, gr * 0.7, gr * 0.7)); } else drapeDisc(gb, 'gGrass', H.x, H.z, 6, { segs: 12, rings: 2, lift: 0.04 }); } // a village's green
     for (const b of Settle.builds) { if (b.x < x0 || b.x >= x0 + WC || b.z < z0 || b.z >= z0 + WC) continue; // a village's chapel: stone and slate, a bell-cote on its west gable
       const hr = new RNG(b.seed), cs = obbCorners(b.o), y = Math.min(...cs.map(([a, q]) => this.heightAt(a, q))), top = Math.max(...cs.map(([a, q]) => this.heightAt(a, q))), saved = this.area.colliders; this.area.colliders = [];
-      gb.setXf(b.x, b.z, b.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -7.5, z0: -4.6, x1: 7.5, z1: 4.6 }, h: 5.6, style: 'stone', roof: 'gable', roofKey: 'roofSlate', roofTint: [0.95, 0.95, 1], doorT: 0.5, found: top - y + 0.8, chimney: 0, winRate: 0.5, wealth: 0.7 });
+      gb.setXf(b.x, b.z, b.ang, y); makeBuilding(this.area, gb, hr, { fp: { x0: -7.5, z0: -4.6, x1: 7.5, z1: 4.6 }, h: 5.6, style: ['stone', 'stoneLight', 'brick', 'stone', 'stone'][regionKind(b.x, b.z)], roof: 'gable', roofKey: ['roofSlate', 'roofSlate', 'roofRed', 'roofSlate', 'roofBrown'][regionKind(b.x, b.z)], roofTint: [0.95, 0.95, 1], doorT: 0.5, found: top - y + 0.8, chimney: 0, winRate: 0.5, wealth: 0.7 });
       gb.box(-8.1, 5.0, -0.7, -6.7, 9.6, 0.7, { side: 'stone', top: 'roofSlate' }, 2, 2); gb.box(-8.25, 9.6, -0.85, -6.55, 9.9, 0.85, 'roofSlate', 1, 1); gb.xf = null;
       c.cols.push(...this.area.colliders); this.area.colliders = saved; blocks.push(mkObb(b.x, b.z, b.ang, 10, 8)); }
     // the farmed strips laid from here (each drawn by the chunk its middle lies in; it may reach a little into the chunks beside), hedged all round
@@ -677,8 +680,8 @@ const Wild = {
       // its hedges: the long side towards the next strip of the block is shared (drawn by one of the two), the ends likewise between rows;
       // near the city, as there, not every side is hedged; further out the fields are closed in
       // every field is closed in (a gate aside); the side shared with the next strip of the block is drawn once
-      const sides = [[1, o.hz, true], [1, o.hx, false], [-1, o.hz, true], [-1, o.hx, false]], wall = o.wall;
-      for (const [sx, len, along] of sides) {
+      const sides = [[1, o.hz, true], [1, o.hx, false], [-1, o.hz, true], [-1, o.hx, false]], wall = o.wall, weald = o.rk === RG.weald;
+      if (!o.nob) for (const [sx, len, along] of sides) {
         const pieces = Math.max(1, Math.ceil(2 * len / 3.5)), gate = hr.chance(0.4) ? hr.int(0, pieces - 1) : -1;
         // one kind of hedge throughout, as round the city: clipped near it, then (some 200 m on) taller, more uneven and grown over with bushes; one height to a hedge
         const hh0 = hr.range(1.0, 1.35) + smoothstep(0.25, 1, g) * hr.range(0, 0.4), hw = 0.6 + g * hr.range(0, 0.15);
@@ -695,7 +698,7 @@ const Wild = {
           gb.setXf(mx, mz, ha, y); gb.box(-hw, -0.5, -L / 2 - 0.2, hw, Math.max(top, hh), L / 2 + 0.2, { side: 'hedge', top: 'hedge' }, 2, 2, { skip: 'ns' }); gb.xf = null;
           if (hr.chance(0.3 + g * 0.6)) { const n2 = 1 + Math.floor((0.5 + g * 2) * hr.next()); for (let b = 0; b < n2; b++) { const f = hr.next(), x = lerp(ax, bx, f), z = lerp(az, bz, f); fl[hr.chance(0.5) ? 'bush' : 'bushB'].push([x, y + Math.max(top, hh) - 0.55, z, hr.range(0.55, 0.85)]); } } // a few bushes break the top
           const e = L / 2 + 0.8; c.cols.push({ x0: mx - e, z0: mz - e, x1: mx + e, z1: mz + e, y0: y - 1, y1: y + Math.max(top, hh), o: { x: mx, z: mz, c: Math.cos(ha), s: Math.sin(ha), hx: 0.6, hz: L / 2 + 0.2 } });
-          if (hr.chance(0.055)) { const th = this.heightAt(mx, mz); (hr.chance(0.25 - 0.15 * g) ? fl.cypress : hr.chance(0.5) ? fl.oak0 : fl.oak1).push([mx, th - 0.15, mz, hr.range(0.8, 1.15)]); c.cols.push({ x0: mx - 0.35, z0: mz - 0.35, x1: mx + 0.35, z1: mz + 0.35, y0: th - 1, y1: th + 8 }); } // a hedgerow tree
+          if (hr.chance(weald ? 0.17 : 0.055)) { const th = this.heightAt(mx, mz); (hr.chance(0.25 - 0.15 * g) && !o.rk ? fl.cypress : hr.chance(0.5) ? fl.oak0 : fl.oak1).push([mx, th - 0.15, mz, hr.range(0.8, 1.15)]); c.cols.push({ x0: mx - 0.35, z0: mz - 0.35, x1: mx + 0.35, z1: mz + 0.35, y0: th - 1, y1: th + 8 }); } // a hedgerow tree
         }
       }
       if (o.key === 'fMeadow' && hr.chance(o.past ? 0.75 : 0.5)) { const n2 = hr.int(3, 9); for (let k = 0; k < n2; k++) { const [sx, sz] = xfP(o, hr.range(-o.hx + 2, o.hx - 2), hr.range(-o.hz + 2, o.hz - 2)); fl.sheep.push([sx, this.heightAt(sx, sz), sz, hr.range(0.85, 1.1)]); } }
@@ -707,7 +710,8 @@ const Wild = {
       const T = run.T, sunk = T.sink ? T.sink[run.qs[q]] : 0, hollow = sunk > 0.6, cu = wildCult(mx, mz); // (a hollow way has a hedge on each bank, fields or not, unless it runs through a wood)
       if (blocks.some(f => circleObb(mx, mz, 6, f)) || HF.some(f => circleObb(mx, mz, 6, f)) || Math.max(Math.abs(mx), Math.abs(mz)) < TG.R + 30 || townCore(mx, mz) > 0 || POI.housesIn(mx - 20, mz - 20, mx + 20, mz + 20).length) continue; // not across a cottage's front
       if (hollow ? E.forestMask(mx, mz, this.heightAt(mx, mz)) > 0.4 : (cu < 0.35 || !near.some(f => circleObb(mx, mz, 16, f)))) continue; // only where fields border the way
-      const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, wall = this.heightAt(mx, mz) > 70;
+      const L = Math.hypot(bx - ax, bz - az), ha = Math.atan2(bx - ax, bz - az), nx = (bz - az) / L, nz = -(bx - ax) / L, bk = regionW(mx, mz) ? RG_BOUND[regionPick(mx, mz, _h2(Math.round(mx / 40), Math.round(mz / 40), 595))] : null, wall = bk ? bk === 'wall' : this.heightAt(mx, mz) > 70;
+      if (bk === 'none' && !hollow) continue; // (the fen and the open downland: nothing stands beside the way)
       for (const sd of [-1, 1]) {
         if (fbm(mx / 40 + sd * 3, mz / 40, 2, 364) < (hollow ? -0.2 : 0.25 - cu * 0.5)) continue; // with gaps and field gates
         const off = hollow ? 6.4 : [3.9, 4.7, 3.2, 3.2][run.cls], px = mx + nx * off * sd, pz = mz + nz * off * sd, y = this.heightAt(px, pz), hh = wall ? 0.95 : rng.range(1.2, 1.6);
@@ -736,7 +740,7 @@ const Wild = {
         const qr = qAt(qR, x, z), qs = qAt(qS, x, z), qw = qAt(qW, x, z); if (qr > 0.5) continue; // nothing roots in bare rock
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 13 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.5 * (1 - 0.5 * smoothstep(6, 13, e)) * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
-          if (rng.chance(0.45)) tree(rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
+          if (rng.chance(0.45)) tree(regionW(x, z) ? (rng.chance(0.75) ? 'willow' : 'oak' + rng.int(0, 2)) : rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
         if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
         let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
@@ -946,7 +950,7 @@ function wildRockiness(x, z, h, slope, apron = 0) {
   return [qr, (1 - qr) * Math.max(alpine, apron)];
 }
 // open heath: heather on the uplands, bracken lower down, where the land is neither wooded nor farmed
-function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, 0.6 * fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365) + (L => 0.95 * (L.expo - 0.3) - 0.45 * L.wet + 0.08 * L.sun)(landAt(x, z))) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
+function wildHeath(x, z, h) { const r = Math.hypot(x, z); if (r < 420) return 0; const up = smoothstep(-90, 0, h - wildTreeLine(x, z)); const g = smoothstep(420, 700, r) * smoothstep(0.08 - 0.25 * up, 0.22 - 0.25 * up, 0.6 * fbm(x / 420 + WSEED, z / 420, 2, 362) + 0.25 * fbm(x / 90, z / 90, 1, 365) + (L => 0.95 * (L.expo - 0.3) - 0.45 * L.wet + 0.08 * L.sun)(landAt(x, z)) + regionP(x, z, RP.heath)) * (1 - smoothstep(0.25, 0.55, wildCult(x, z))); const st = r > 1500 ? siteAt(x, z) : null; return st ? lerp(g, siteHeath(st.S, x, z, h), st.w) : g; } // broad tracts on the high dry ground
 // small woods standing in open country (the copses of the plant rules), for the ground tint under them
 function wildCopse(x, z) { const r = Math.hypot(x, z); if (r < 380) return 0; return smoothstep(380, 560, r) * smoothstep(0.4, 0.5, fbm(x / 34, z / 34, 2, 88)) * (1 - smoothstep(0.4, 0.55, wildCult(x, z))) * (1 - siteWeight(x, z)) * (1 - townCore(x, z)); }
 
@@ -967,11 +971,16 @@ function wildPlant(x, z, h, sl, n, rng, m, dens, qs, cult, heath = 0, fixed = fa
     if (r2 < (edge ? 0.3 : 0.07) + alp * 0.25) return { kind: 'bush', s: 0.7 + r3 * 0.7 };
     // each stand has a leading species: pine on high and north-facing ground, broadleaf in the lowlands, mixed between
     const L = landAt(x, z), conif = 1.1 * fbm(x / 260 + WS * 2.3, z / 260, 2, 350) + 1.2 * smoothstep(TL - 110, TL - 40, h) - 0.35 * n[2] + alp + 0.7 * L.expo - 0.7 * L.floor - 0.3 * L.sun - 0.5 * L.wet + 0.1; // pine on the high, open and shaded ground, broadleaf in the valleys and by the water // stands of one kind or the other, few mixed
-    let kind;
-    if (conif > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
-    else if (conif < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
+    let kind; const rw = fixed ? null : regionW(x, z), cf = rw ? conif + regionMix(rw, RP.conif) : conif;
+    if (cf > 0.3) kind = r2 < 0.86 ? 'pine' : r2 < 0.93 ? 'oak' : 'dead';
+    else if (cf < -0.12) kind = r2 < 0.9 ? 'oak' : r2 < 0.95 ? 'pine' : n[2] > 0.25 && h < 40 && r3 < 0.5 ? 'cypress' : 'oak';
     else kind = r2 < 0.55 ? 'oak' : r2 < 0.95 ? 'pine' : 'dead';
-    if (kind === 'oak') kind = m > 0.75 && r3 > 0.55 && h < 95 ? 'grove' : 'oak' + (Math.floor(r3 * 3) % 3); // deep woods read as one canopy
+    // each kind of country has its tree: beech on the chalk, willow and alder in the fen, birch and thorn on the moor, oak in the weald
+    const u4 = rw ? (r3 * 7.13) % 1 : 1;
+    if (rw && u4 < rw[RG.downs]) { if (kind !== 'dead') kind = 'beech'; }
+    else if (rw && u4 < rw[RG.downs] + rw[RG.fen]) kind = kind === 'dead' ? 'dead' : 'willow';
+    else if (rw && u4 < rw[RG.downs] + rw[RG.fen] + rw[RG.moor]) { if (kind === 'oak') kind = r2 * 13 % 1 < 0.7 ? 'birch' : 'thorn'; }
+    else if (kind === 'oak') kind = m > 0.75 && r3 > 0.55 && h < 95 ? 'grove' : 'oak' + (Math.floor(r3 * 3) % 3); // deep woods read as one canopy
     // old trees and young ones: saplings crowd the edges of the woods
     let s = 0.62 + Math.pow(r3, 0.6) * 0.66; if (edge && r3 < 0.35) s *= 0.6; if (kind === 'pine' && alp > 0.3) s *= 0.72;
     return { kind, s };

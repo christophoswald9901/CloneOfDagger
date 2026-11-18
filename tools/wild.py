@@ -5,6 +5,8 @@ SET=hall python3 tools/wild.py OUTDIR 0 1 2     -> eighteen views of Halewood Ho
 SET=beyond python3 tools/wild.py OUTDIR 0 1 2   -> the world beyond the home country: the west pass from inside, on top and beyond, a great
                                                     river at the gap it leaves a country by, a village, a meeting place and a border range in
                                                     the countries round home, and the home mountains from inside and from outside
+SET=regions python3 tools/wild.py OUTDIR 0 1 2  -> each kind of country beyond home (downs, fen, moor, weald): a way, a village and open
+                                                    ground in it, from the ground and from the air; a region's edge crossing a border
 VIEWS=a,b                                         -> capture only some views"""
 import asyncio, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
@@ -135,7 +137,23 @@ BEYOND = r"""(()=>{const g=__game,W=g.World,h=g.terrainH,look=(x,z,tx,tz)=>Math.
  V.border_air=[20000,-13000,look(20000,-13000,20000,-9000),-0.3,420]; V.coast_west=[-15000,-900,look(-15000,-900,-17000,-200),-0.2,150];
  V.home_skyline_n=[-1500,-9000,0,0.05,40]; V.home_skyline_w=[-3000,-6000,1.5708,0.05,40];
  return JSON.stringify(V);})()"""
-ARC = {'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
+# the regions beyond the home country (SET=regions): for each kind of country (downs, fen, moor, weald) the nearest good stretch of a way
+# deep inside it (from the ground and from the air), a village or hamlet in it (ground and air), and open ground away from the ways;
+# and, from high up, a place where a region's edge crosses a border between two countries
+REGIONS_V = r"""(()=>{const g=__game,W=g.World,h=g.terrainH,look=(x,z,tx,tz)=>Math.atan2(-(tx-x),-(tz-z)); const V={}; W.DROP=1e12;
+ W.planBox(-20000,-28000,19999,1999); const T=g.Wild.tracks, hd=(x,z)=>Math.hypot(x,z+8000);
+ for(let k=1;k<5;k++){ const nm=g.RG_KEYS[k], wk=(x,z)=>{const w=g.regionW(x,z);return w?w[k]:0;};
+  let best=null; for(const t of T){ if(t.spur)continue; for(let q=40;q<t.length-40;q+=20){const [x,z]=t[q]; if(wk(x,z)<0.93||g.rimDist(x,z)<1500||h(x,z)<3)continue; const sc=hd(x,z)+(t.lane?4000:0); if(!best||sc<best[0])best=[sc,t,q];}}
+  if(best){const [,t,q]=best,p=t[q],n=t[q+10],y=look(p[0],p[1],n[0],n[1]);V[nm+'_way']=[p[0],p[1],y,-0.03,null];V[nm+'_air']=[p[0],p[1],y,-0.3,130];}
+  const S=g.Settle.list.filter(v=>wk(v.x,v.z)>0.9).sort((a,b)=>(a.kind==='village'?0:6000)+hd(a.x,a.z)-(b.kind==='village'?0:6000)-hd(b.x,b.z))[0];
+  if(S){V[nm+'_place']=[S.x+42,S.z+30,look(S.x+42,S.z+30,S.x,S.z),-0.04,null];V[nm+'_place_air']=[S.x+170,S.z+170,look(S.x+170,S.z+170,S.x,S.z),-0.45,120];}
+  let o=null; for(let x=-19800;x<19800;x+=300)for(let z=-27800;z<1500;z+=300){ if(wk(x,z)<0.97||g.rimDist(x,z)<1800||h(x,z)<3||g.Wild.trackD(x,z)<250||g.wildCult(x,z)>0.2)continue; const sc=hd(x,z); if(!o||sc<o[0])o=[sc,x,z];}
+  if(o)V[nm+'_open']=[o[1],o[2],0,-0.05,null]; }
+ // where a region's edge crosses a border line (2.5 km either side of the line the kinds differ along it, the same kind running across)
+ { let e=null; for(const lx of [-20000,-10000,10000,20000])for(let z=-27000;z<0;z+=250){const a=g.regionKind(lx-2500,z),b=g.regionKind(lx+2500,z),c=g.regionKind(lx-2500,z+3000),d=g.regionKind(lx+2500,z+3000); if(a===b&&c===d&&a!==c&&a&&c&&g.rimDist(lx-2500,z)>800){e=[lx,z+1500];break;}}
+   if(e)V.edge_over_border=[e[0]-2600,e[1]+2600,look(e[0]-2600,e[1]+2600,e[0],e[1]),-0.42,900]; }
+ return JSON.stringify(V);})()"""
+ARC = {'downs_open': 3.14, 'fen_open': 3.14, 'moor_open': 3.14, 'weald_open': 3.14, 'upland': 3.14, 'coast': 1.3, 'forest': 0.4, 'track': 0.3, 'river': 0.3, 'rim': 0.6, 't_east': 0.6, 't_north': 0.6, 't_west': 0.6, 't_back': 0.8, 't_nw': 0.8}
 
 PLACE = r"""(()=>{const g=__game,G=g.G,P=G.player; G.time=12*60+G.time-(G.time%1440); G.weather='clear'; G.weatherDay=Math.floor(G.time/1440);
   const [x,z,yaw,pitch,fly,arc,margin,name]=ARGS; g.Wild.prime(x,z); let X=x,Z=z;
@@ -186,7 +204,7 @@ async def main():
         else: print('new game never started', c.errors()[:2]); c.stop(); return
         await asyncio.sleep(2)
         await c.ev("document.getElementById('msgs').style.display='none'; document.getElementById('hint').style.display='none'; document.getElementById('status').style.display='none'")
-        views = json.loads(await c.ev(BEYOND if SET == 'beyond' else TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else HALL_V if SET == 'hall' else FIND))
+        views = json.loads(await c.ev(REGIONS_V if SET == 'regions' else BEYOND if SET == 'beyond' else TRANS if SET == 'transition' else SITES_V if SET == 'sites' else TOWN_V if SET == 'town' else HALL_V if SET == 'hall' else FIND))
         files = []
         for name, (x, z, yaw, pitch, fly) in views.items():
             if ONLY and name not in ONLY: continue
@@ -198,6 +216,6 @@ async def main():
             info = await c.ev("(()=>{const r=__game.renderer().info.render,W=__game.Wild;return JSON.stringify({tri:r.triangles,calls:r.calls,chunks:W.chunks.size})})()")
             print(seed, name, where, info)
         allf = [(n, f'{OUT}/s{seed}_{n}.png') for n in views if os.path.exists(f'{OUT}/s{seed}_{n}.png')] # every view taken so far, in order
-        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else "hall" if SET == "hall" else "b" if SET == "beyond" else ""}s{seed}.jpg')
+        if allf: sheet(allf, f'{OUT}/sheet_{"t" if SET == "transition" else "x" if SET == "sites" else "town" if SET == "town" else "hall" if SET == "hall" else "b" if SET == "beyond" else "r" if SET == "regions" else ""}s{seed}.jpg')
         print(seed, 'errors:', [e[:300] for e in c.errors()[:3]]); c.stop()
 asyncio.run(main())

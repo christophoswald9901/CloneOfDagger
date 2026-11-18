@@ -178,7 +178,9 @@ function* planLandGen(K) {
   for (let t = 0; t < on; t++) { const k = order[t]; out[k] = k === outK ? 1 : sea[k] ? sea[k] : out[rec[k]]; }
   const tFlood = performance.now();
   const Amin = 1.6e6 / (C * C);                                  // a river once 1.6 km² of land drains to it
-  const ch = k => k >= 0 && !sea[k] && A[k] >= Amin && out[k] === 1;
+  // (more land than that on the chalk, which swallows its water; less in the fen and on the moor: the kind of country at each cell)
+  let AK = null; if (!home) { AK = new Float32Array(n); for (let k = 0; k < n; k++) { const i = k % NI; AK[k] = regionP(X0 + i * C, Z0 + (k - i) / NI * C, RP.stream); } yield; }
+  const ch = k => k >= 0 && !sea[k] && A[k] >= (AK ? Amin * AK[k] : Amin) && out[k] === 1;
   const main = new Int32Array(n).fill(-1), dHead = new Int32Array(n).fill(-1), dNext = new Int32Array(n).fill(-1);
   for (let t = 0; t < on; t++) { const k = order[t]; if (!ch(k) || k === outK) continue; const r = rec[k]; dNext[k] = dHead[r]; dHead[r] = k; if (main[r] < 0 || A[k] > A[main[r]]) main[r] = k; }
   const widthOf = a => Math.min(16, 1.2 + 1.6 * Math.sqrt(a * C * C / 1e6));
@@ -211,7 +213,8 @@ function* planLandGen(K) {
   for (const R of rivers) {
     if (R.parent >= 0 && !built[R.parent]) continue;
     if (!home) yield;
-    let V = R.hand ? smoothPath(R.cells, 3) : smoothPath(R.gin || R.gout ? [...(R.gin ? R.cells.slice(0, 2) : []), ...simplifyPath(R.cells.slice(R.gin ? 2 : 0, R.gout ? -2 : undefined), 28), ...(R.gout ? R.cells.slice(-2) : [])] : simplifyPath(R.cells, 28), 4); // the grid's staircase straightened first, so the bends come out broad (not so far that it leaves its valley)
+    const mid = R.cells[R.cells.length >> 1], mk0 = home ? 1 : regionP(mid[0], mid[1], RP.meander), eps = mk0 < 0.6 ? 95 : 28; // (through a fen a river runs in long straight reaches, like a cut drain)
+    let V = R.hand ? smoothPath(R.cells, 3) : smoothPath(R.gin || R.gout ? [...(R.gin ? R.cells.slice(0, 2) : []), ...simplifyPath(R.cells.slice(R.gin ? 2 : 0, R.gout ? -2 : undefined), eps), ...(R.gout ? R.cells.slice(-2) : [])] : simplifyPath(R.cells, eps), mk0 < 0.6 ? 2 : 4); // the grid's staircase straightened first, so the bends come out broad (not so far that it leaves its valley)
     if (R.parent >= 0) { // run on into the parent river's line, where it meets it
       const Pv = built[R.parent].V, [ex, ez] = V[V.length - 1]; let bq = 0, bd = 1e9; for (let q = 0; q < Pv.length; q++) { const d = Math.hypot(Pv[q][0] - ex, Pv[q][1] - ez); if (d < bd) { bd = d; bq = q; } }
       const PP = rivers[R.parent].out.P; let jp = Pv[bq], jd = 1e9; for (const p of PP) { const d = Math.hypot(p[0] - Pv[bq][0], p[1] - Pv[bq][1]); if (d < jd) { jd = d; jp = p; } }
@@ -220,7 +223,8 @@ function* planLandGen(K) {
     V = resampleEven(V, 20);
     const L = V.length, nrm = V.map((_, q) => { const a = V[Math.max(0, q - 1)], b = V[Math.min(L - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
     const sd = rng.next() * 100;
-    if (!R.hand) V = V.map((p, q) => { const off = 66 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
+    const mk = home ? null : V.map(p => regionP(p[0], p[1], RP.meander)), ik = home ? null : V.map(p => regionP(p[0], p[1], RP.incise));
+    if (!R.hand) V = V.map((p, q) => { const off = 66 * fbm(q * 20 / 560 + sd, 1.7, 2, 381) * Math.min(1, q / 6, (L - 1 - q) / 6) * (mk ? mk[q] : 1); return [p[0] + nrm[q][0] * off, p[1] + nrm[q][1] * off]; });
     // width from the land drained, at each point of the line (by its share of the way down)
     const w = V.map((_, q) => widthOf(R.area[Math.min(R.area.length - 1, Math.round(q / (L - 1) * (R.area.length - 1)))]) * (R.hand || R.gin ? 1 : lerp(0.45, 1, Math.min(1, q * 20 / 400)))); // a spring's trickle at first
     if (R.gout) for (let q = 0; q < L; q++) w[q] = lerp(16, w[q], smoothstep(0, 900, (L - 1 - q) * 20)); // (at a gap it is a great river, whatever it drained: the next country takes it up as one)
@@ -229,13 +233,13 @@ function* planLandGen(K) {
     const gb = V.map(([x, z], q) => { if (q % 2 && q < L - 1) return null; const [nx, nz] = nrm[q]; let g = Infinity; for (const f of [-0.5, 0, 0.5]) g = Math.min(g, terrainBase(x + nx * Fw[q] * f, z + nz * Fw[q] * f)); return g; }); // every other point, the rest between
     for (let q = 1; q < L - 1; q += 2) gb[q] = (gb[q - 1] + gb[q + 1]) / 2;
     // larger rivers have worn deeper valleys into the land
-    const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500))); // (a young stream has hardly cut in)
+    const inc = w.map((v, q) => R.hand ? 0 : (2 + 2.8 * v) * (R.gin ? 1 : Math.min(1, q * 20 / 1500)) * (ik ? ik[q] : 1)); // (a young stream has hardly cut in)
     const wl = [], drop = R.gin ? 0.0003 : 0.03; // (a great river that has come in through a gap falls little from there on)
     for (let q = 0; q < L; q++) { const g = gb[q] - 0.6 - inc[q]; wl.push(q ? Math.min(wl[q - 1] - drop, g) : R.gin ? R.gin.f.wl : g); }
     // (where two great rivers come into one country they meet at one level: each comes down to a little under the lower of the gaps' levels within its first 600 m)
     if (R.gin && gaps.ins.length > 1) { const lo = Math.min(...gaps.ins.map(g => g.f.wl)) - 0.25; for (let q = 0; q < L; q++) wl[q] = Math.min(wl[q], lerp(wl[0], lo, smoothstep(0, 600, q * 20))); }
     for (let q = 0; q < L; q++) wl[q] = Math.max(wl[q], SEA);
-    if (R.gout) { const E = R.gout.f.wl; for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + 0.08 * (L - 1 - q)); } // it leaves at the gap's own level
+    if (R.gout) { const E = R.gout.f.wl, fall = Math.max(0.08, R.gin ? 1.2 * (wl[0] - E) / Math.max(1, L - 1) : 0); for (let q = 0; q < L; q++) wl[q] = Math.min(Math.max(wl[q], E + 0.00005 * (L - 1 - q)), E + fall * (L - 1 - q)); } // it leaves at the gap's own level (and comes down to it from the level it came in at, however far above that lies: a fen's river stands high, a moor's has cut deep)
     if (R.parent >= 0) { const pw = built[R.parent].wl[R.joinQ]; wl[L - 1] = pw; for (let q = L - 2; q >= 0; q--) wl[q] = Math.max(wl[q], wl[q + 1] + (R.gin ? drop : 0.01)); }
     // how far the ground must come down where the river runs through higher ground (a gorge through a ridge), and how far round that reaches
     const cut0 = gb.map((g, q) => Math.max(0, g - (wl[q] + 0.5))), cut = cut0.slice();
@@ -247,7 +251,7 @@ function* planLandGen(K) {
     const P0 = resampleEven(V, 4), PL = P0.length, Pw = [], Pwl = [];
     for (let q = 0; q < PL; q++) { const f = q / (PL - 1) * (L - 1), a = Math.floor(f), b = Math.min(L - 1, a + 1), u = f - a; Pw.push(lerp(w[a], w[b], u) * (1 + 0.34 * fbm(q * 4 / 110 + sd * 0.7, 9.1, 2, 383) * Math.min(1, R.gin ? q / 30 : 1, R.gout ? (PL - 1 - q) / 30 : 1))); Pwl.push(lerp(wl[a], wl[b], u)); } // wider in the pools, narrower at the riffles
     const pn = P0.map((_, q) => { const a = P0[Math.max(0, q - 1)], b = P0[Math.min(PL - 1, q + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [-(b[1] - a[1]) / l, (b[0] - a[0]) / l]; });
-    const P = P0.map((p, q) => { const off = (4 + Pw[q] * 1.7) * fbm(q * 4 / 150 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
+    const P = P0.map((p, q) => { const off = (4 + Pw[q] * 1.7) * fbm(q * 4 / 150 + sd * 1.3, 3.3, 2, 371) * Math.min(1, q / 10, (PL - 1 - q) / 10) * (mk ? mk[Math.min(L - 1, Math.round(q / (PL - 1) * (L - 1)))] : 1); return [p[0] + pn[q][0] * off, p[1] + pn[q][1] * off]; });
     const xs = P.map(p => p[0]), zs = P.map(p => p[1]), pad = 30;
     R.out = { P, w: Pw, wl: Pwl, end: R.end, hand: !!R.hand, gin: !!R.gin, gout: !!R.gout, box: [Math.min(...xs) - pad, Math.min(...zs) - pad, Math.max(...xs) + pad, Math.max(...zs) + pad] };
   }
@@ -297,6 +301,8 @@ function* planLandform(K, A, ANI, ANJ, AX0, AZ0, AC) {
     const a = gather(X0 + i * C, Z0 + j * C), run = smoothstep(Math.log(5), Math.log(110), Math.log(a + 1)) * (1 - smoothstep(0.14, 0.4, sl)); // water gathering from above, where the ground is not too steep to hold it
     const hollow = smoothstep(-1.5, -10, TPI[k]) * (1 - smoothstep(0.03, 0.11, sl));                                                    // and flat ground lying below what is round it
     WET[k] = h <= SEA ? 0 : clamp(0.85 * run + 0.55 * hollow, 0, 1);
+    if (!home && h > SEA) { const wk = regionP(X0 + i * C, Z0 + j * C, RP.wetK); // the fen is wet wherever it is not an island, the moor boggy on its flats; the chalk is dry
+      if (wk > 0) WET[k] = clamp(WET[k] + wk * (1 - smoothstep(0.035, 0.1, sl)) * (1 - smoothstep(1.2, 3.5, TPI[k])), 0, 1); else if (wk < 0) WET[k] *= 1 + wk; }
     SUN[k] = sl > 1e-4 ? (-gx * lx - gz * lz) / sl * smoothstep(0.02, 0.12, sl) : 0;
   } }
   K.land.lf = { C, X0, Z0, NI, NJ, H, SL, TPI, TPL, WET, SUN };
