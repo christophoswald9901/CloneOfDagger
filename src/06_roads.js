@@ -24,7 +24,7 @@ const Roads = {
     if (this.list.length >= this.want() || Math.max(Math.abs(px), Math.abs(pz)) < TG.R - 60) return;
     // a point on a track some way off (not under the player's nose), outside the surveyed land
     const T = Wild.tracks; const cand = [];
-    for (let ti = 0; ti < T.length; ti++) if (!T[ti].lane) for (let q = 0; q < T[ti].length; q += 20) { /* (on the tracks; the lanes are the farmers' own) */ const [x, z] = T[ti][q], d = Math.hypot(x - px, z - pz); if (d > 260 && d < 560 && Math.max(Math.abs(x), Math.abs(z)) > TG.R + 20) cand.push([ti, q]); }
+    for (let ti = 0; ti < T.length; ti++) for (let q = 0; q < T[ti].length; q += 20) { /* (on the high roads most, on the tracks, and on a lane only where it carries a village's traffic) */ const k = T[ti].cls ? T[ti].cls[q] : T[ti].lane ? WAY.lane : WAY.track; if (k === WAY.lane || k === WAY.green) continue; const [x, z] = T[ti][q], d = Math.hypot(x - px, z - pz); if (d > 260 && d < 560 && Math.max(Math.abs(x), Math.abs(z)) > TG.R + 20) { cand.push([ti, q]); if (k === WAY.road) cand.push([ti, q], [ti, q]); } }
     if (!cand.length) return;
     const [ti, q] = rnd.pick(cand), tot = TRAVELLER_KINDS.reduce((a, k) => a + k.w, 0); let r = rnd.next() * tot, K = TRAVELLER_KINDS[0], ki = 0; for (const k of TRAVELLER_KINDS) { r -= k.w; if (r <= 0) { K = k; break; } ki++; } ki = Math.min(ki, TRAVELLER_KINDS.length - 1);
     const dir = rnd.chance(0.5) ? 1 : -1, n = K.pair || rnd.chance(0.15) ? 2 : 1;

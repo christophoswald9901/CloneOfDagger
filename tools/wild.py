@@ -39,6 +39,12 @@ FIND = r"""(()=>{const g=__game,W=g.Wild,h=g.terrainH,R=g.LAND.rivers,T=W.tracks
    if(v){ const t=T[v.ti]; if(t){ const q0=Math.max(0,v.q-45), p=t[q0], n=t[Math.min(t.length-1,q0+4)]; V.village=[p[0],p[1],look(p[0],p[1],v.x,v.z),-0.03,null]; }
      V.air_village=[v.x+260,v.z+180,look(v.x+260,v.z+180,v.x,v.z),-0.32,140]; }
    const f=S.farms.find(f=>f.lane&&!f.lane.spur&&f.lane.length>40&&Math.hypot(f.x,f.z)>2500); if(f){ const L=f.lane, p=L[Math.min(L.length-1,30)], q=L[Math.min(L.length-1,22)]; V.lane=[p[0],p[1],look(p[0],p[1],q[0],q[1]),-0.03,null]; } }
+ // each kind of way, from the ground, looking along it (the first good stretch 2-8 km out): a high road, a hollow way, a green lane
+ { const find=(ok)=>{ for(const t of T){ if(!t.cls)continue; for(let q=20;q<t.length-20;q+=7){ const d=Math.hypot(t[q][0],t[q][1]); if(d<2000||d>8000)continue; if(ok(t,q)){ const n=t[q+6]; return [t[q][0],t[q][1],look(t[q][0],t[q][1],n[0],n[1]),-0.03,null]; } } } return null; };
+   const run=(t,q,k)=>{ for(let m=-12;m<=12;m++) if(t.cls[q+m]!==k) return false; return true; };
+   const r1=find((t,q)=>run(t,q,1)); if(r1)V.highroad=r1;
+   const r2=find((t,q)=>t.sink&&t.sink[q]>1.2&&t.sink[q+6]>1.0); if(r2)V.hollow=r2;
+   const r3=find((t,q)=>run(t,q,3)&&!t.sink); if(r3)V.greenlane=r3; }
  V.air_high=[-2500,-6500,Math.atan2(-0.3,1),-0.22,360];
  V.air_city=[650,-500,look(650,-500,2500,-3000),-0.25,140];
  return JSON.stringify(V);})()"""
