@@ -28,15 +28,17 @@ const SITES = [
 for (const S of SITES) S.road = S.road.map(([x, z]) => [S.x + x, S.z + z]);
 
 // the distance to a site's centre, warped so its edge is not a circle (fixed noise: the same in every world)
-function siteDist(S, x, z) { const dx = x - S.x, dz = z - S.z, r = Math.hypot(dx, dz); if (r > S.rb + 260) return r; return r + 0.16 * S.rb * fbm(x / (S.rb * 0.6) + 31.7, z / (S.rb * 0.6), 2, 940 + S.x % 7); }
-function siteW(S, x, z) { if (Math.abs(x - S.x) > S.rb + 260 || Math.abs(z - S.z) > S.rb + 260) return 0; return 1 - smoothstep(S.rc, S.rb, siteDist(S, x, z)); }
+// a site laid along a line (S.box: its bounds, S.dist: its own distance) is told apart from the round ones
+function siteOff(S, x, z, m) { const b = S.box; return b ? x < b[0] - m || x > b[2] + m || z < b[1] - m || z > b[3] + m : Math.abs(x - S.x) > m || Math.abs(z - S.z) > m; }
+function siteDist(S, x, z) { const dx = x - S.x, dz = z - S.z, r = S.dist ? S.dist(x, z) : Math.hypot(dx, dz); if (r > S.rb + 260) return r; return r + 0.16 * S.rb * fbm(x / (S.rb * 0.6) + 31.7, z / (S.rb * 0.6), 2, 940 + S.x % 7); }
+function siteW(S, x, z) { if (siteOff(S, x, z, S.rb + 260)) return 0; return 1 - smoothstep(S.rc, S.rb, siteDist(S, x, z)); }
 // the site a point lies in (or nearest to), with how far its fixed ground holds there (0..1)
 function siteAt(x, z) { let best = null, bw = 0; for (const S of SITES) { const w = siteW(S, x, z); if (w > bw) { bw = w; best = S; } } return best ? { S: best, w: bw } : null; }
 function siteWeight(x, z) { let w = 0; for (const S of SITES) w = Math.max(w, siteW(S, x, z)); return w; }
 // as siteWeight, but leaving out the sites whose country is farmed like any other (the towns: their own fields reach out over the plain)
 function siteWild(x, z) { let w = 0; for (const S of SITES) if (!S.farmed) w = Math.max(w, siteW(S, x, z)); return w; }
 // rivers are not planned through a site or the land blending into it
-function siteZone(x, z, m = 0) { for (const S of SITES) if (Math.abs(x - S.x) < S.rb + m + 260 && Math.abs(z - S.z) < S.rb + m + 260 && siteDist(S, x, z) < S.rb + m) return true; return false; }
+function siteZone(x, z, m = 0) { for (const S of SITES) if (!siteOff(S, x, z, S.rb + m + 260) && siteDist(S, x, z) < S.rb + m) return true; return false; }
 
 /* ---------------- the fixed ground ---------------- */
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
@@ -147,7 +149,7 @@ const Sites = {
   update(x, z) {
     if (!G.player || G.area !== G.city) return null;
     const found = G.flags.found || (G.flags.found = {}); let hit = null;
-    for (const S of SITES) if (!found[S.id] && Math.hypot(x - S.x, z - S.z) < S.discR) { found[S.id] = dayOf(G.time) + 1; hit = S; msg(`You have found ${S.name}: ${S.blurb}.`, 'district'); bigMsg(S.name.replace(/^the /, 'The '), 2.2); }
+    for (const S of SITES) if (!found[S.id] && (S.dist ? S.dist(x, z) : Math.hypot(x - S.x, z - S.z)) < S.discR) { found[S.id] = dayOf(G.time) + 1; hit = S; msg(`You have found ${S.name}: ${S.blurb}.`, 'district'); bigMsg(S.name.replace(/^the /, 'The '), 2.2); }
     if (this.glowMat) this.glowMat.opacity = isNight(G.time) ? 1 : 0;
     // the people of Mirrormere, about their doors by day
     const M = SITES[2], dm = Math.hypot(x - M.x, z - M.z);
