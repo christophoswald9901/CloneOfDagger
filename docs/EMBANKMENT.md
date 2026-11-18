@@ -1,4 +1,4 @@
-# The Long Ridge (working name)
+# The Giant's Ridge
 
 A seventh fixed landmark: a bank of earth 2 km long that carries the road level across a wooded valley in the foothills some 7 km west of Aldhaven. It is the same in every world (`?seed=N`). Code in `src/03_sites_ridge.js`, walk test `tools/ridgewalk.py SEED`.
 
@@ -7,7 +7,15 @@ The user found it walking west from Aldhaven on the default country (seed 0): th
 
 - **Cause.** The home country's ways are graded once, under `LEGACY = 1`, on the land as it was. Then the endless world cuts a col into the home mountains at each pass (`homeNotch`, `src/03_terrain.js`, down to 17 % of their height). The col spares the ground near the home rivers but not near the ways. So a way keeps its old height over the lowered ground, and the chunk levelling (`genChunk` in `src/03_wild.js` brings the ground up to a way's height within about 12 m of it) builds the wall.
 - **It moved with the seed.** Seed 1 had only 580 m at 11 m high, near its own west pass at z = -2700. Seed 2 had nothing on the west road (its pass is at z = -5800).
-- **The same fault elsewhere (not fixed, waiting for the user's decision).** Lanes and tracks near the east and north passes stand up to 96 m above the ground (seed 0, around (7800, -4651)), 101 m (seed 1, (8404, -5195)) and 52 m (seed 2, (-1657, -16226)). A smaller, separate cause: the 39 m grade smoothing fills narrow gullies at fords, giving banks of 26–30 m over 75–145 m (seed 1 (339, -3805), seed 2 (917, -2497)). A likely fix: after the home plan, give the home ways their heights again from the ground as it now lies wherever the legacy ground differs. Their lines stay where they are, so `digest.py` would not change.
+- **The same fault elsewhere: fixed.** Lanes and tracks near the east and north passes stood up to 96 m above the ground (seed 0, around (7800, -4651)), 100 m (seed 1, (8363, -5227)) and 52 m (seed 2, (-1657, -16226)), on near-vertical walls up to 1.6 km long. Now `regradeHome()` (`src/03_wild.js`, called from `World.finishHome` before the kinds of way and the hollow ways are worked out) gives every home way its grade from the land as it now lies, wherever that differs from the land the plan saw:
+  - It measures the difference every 48 m along the way, near the passes, the old crest and the home box's edge (nowhere else does the land differ).
+  - It smooths the difference as the grade was smoothed and adds it.
+  - Bridges keep their decks, and the Giant's Ridge's own stretch is left as laid.
+  - Lines don't move, so `tools/digest.py --diff` against main shows every item the same for seeds 0, 1 and 2.
+  - It takes about 64 ms at load (headless).
+
+  See "Walls before and after" below.
+- **A separate, smaller cause, not fixed.** Where a way fords a narrow, deep gully, the 39 m grade smoothing fills it, leaving a short bank: seed 1 (339, -3805), 30 m high over 75 m, and (4631, -6581), 11 m over 54 m; seed 2 (5929, -3729), 16 m over 57 m. Seed 0 has none.
 
 ## What is fixed data
 `RIDGE_P` and `RIDGE_LAND` at the end of `src/03_sites_ridge.js`. The same numbers are in `docs/embankment_data.json`, made by the scripts described below.
@@ -36,7 +44,7 @@ The user found it walking west from Aldhaven on the default country (seed 0): th
   - Beside each portal a flight of stone steps slanting up the face to the crest.
 - **Discovery.** Within 300 m of the line, by the zone distance, so nearer at the narrowed ends.
 
-## The changes it makes to the home plan (undecided: see the question to the user)
+## The changes it made to the home plan (merged into main as PR #7)
 It is a fixed site, so the home plan sees its ground: rivers are kept out of its zone and the settlement and places keep clear of it.
 The home planners are not local, so the change spreads far beyond it:
 - **Rivers.** Each river's meanders take the next number from one random stream, in order (`planLandGen`, `rng.next()` per river). When one river near the bank goes or shortens, every later river in the list changes shape.
@@ -54,6 +62,15 @@ The landmark can't simply be laid in after the plan, like the passes' cols: on s
 
 In seed 0 the west gate's track now goes round the bank about 120 m from it. The road on the crest joins it at both ends and takes the high road's traffic.
 
+## Walls before and after
+Stretches of home ways (the Giant's Ridge's own road left out) standing more than 4 m above the ground beside them (the higher of the ground under the way and 16 m to either side), for at least 45 m. Measured on main and on this branch, from the plan data. "Col" means the land beside lies lower than the land the plan saw, "ford" that it does not (the grade fills a gully).
+
+| seed | col walls on main | col walls now | ford fills on main | ford fills now |
+| --- | --- | --- | --- | --- |
+| 0 | 17 stretches, up to 96 m, 8.0 km in all (by pass: E 96 m, N 91 m, W 25 m) | 0 | 0, up to 0 m | 0, up to 0 m |
+| 1 | 10 stretches, up to 100 m, 4.0 km in all (by pass: E 100 m, W 24 m) | 0 | 2, up to 30 m | 2, up to 30 m |
+| 2 | 5 stretches, up to 52 m, 1.8 km in all (by pass: N 52 m) | 0 | 1, up to 16 m | 1, up to 16 m |
+
 ## Measured (headless Chrome, software rendering)
 - **`tools/ridgewalk.py`, seeds 0, 1 and 2:**
   - The crest walked end to end in 100 legs of 20 m. The walker stayed within 0.29–0.45 m of the line and 0.5 m below to 0.13 m above the crest.
@@ -67,9 +84,17 @@ In seed 0 the west gate's track now goes round the bank about 120 m from it. The
 - **`tools/check.py`:** boots with no errors.
 - **`tools/endless.py 0 1 2`:** 0 failures (rivers, gaps, passes and ground across the borders of 37 countries a seed).
 - **`tools/invariants.py`:** world seeds 0–5 and town seeds 0–3 pass every check except `rivers.trench` (3–8 points a seed), which fails on main too, by the same counts (6, 2 and 4 points on main for world seeds 0–2, against 6, 3 and 4 here).
+- **After the passes were fixed** (`regradeHome`, on main with the Giant's Ridge merged):
+  - `tools/digest.py --diff` against main: every item the same for seeds 0, 1 and 2.
+  - The Giant's Ridge's own road heights are the same as on main.
+  - `tools/ridgewalk.py 0 1 2`: ok. The crest stayed within 0.39 m of the line and 0.5 m below to 0.14 m above it. Both flights of steps climbed, and the journey arrived over the crest.
+  - `tools/endless.py 0 1 2`: 0 failures.
+  - `tools/invariants.py`: as on main (only `rivers.trench`, same counts).
+  - `tools/check.py`: no errors.
+  - Load: the re-grading takes about 64 ms. Back-to-back boots, with the machine heavily loaded by other work: main 14.7–14.9 s, this branch 14.5–16.0 s.
+  - Photographs of the worst wall (east pass, seed 0) before and after are in `tools/out/east_pass_walls.png` (not in git).
 
 ## Not done
-- Named only as a working name (the Long Ridge). The user wants "ridge" or "ledge" in the name.
-- The fault at the other passes (above) is not fixed, pending the user.
+- The ford gully fills (above) are not fixed. They are a separate cause, and a fix would change how fords are graded across the country.
 - Not tried on an iPad. Nothing here touches the touch controls.
 - From more than 400 m away (the far rings) the crest line is coarse. It is drawn at 16 m and 64 m like every other landform.

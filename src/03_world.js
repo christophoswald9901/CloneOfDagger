@@ -17,7 +17,7 @@ Object.assign(World, {
     this._all[kind] = { rev: this.rev, n: base.length, list }; return list;
   },
   due() { return performance.now() - this.t1 > 3.5; }, t1: 0, // true when the step of a plan in hand has run long enough
-  finishHome() { trimHomeRivers(); Settle.finishHome(); this.home.state = 2; },
+  finishHome() { trimHomeRivers(); regradeHome(); Settle.finishHome(); this.home.state = 2; }, // (the ways graded again where the land now lies otherwise, before their kinds and hollow ways are worked out)
   // how far a point lies from a country's box
   boxDist(i, j, x, z) { const home = isHomeTile(i, j), x0 = home ? WORLD.x0 : WORLD.x0 + i * TILE, x1 = home ? WORLD.x1 : x0 + TILE, z0 = home ? WORLD.z0 : WORLD.z0 + j * TILE, z1 = home || j >= 1 ? 1e12 : z0 + TILE; return Math.hypot(Math.max(0, x0 - x, x - x1), Math.max(0, z0 - z, z - z1)); },
   // the countries within r of a point that are not planned yet, nearest first
