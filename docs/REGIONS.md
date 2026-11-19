@@ -38,7 +38,61 @@ New tree sprites: beech, willow, birch, thorn (`drawTree` in `src/01_textures.js
 ## A fault in the endless world that regions exposed, fixed
 A great river that enters and leaves a country was held to within 0.08 m a point of its leaving level. Gap levels used to be alike (ground less 47 m). Now a gap in a fen stands near the ground and one on a moor is cut deep, so a short river could not come down far enough and started 16 to 19 m below the level it arrived at (`gap.seam` in `tools/endless.py`, seeds 0 and 2). The allowed fall now follows the difference between the two gaps (`fall` in `planLandGen`).
 
+## The relief beyond home: one relief in layers, weighted by kind (2026-11-19)
+Asked for: places felt too spacious for walking (3.9 m/s). Never shrink anything and keep the total sizes, but make the land denser, with shorter length scales, the scale varying by region. Two parts: a lower overall scale beyond home (the user looked at test builds at 0.72, 0.55 and 0.40 and found 0.40 natural), and the scale per region by weighting layers rather than stretching coordinates (`x / K(x, z)` would warp the land wherever K changes, more so the further from the origin).
+
+### Design (`RELIEF`, `reliefAt` in `src/03_terrain.js`; `RP` in `src/03_regions.js`)
+- **Layers of fixed size.** Beyond home the relief is the sum of: the uplands and plains (`RP.broad`, about a kilometre across), the ranges in them (`RP.range`, spurs some hundreds of metres apart), the crags, gullies and steps on the ranges' high ground (`RP.crag`), the knolls (`RP.knoll`, 150 to 230 m), the hillocks (`RP.hillock`, new, 70 to 110 m), the swells (`RP.swell`, 260 m) and the kind's own shape (`regionShape`). Each kind says how much height each layer carries; `regionMix` blends the weights across region edges as it does everything else. `RP.relief` is gone (split into broad, range and crag).
+- **The overall scale.** `RELIEF.k = 0.40` (was `RELIEF_K = 0.72`): the wild relief's uplands, ranges and crags stand at 0.40 of their home size. `RELIEF.kv = 0.72`: the valley lines keep today's size. At 0.40 the valley floors became trenches: the uplands dropped 45 m into them over some 60 m, which drew winding black lines on the shaded maps.
+- **The heights.** `RELIEF.h = 0.92` as before, and `RELIEF.range` for the ranges alone. The ranges at 0.40 of their size and full height (option A, `range: 1`) made 2.5 to 4.0 % of the heartland too steep to climb (main: 0.9 to 1.6 %). At 0.556 (option B: 0.40 / 0.72, their slopes as they were) it was 0.5 to 1.1 %, but the hills stood lower and the moor was no denser than today. **Chosen: 0.75**, between the two: 1.2 to 2.1 % (mean 1.54 % against main's 1.19 %). The uplands and plains keep their full height: at a kilometre across they stay gentle.
+- **Each kind's grain** (heart, downs, fen, moor, weald):
+
+  | layer | heart | downs | fen | moor | weald |
+  |-|-|-|-|-|-|
+  | broad | 1 | 0.3 | 0 | 1.3 | 0.4 |
+  | range | 1 | 0.15 | 0 | 0.45 | 0.4 |
+  | crag (of the ranges') | 1 | 0 | 0 | 0.6 | 0.35 |
+  | knoll | 1 | 0.15 | 0.03 | 0.55 | 2 |
+  | hillock | 0.3 | 0 | 0 | 0.15 | 1.1 |
+  | swell | 1 | 2.8 | 0.12 | 1.2 | 0.8 |
+
+  The weald carries its height in knolls and hillocks (small, close-set hills), the downs in smooth swells and their own whale-backs, the moor in broad uplands with rough ground and few ranges, the fen in nothing. The kinds' own shapes stand closer too: the downs' whale-backs at 620 m (were 1250) and their small term at 300 m (500), the moor's swells at 640 m (880) and its rough ground at 125 m (170, now 6 m high instead of 4.5), the weald's ghylls at 310 m (430). The downs' dry valleys stay at 820 m: at 480 m they became worm-like loops.
+- **Where kinds meet.** Two kinds of like roughness but different grain (weald and downs, say) mixed half and half are smoother than either, since each layer then carries half its height. So each layer's departure from its mean is raised there (`lift`) until the ground is as rough as the geometric mean of the two kinds' roughness. The layers' spread and mean (`RLAY`) were measured over the land beyond home with `__game.reliefLayers`. Along transects across region edges the lift reached 1.25 between weald or moor and downs, and stayed at 1.0 to 1.05 elsewhere; it made the ground there 10 to 15 % rougher than a plain mix. Where one side is flat (fen) it does nearly nothing.
+- **Patchiness.** The knolls and hillocks are stronger in some stretches than others (0.45 to 1.55 times, over about 1.7 km), so no kind is evenly crumpled.
+- **Straight ranges.** The band the ranges follow is the zero line of a value noise, and value noise lays its zero lines along its lattice: at 0.40 its crests ran dead straight north-south and east-west for a kilometre (seed 1, heartland, west of the spot). Beyond home the band is bent by a further warp of 520 (of its own units, about 200 m) at 1500, which removed them. Main's ranges come from the same noise at 1.8 times the size, so it may have such lines too, longer (not looked for). Bending the massifs themselves did not help.
+- **By the home country.** Everything new comes in over the first 1.5 km beyond the home box (`RELIEF.fade`, with the regions' own fade): the wild relief is blended from its home size, and the patchiness and the hillocks fade in, so the ground does not step at the box's edge. Inside the box `terrainBase` runs the old code unchanged (`wildRelief` without layers is the same arithmetic), and `tools/digest.py --diff` against main is identical for seeds 0, 1 and 2.
+
+### Measured: `tools/relief.py` (new)
+One spot per kind and seed: the point of a 500 m lattice nearest home that is at least 5.5 km beyond the home box, 3 km inside its country's border belts, 3 km inland and wholly of that kind (none of that depends on the relief, so main and this branch measure the same ground). Round it, 4 x 4 km of `terrainRaw` (rivers cut in) at 10 m, counting only ground of that kind (weight over 0.85) 1.5 km clear of the border belts. "Crest" is the median distance from a crest to the next hollow along straight lines (a turn counts once the ground has climbed or fallen 4 m; again at 15 m). Means over seeds 0, 1 and 2, main → this branch:
+
+| kind | crest, 4 m | crest, 15 m | 90 % of slopes under | too steep to climb | height range (5-95 %) |
+|-|-|-|-|-|-|
+| heart | 220 → 173 m | 363 → 313 m | 27.0 → 30.3° | 1.19 → 1.54 % | 127 → 110 m |
+| downs | 280 → 260 m | 577 → 527 m | 14.5 → 15.3° | 0.02 → 0.01 % | 115 → 97 m |
+| fen | 477 → 440 m (flat) | mostly no 15 m swings at all | 3.9 → 3.7° | 0 → 0 % | 30 → 29 m |
+| moor | 213 → 200 m | 373 → 373 m | 32.0 → 24.5° | 2.06 → 0.26 % | 170 → 130 m |
+| weald | 147 → 87 m | 327 → 253 m | 27.1 → 31.4° | 0.60 → 0.38 % | 128 → 104 m |
+
+Per seed: weald 140/160/140 → 80/100/80 m; heart 200/240/220 → 180/180/160 m.
+
+What that says:
+- The weald (41 % and 22 % shorter from crest to hollow) and the heartland (21 % and 14 %) are much denser. The downs are only 7 to 9 % denser, and the moor 6 % at 4 m and not at all at 15 m: by design they stay the broad kinds, the downs in long smooth swells and the moor broad and open. Making them denser too is a matter of their weights (more swell, smaller whale-backs; more knolls on the moor).
+- The moor is much easier to walk than it was (its ranges were at full height: 2 to 3.4 % too steep on seeds 1 and 2). The weald has less ground too steep to climb (0.60 → 0.38 %) but more climbing: its slopes are steeper on the whole (90 % under 31° instead of 27°), as close-set hills are. The heartland's share of unclimbable ground rose (seed 0: 0.88 → 2.10 %; seeds 1 and 2 about the same: 1.57 → 1.33, 1.12 → 1.19 %). On seed 0, 80 % of it lies where the ranges stand over 60 m (their crags, gullies and steps), 20 % on their flanks, next to none on low ground.
+- **The land stands lower**: the 5 to 95 % height range in these windows is 13 to 24 % lower than on main (the moor's ranges and the weald's ranges gave way to broad ground and to knolls; the ranges are at 0.75 of their height). Not decided with the user. The uplands layer could carry more height without steepening the ground much, at a kilometre across.
+- **Checks on the final code** (headless Chrome, software rendering, one machine; main and this branch run back to back):
+  - `tools/digest.py --diff` against main: all ten entries the same for seeds 0, 1 and 2. `tools/invariants.py`: the same as main (only `rivers.trench`, which fails on main too, with the same points). `tools/check.py`: boots, no errors.
+  - `tools/endless.py 0 1 2`: no failures. A country's plan: 1.32, 1.35 and 1.41 s of CPU (mean over 36 countries) against 1.26, 1.21 and 1.31 s on main, about 5 to 11 % more; two more runs of seed 2 gave 1.31 s. The longest single step: 46, 69 and 117 ms against 58, 83 and 25 ms; seed 2 again gave 45 and 72 ms, so the 117 was a one-off, but steps of 70 ms do occur (on main too). The step across border lines is smaller than on main (0.4 to 1.0 m against 1.9 to 2.4 m).
+  - The ways and places of the 36 countries round home, main → this branch: way length +3 to 4 %; ways steeper than 12 %: 4.1 → 4.6, 4.2 → 4.5, 4.7 → 5.8 % of their length; bridges 488 → 509, 506 → 498, 486 → 492; villages 374 → 379, 386 → 386, 384 → 380; hamlets 418 → 469, 428 → 488, 399 → 461; farmsteads +3 to 4 %; field blocks within 1 %.
+- In the fen the numbers can swing with the rivers: in one test build a great river came in through a lower border gap (a gap sits at the lowest ground on its border line, which the relief moves) and cut 40 m into the fen. Not seen in the final build's spots.
+
+### Not done or not verified (relief)
+- The height option (ranges at 0.75) and the lower land are my choice, not the user's. The downs and the moor are hardly denser than before.
+- One spot per kind and seed was measured; the numbers of a kind vary a good deal from spot to spot (the downs' height range was 59 m on seed 1 and 143 m on seed 2).
+- Not walked in the game, and nothing tried on an iPad. Chunk building times and `tools/farwalk.py` were not run. No critic rounds (not asked for).
+- The tors, coasts, meres and drains are as they were (see below).
+
 ## Tools
+- `tools/relief.py OUT 0 1 2` and `--compare OUT main=DIR new=DIR`: the relief per kind beyond home (numbers above, a shaded map and views from the ground, 150 m and 500 m up); serve each build on its own port with `HTTP_PORT`.
 - `REGION=-30000,-38000,30000,2000,60 tools/landmap.py OUT 0 1 2`: a third panel shows the regions in colour with the countries' lattice in white and the home box in black. The printed line gives each kind's share of the land.
 - `SET=regions tools/wild.py OUT 0 1 2`: for each kind beyond home a way, a village or hamlet and open ground, from the ground and from the air, and one view from high up where a region's edge crosses a border.
 
