@@ -61,46 +61,78 @@ function riseHeight(x, z) {
 // soft > 1: the big crests are rounded, not knife-edged
 function ridgedMF(x, z, oct, s, soft = 1) { let sum = 0, amp = 1, f = 1, w = 1, norm = 0; for (let i = 0; i < oct; i++) { const v = Math.abs(vnoise(x * f, z * f, s + i * 29)); let n = 1 - (i < 2 && soft > 1 ? Math.pow(v, soft) * (1 + (soft - 1) * 0.35) : v); n *= n * w; w = clamp(n * 1.8, 0, 1) * (soft > 1 ? 1 - 0.75 * smoothstep(0.55, 0.95, n) : 1); sum += n * amp; norm += amp; amp *= 0.5; f *= 2.05; } return sum / norm; }
 // the valley lines of the wild: a broad field whose zero line the valleys (and the streams in them) follow
-function wildValley(x, z) {
+function wildValley(x, z, warpOnly) {
   const s = WSEED * 131, X = x + WSEED * 7919, Z = z - WSEED * 6271;
   const wx = X + 260 * fbm(X / 1200, Z / 1200, 2, 302 + s), wz = Z + 260 * fbm(X / 1200 + 4.1, Z / 1200, 2, 303 + s);
+  if (warpOnly) return [wx, wz, 0];
   return [wx, wz, Math.abs(fbm(wx / 1500, wz / 1500, 3, 304 + s) + 0.018 * fbm(wx / 90, wz / 90, 2, 309 + s))]; // the small term makes the stream meander
 }
-// the wild country: uplands and plains, long mountain ranges, broad valleys winding through. Returns [extra height, valley floor 0 (on it) .. 1]
-function wildRelief(x, z) {
+// the wild country: uplands and plains, long mountain ranges, broad valleys winding through. Returns [extra height, valley floor 0 (on it) .. 1].
+// Beyond the home country it is asked for its layers instead (reliefAt): L is an array to fill with the uplands and plains, the ranges and
+// the valley floor, and holds the weight of the ranges (L[3]) and of the crags on them (L[4]) at the place (no weight leaves a layer out),
+// and the valley floor there (L[5]; the valleys are laid out at a size of their own)
+function wildRelief(x, z, L) {
   const s = WSEED * 131, X = x + WSEED * 7919, Z = z - WSEED * 6271;
-  const [wx, wz, vl] = wildValley(x, z);
-  const floor = smoothstep(0.015, 0.17, vl); // valleys wind along the zero line of a broad field
+  const [wx, wz, vl] = wildValley(x, z, !!L);
+  const floor = L ? L[5] : smoothstep(0.015, 0.17, vl); // valleys wind along the zero line of a broad field
   const region = fbm(X / 2800, Z / 2800, 3, 301 + s) + 0.12;                                // lowland plains < 0 < uplands
-  let h = 34 * smoothstep(-0.35, 0.35, region);
+  let h = 34 * smoothstep(-0.35, 0.35, region), m = 0;
   // ranges follow the zero lines of another broad field: a crest band some hundreds of metres wide, foothills either side
-  const band = Math.abs(fbm(wx / 2400, wz / 2400, 3, 310 + s));
+  const band = L ? Math.abs(fbm((wx + 520 * fbm(wx / 1500 + 1.3, wz / 1500, 2, 321 + s)) / 2400, (wz + 520 * fbm(wx / 1500, wz / 1500 + 8.7, 2, 322 + s)) / 2400, 3, 310 + s)) // (beyond home bent further: at
+    : Math.abs(fbm(wx / 2400, wz / 2400, 3, 310 + s));                                                                                                                 // the size there its crests ran straight along the noise's lattice for a kilometre)
   const rm = (1 - smoothstep(0.04, 0.32, band)) * smoothstep(-0.5, 0.05, region);
-  if (rm > 0.001) {
+  if (rm > 0.001 && !(L && L[3] < 0.004)) {
     const qx = wx + 110 * fbm(wx / 330, wz / 330, 2, 317 + s), qz = wz + 110 * fbm(wx / 330 + 5.2, wz / 330, 2, 318 + s); // warped, so peaks grow spurs and lopsided flanks
-    let m = rm * rm * (95 + 95 * smoothstep(0, 0.6, region)) * (0.75 * ridgedMF(qx / 760, qz / 760, 6, 306 + s, 1.7) + 0.25 * ridgedMF(qx / 410, qz / 410, 4, 319 + s, 1.4)) * 1.3; // massifs with shoulders and spurs, not cones
+    m = rm * rm * (95 + 95 * smoothstep(0, 0.6, region)) * (0.75 * ridgedMF(qx / 760, qz / 760, 6, 306 + s, 1.7) + 0.25 * ridgedMF(qx / 410, qz / 410, 4, 319 + s, 1.4)) * 1.3; // massifs with shoulders and spurs, not cones
     // the high ground breaks into crags and cliff bands: sharper small ridges, and soft steps in the slope
-    const hi = smoothstep(60, 190, m);
-    if (hi > 0) {
-      m += hi * 12 * (ridgeNoise(wx / 120, wz / 120, 3, 312 + s) - 0.45);
+    const hi = smoothstep(60, 190, m), cr = L ? L[4] : 1;
+    if (hi > 0 && cr > 0) {
+      m += hi * 12 * (ridgeNoise(wx / 120, wz / 120, 3, 312 + s) - 0.45) * cr;
       // gullies run down the fall line: a groove noise stretched along the slope of the range
       const e = 12, gx = ridgedMF((wx + e) / 720, wz / 720, 3, 306 + s) - ridgedMF((wx - e) / 720, wz / 720, 3, 306 + s), gz = ridgedMF(wx / 720, (wz + e) / 720, 3, 306 + s) - ridgedMF(wx / 720, (wz - e) / 720, 3, 306 + s), gl = Math.hypot(gx, gz) || 1e-6;
-      const u = (wx * gz - wz * gx) / gl, v = (wx * gx + wz * gz) / gl; m -= hi * 11 * Math.pow(1 - Math.abs(vnoise(u / 26, v / 170, 313 + s)), 4);
-      const t = m / 17, f = Math.floor(t); m = lerp(m, (f + smoothstep(0.3, 0.7, t - f)) * 17, 0.2 * hi);
+      const u = (wx * gz - wz * gx) / gl, v = (wx * gx + wz * gz) / gl; m -= hi * 11 * Math.pow(1 - Math.abs(vnoise(u / 26, v / 170, 313 + s)), 4) * cr;
+      const t = m / 17, f = Math.floor(t); m = lerp(m, (f + smoothstep(0.3, 0.7, t - f)) * 17, 0.2 * hi * cr);
     }
-    h += m;
+    if (!L) h += m;
   }
+  if (L) { L[0] = h; L[1] = m; L[2] = floor; return L; }
   return [h * lerp(0.2, 1, floor) - 9 * (1 - floor), floor];
 }
-// beyond the home country the hills and valleys stand closer together (things are sized to walking time): the same relief at 0.72 of
-// its scale, taking over across the home country's border
-const RELIEF_K = 0.72;
-function wildReliefAt(x, z) {
-  if (LEGACY) return wildRelief(x, z);
-  const w = smoothstep(0, 1500, Math.max(WORLD.x0 - x, x - WORLD.x1, WORLD.z0 - z, 0)); if (w <= 0) return wildRelief(x, z);
-  const b = wildRelief(x / RELIEF_K, z / RELIEF_K); b[0] *= 0.92; if (w >= 1) return b;
-  const a = wildRelief(x, z); return [lerp(a[0], b[0], w), lerp(a[1], b[1], w)];
+function wildReliefAt(x, z) { return wildRelief(x, z); } // (the home country's; beyond it the relief is made in layers by reliefAt)
+/* ---------------- the relief beyond the home country ----------------
+   One relief made of layers of fixed size, and each kind of country (03_regions.js) says how much height each layer carries: the uplands
+   and plains (RP.broad, about a kilometre across), the ranges in them (RP.range, their spurs some hundreds of metres apart), the crags on
+   the ranges (RP.crag), the knolls (RP.knoll, 150 to 230 m), the hillocks (RP.hillock, 70 to 110 m), the swells (RP.swell, 260 m) and the
+   kind's own shape (regionShape). A kind's hills are as close-set as the layers it favours: the weald's height is in its knolls and
+   hillocks, the downs' in long swells, the moor's in broad uplands. Nothing is stretched, so where one kind shades into another the land
+   stays whole. Where two kinds of like roughness but different grain meet, their layers mixed are smoother than either (half of each); there
+   each layer's departure from its mean is raised (lift), so the ground stays as rough as the kinds either side, mixed by ratio.
+   RELIEF.k: the size of the wild relief's uplands, ranges and crags beyond home, of their size at home, so they stand closer together
+   (things are sized to walking time). RELIEF.kv: the size of its valleys, which keep more room: at RELIEF.k their sides would be walls.
+   RELIEF.h: the wild relief's height, of its height at home; RELIEF.range: the ranges' height besides. At their full height and this size
+   the ranges made 2.5 to 4 % of the heartland too steep to climb (0.9 to 1.6 % before); at 0.556 (their slopes as they were) about 1 %,
+   but they stood a fifth lower; 0.75 lies between, at 1.2 to 2.1 % (docs/REGIONS.md). All take over over the first RELIEF.fade metres
+   beyond the home country's box, where the regions come in too. */
+const RELIEF = { k: 0.40, kv: 0.72, h: 0.92, range: 0.75, fade: 1500 };
+// the layers' spread (sd) and mean at a weight of 1, measured over the land beyond home (tools: __game.reliefLayers), and each kind's
+// roughness: the spread of all its layers together
+const RLAY = { keys: ['broad', 'range', 'knoll', 'hillock', 'swell'], sd: [12.1, 29.6, 2.65, 3.3, 1.25], mean: [21.7, 19.4, 1.39, 0, 0], shapeSd: [0, 15.5, 2.05, 4.95, 1.83], shapeMean: [0, 35.7, 0.9, -0.08, -0.67] };
+RLAY.logRough = RG_KEYS.map((_, k) => Math.log(Math.sqrt(RLAY.keys.reduce((a, n, i) => a + (RP[n][k] * RLAY.sd[i]) ** 2, 0) + RLAY.shapeSd[k] ** 2)));
+const _RL = { broad: 0, range: 0, crag: 0, knoll: 0, hillock: 0, swell: 0, lift: 1, fade: 1, wild: [0, 1] }, _rlL = new Float64Array(6);
+function reliefAt(x, z, rw) {
+  const R = _RL, Y = RLAY; let lin = 0, sq = 0;
+  for (let i = 0; i < 5; i++) { const n = Y.keys[i], c = regionMix(rw, RP[n]); R[n] = c; sq += (c * Y.sd[i]) ** 2; }
+  for (let k = 0; k < RG_N; k++) { lin += rw[k] * Y.logRough[k]; sq += (rw[k] * Y.shapeSd[k]) ** 2; }
+  R.crag = regionMix(rw, RP.crag); R.lift = clamp(Math.exp(lin) / Math.sqrt(sq + 1e-6), 1, 1.5); // (as rough as the kinds' roughness mixed by ratio, their geometric mean)
+  // the wild relief: its uplands, ranges and valleys at RELIEF.k of their size and RELIEF.h of their height, each layer by its weight
+  const K = RELIEF.k, L = _rlL; L[3] = R.range; L[4] = R.crag; L[5] = smoothstep(0.015, 0.17, wildValley(x / RELIEF.kv, z / RELIEF.kv)[2]); wildRelief(x / K, z / K, L);
+  const f = R.lift, b = RELIEF.h * ((R.broad * (Y.mean[0] + f * (L[0] - Y.mean[0])) + RELIEF.range * R.range * (Y.mean[1] + f * (L[1] - Y.mean[1]))) * lerp(0.2, 1, L[2]) - 9 * R.broad * (1 - L[2]));
+  const w = R.fade = smoothstep(0, RELIEF.fade, homeOut(x, z));
+  if (w >= 1) { R.wild[0] = b; R.wild[1] = L[2]; return R; }
+  const a = wildRelief(x, z); R.wild[0] = lerp(a[0] * R.broad, b, w); R.wild[1] = lerp(a[1], L[2], w); return R; // (by the home country, its own relief at its own size)
 }
+// the layers at a point beyond home, unweighted (for the tools): [uplands, ranges, valley floor, knolls, hillocks, swells]
+function reliefLayers(x, z) { const L = new Float64Array(6); L[3] = 1; L[4] = 1; L[5] = smoothstep(0.015, 0.17, wildValley(x / RELIEF.kv, z / RELIEF.kv)[2]); wildRelief(x / RELIEF.k, z / RELIEF.k, L); return [L[0], L[1], L[2], knollAt(x, z), hillockAt(x, z), swellAt(x, z)]; }
 // sand on the shore: wide beaches by the city, out along the coast only a strip at the water's edge (low river flats beside it stay green)
 function isBeach(x, z, h) { const w = smoothstep(900, 1500, Math.abs(x)), n = w > 0 ? fbm(x / 45, z / 45, 2, 308) : 0; return h < SEA + lerp(2.4, 3.2, w) + 1.4 * n * w && coastZ(x) - z < lerp(140, 60 + 45 * n, w); }
 /* ---------------- the countries: a lattice of valley-countries divided by ranges and hill belts ----------------
@@ -235,27 +267,36 @@ function rimHeight(x, z) {
   const plinth = smoothstep(3600, 300, de), wall = smoothstep(950, -250, de);
   return Math.max(h, amp * (plinth * (0.4 + 0.6 * plinth) * 190 * (0.55 + 0.6 * pk) + wall * (280 + 380 * mass) * (0.4 + 0.8 * pk) + wall * 40 * fine + smoothstep(150, -350, de) * 230));
 }
+// three of the layers beyond home (of unit weight): the knolls (as the home country's far out), the hillocks and the swells
+function knollAt(x, z) { const wx = x + 40 * fbm(x / 300, z / 300, 2, 23), wz = z + 40 * fbm(x / 300 + 5, z / 300, 2, 24); return 22.72 * (0.6 * ridgeNoise(wx / 230, wz / 230, 4, 25) + 0.4 * (fbm(wx / 150, wz / 150, 4, 26) * 0.5 + 0.5) - 0.42); }
+function hillockAt(x, z) { const wx = x + 25 * fbm(x / 160 + 3.3, z / 160, 2, 28), wz = z + 25 * fbm(x / 160, z / 160 + 7.1, 2, 29); return 24 * (0.65 * ridgeNoise(wx / 110, wz / 110, 3, 31 + WSEED * 3) + 0.35 * (fbm(wx / 70, wz / 70, 2, 33) * 0.5 + 0.5) - 0.481); }
+function swellAt(x, z) { return 4.5 * fbm(x / 260 + 11, z / 260, 3, 21); }
 // the raw height before level plots and roads are cut in, and before the rivers have cut their valleys (terrainRaw, in 03_water.js, adds those)
 function terrainBase(x, z, noRim) {
   const dIn = SHORE - z; const r0 = Math.hypot(x, z);
-  const wW = smoothstep(800, 1400, r0); const wr = wW > 0 ? wildReliefAt(x, z) : null;
-  const rw = wr ? regionW(x, z) : null;                             // the kind of country this is (null: the home country's own)
+  const wW = smoothstep(800, 1400, r0), rw = wW > 0 ? regionW(x, z) : null; // the kind of country this is (null: the home country's own)
+  const RL = rw ? reliefAt(x, z, rw) : null, wr = RL ? RL.wild : wW > 0 ? wildReliefAt(x, z) : null; // (beyond home the relief is made in layers)
   let h = 0.6 + 45 * (1 - Math.exp(-Math.max(0, dIn) / 330));      // the land climbs away from the sea
-  h += 4.5 * fbm(x / 260 + 11, z / 260, 3, 21) * (rw ? regionMix(rw, RP.swell) : 1); // broad swells
+  h += RL ? swellAt(x, z) * RL.swell * RL.lift : 4.5 * fbm(x / 260 + 11, z / 260, 3, 21); // broad swells
   const inside = pointInPoly(x, z, WALL_PTS) && z < SHORE + 2;
   const wd = inside ? 0 : wallDist(x, z);
   const out = smoothstep(4, 75, wd);
   h += (1 - out * 0.7) * 2.2 * fbm(x / 70, z / 70, 3, 22);         // small rises and dips in the streets
   h += 16 * Math.exp(-(x * x + (z + 128) * (z + 128)) / (42 * 42)); // the castle knoll
+  if (RL) { // beyond home: the knolls and the hillocks by the kind of country, lower on the valley floors, and hillier in some stretches than others
+    const fl = out * lerp(1, lerp(0.35, 1, wr[1]), wW) * (1 + RL.fade * (1.1 * smoothstep(-0.4, 0.4, fbm(x / 1700 + 2.9, z / 1700, 2, 35 + WSEED * 3)) - 0.55)), f = RL.lift;
+    if (RL.knoll > 0.004) h += fl * RL.knoll * (RLAY.mean[2] + f * (knollAt(x, z) - RLAY.mean[2]));
+    if (RL.hillock > 0.004) h += fl * RL.hillock * RL.fade * f * hillockAt(x, z);
+  } else {
   // hills beyond the walls, bigger towards the horizon
   const far = smoothstep(330, 700, Math.hypot(x, z));
-  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)) * (rw ? regionMix(rw, RP.knoll) : 1); // out in the country the big shapes carry the relief, the knolls calm down
+  const amp = out * (26 + 45 * far) * lerp(1, 0.32, smoothstep(700, 1700, r0)); // out in the country the big shapes carry the relief, the knolls calm down
   if (amp > 0.01) {
     const wx = x + 40 * fbm(x / 300, z / 300, 2, 23), wz = z + 40 * fbm(x / 300 + 5, z / 300, 2, 24);
     const hills = 0.6 * ridgeNoise(wx / 230, wz / 230, 4, 25) + 0.4 * (fbm(wx / 150, wz / 150, 4, 26) * 0.5 + 0.5);
     h += amp * (hills - 0.42) * (wr ? lerp(1, lerp(0.35, 1, wr[1]), wW) : 1);
-  }
-  if (wr) h += out * wW * ((rw ? wr[0] * regionMix(rw, RP.relief) + regionMix(rw, RP.lift) + regionShape(x, z, rw) : wr[0]) + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
+  } }
+  if (wr) h += out * wW * ((RL ? wr[0] + regionMix(rw, RP.lift) + regionShape(x, z, rw, RL.lift) : wr[0]) + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
   if (r0 > 5500 && !noRim) h += LEGACY ? rimHeight0(x, z) : rimHeight(x, z);
   if (Math.abs(x - 205) < 700 && Math.abs(z + 220) < 700) h += out * riseHeight(x, z); // it has faded to nothing long before the box ends
   // western downs framing the other side of the bay

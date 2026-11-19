@@ -28,10 +28,14 @@ const REGION = {
 };
 // what each kind does, in the order of RG (heart, downs, fen, moor, weald)
 const RP = {
-  relief:  [1,    0.3,   0,     1.15,  0.7],   // the broad uplands and ranges of the country, of their full height
+  // the height each layer of the relief carries (of its height in the heartland; see RELIEF in 03_terrain.js), so each kind has hills of its own grain
+  broad:   [1,    0.3,   0,     1.3,   0.4],   // the uplands and plains, about a kilometre across
+  range:   [1,    0.15,  0,     0.45,  0.4],   // the ranges in them, their spurs some hundreds of metres apart
+  crag:    [1,    0,     0,     0.6,   0.35],  // the crags, gullies and steps on the ranges' high ground (of the ranges' own)
+  knoll:   [1,    0.15,  0.03,  0.55,  2],     // the knolls, 150 to 230 m apart
+  hillock: [0.3,  0,     0,     0.15,  1.1],   // the hillocks, 70 to 110 m apart
+  swell:   [1,    2.8,   0.12,  1.2,   0.8],   // the swells of the ground, some 260 m across
   lift:    [0,    8,     -8,    24,    0],     // the whole of it raised or let down (metres)
-  knoll:   [1,    0.3,   0.03,  0.7,   1.75],  // the small close hills
-  swell:   [1,    1,     0.12,  1,     1],     // the broad swells of the ground
   rim:     [1,    0.7,   0.4,   1.1,   0.85],  // the height of a border range where it runs through
   stream:  [1,    5,     0.55,  0.7,   0.8],   // the land a stream must drain before it runs (of 1.6 km2): the chalk swallows its water, the fen and the moor shed it
   incise:  [1,    1,     0.06,  0.75,  1],     // how deep a river has cut its valley
@@ -128,21 +132,22 @@ function fenBase(x, z) { return 0.6 + 45 * (1 - Math.exp(-Math.max(0, SHORE - z)
 // a mere: a sheet of shallow open water in a hollow of the fen, 0 (none) .. 1 (its middle). Only well inland, where the fen is level
 function mereAt(x, z) { if (!REGION.meres) return 0; const w = regionW(x, z); if (!w || w[RG.fen] < 0.86 || coastZ(x) - z < 14200) return 0; return smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, w[RG.fen]); }
 const MERE_DEPTH = 1.9, MERE_LEVEL = -0.75; // the bed of a mere below the fen's level, and its water
-function regionShape(x, z, w) {
-  let h = 0; const s = WSEED * 57;
+// (lift: how far each shape's departure from its mean, RLAY.shapeMean, is raised where kinds meet)
+function regionShape(x, z, w, lift = 1) {
+  let h = 0; const s = WSEED * 57, M = RLAY.shapeMean;
   { const k = w[RG.downs]; if (k > 0.004) { // downs: broad whale-backed hills of chalk, dry valleys winding into them, a scarp along part of their edge
-    let d = 46 * smoothstep(-0.5, 0.5, fbm(x / 1250 + s, z / 1250, 2, 560)) + 8 * fbm(x / 500, z / 500, 2, 561);
+    let d = 46 * smoothstep(-0.5, 0.5, fbm(x / 620 + s, z / 620, 2, 560)) + 8 * fbm(x / 300, z / 300, 2, 561);
     d -= 15 * (1 - smoothstep(0.012, 0.1, Math.abs(fbm(x / 820 + 3.1, z / 820 + s, 2, 562)))) * smoothstep(6, 30, d); // the coombes
     const sc = smoothstep(0.3, 0.62, 0.5 + 0.9 * fbm(x / 4300 + 9.1, z / 4300, 2, 563 + s));                              // where the edge is a scarp, and where it shades off
-    h += lerp(k, smoothstep(0.36, 0.6, k), sc) * (d + 14); } }
+    h += lerp(k, smoothstep(0.36, 0.6, k), sc) * (M[1] + lift * (d + 14 - M[1])); } }
   { const k = w[RG.fen]; if (k > 0.004) { // fen: level, with low islands of firm ground and shallow meres
     let f = 6.5 * smoothstep(0.26, 0.5, fbm(x / 820 + s, z / 820, 2, 570)) + 0.3 * fbm(x / 85, z / 85, 2, 572);
     if (REGION.meres && k > 0.86 && coastZ(x) - z > 14200) f -= (MERE_DEPTH + 0.3) * smoothstep(0.3, 0.42, -fbm(x / 640 + WSEED * 3.7, z / 640, 2, 571)) * smoothstep(0.86, 0.97, k);
-    h += k * f; } }
+    h += k * (M[2] + lift * (f - M[2])); } }
   { const k = w[RG.moor]; if (k > 0.004) { // moor: high, broad-backed, rough underfoot; tors on its tops
-    let m = 17 * fbm(x / 880 + s, z / 880, 3, 565) + 4.5 * fbm(x / 170, z / 170, 2, 566) + 1.3 * fbm(x / 36, z / 36, 2, 567);
+    let m = 17 * fbm(x / 640 + s, z / 640, 3, 565) + 6 * fbm(x / 125, z / 125, 2, 566) + 1.3 * fbm(x / 36, z / 36, 2, 567);
     if (k > 0.5) { const t = torNear(x, z); if (t) { const d = Math.hypot(x - t[0], z - t[1]) / (30 * t[2]); if (d < 2.4) m += 7.5 * t[2] * Math.exp(-d * d) * smoothstep(0.5, 0.75, k); } }
-    h += k * m; } }
-  { const k = w[RG.weald]; if (k > 0.004) h -= k * 7 * (1 - smoothstep(0.01, 0.075, Math.abs(fbm(x / 430 + s, z / 430, 2, 569)))); } // weald: steep little stream valleys (ghylls) between its close hills
+    h += k * (M[3] + lift * (m - M[3])); } }
+  { const k = w[RG.weald]; if (k > 0.004) h += k * (M[4] + lift * (-7 * (1 - smoothstep(0.01, 0.075, Math.abs(fbm(x / 310 + s, z / 310, 2, 569)))) - M[4])); } // weald: steep little stream valleys (ghylls) between its close hills
   return h;
 }
