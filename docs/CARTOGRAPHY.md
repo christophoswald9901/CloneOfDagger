@@ -12,14 +12,23 @@ This first version does one thing: **fix your own position from landmarks that a
   - Readings are rounded to the half degree, as you would read them off the card ("247½°").
   - The **wheel** (or + and −) works the spyglass, ×1 (the plain sights) to ×10. Through it the view turns more finely and far things stand clear of the haze in proportion (see "Why a spyglass" below).
   - Bearings taken within 30 m of each other belong to one station. Walk on and the next bearing starts a new station.
+  - **B** plants a flag a step ahead of you: a survey pole 4.6 m tall with a pennant 1.8 by 1.1 m in the colour chosen. **B** beside one of your flags pulls it up again. **C** changes the colour (red, yellow, blue, white, black, green), which the line under the sights shows.
+  - A planted flag is not put on the map: you fix where it stands and draw it yourself, then sight it from elsewhere.
+  - Through the spyglass the flag stands out at 400 m (×4) and can still be found at 1–2 km (×6–×10), as a small pole with a coloured head. Flags are kept with the game.
 - **M** with the kit out opens the map as a **survey sheet**, with the field book and the ruler. M or Esc goes back to the compass.
   - Gold circles mark the points you can sight on the map: Aldhaven's Bell Tower and Lighthouse, Corrinvale's Belfry and Cathedral, the two named peaks of the western mountains (the Spindle and Harrow Fell, at their summits), and each landmark you know of, at its tower, steeple or keep rather than the middle of the place.
   - Drag the ruler by its body to move it. Its pin settles into a landmark dropped near it.
   - Turn the ruler by the knobs at its ends: by mouse or finger, by two fingers twisting on a tablet, with `[` and `]` (0.1°, or 1° with Shift), Shift+wheel, or the ↺ ↻ buttons. The ruler always shows both bearings of its edge (for example `075.0° · 255.0°`), so you turn it to the number in your field book, either way round. There is no adding 180°.
   - **Draw line** (Enter) draws a pencil line along the ruler's edge, carried on across the whole sheet as with a long straight-edge, because the landmarks stand kilometres off.
   - Two lines cross where you stood. A third leaves a small triangle (the navigator's "cocked hat") whose size shows how good the fix is.
-  - **Mark my position**, then a tap, puts a numbered mark on the sheet. **Undo** and **Clear sheet** (tap twice) take lines and marks off again. **Ruler here** brings the ruler back to the middle. The ◂ button folds the panel into a tab so a small screen shows the map.
-- On a tablet, the top row has **Survey**, which reads **Put away** while the kit is out. While sighting, **Bearing**, **+**, **−** and **Sheet** take the place of Use and Jump. Drag on the right to aim, as usual.
+  - **Mark my position**, then a tap, puts a numbered mark on the sheet. **Undo** and **Clear sheet** (tap twice) take lines, marks and symbols off again. **Ruler here** brings the ruler back to the middle. The ◂ button folds the panel into a tab so a small screen shows the map.
+  - **Symbols** (the panel's third part, which folds with ▾):
+    - There are seventeen: flag, hilltop, pass, village, farm, church, tower, castle, ruin, mill, inn, bridge, ford, crossroads, wood, spring and cairn. They are small pictures in the manner of the period's maps: ink on paper, with colour only for flags, water and woods.
+    - Pick one and tap the sheet to put it down. It stays picked for more until you tap it again or press Esc.
+    - Drag a symbol to move it. The rubber, the last button, rubs out whatever symbol, mark or pencil line you tap.
+    - The six colours under the symbols are for the flag symbol and for the flags you plant.
+    - Symbols show on the ordinary map too, and the ruler's pin settles in them as in a landmark ("pinned in your green flag"), so a flag you have put on the map can be the start of later lines.
+- On a tablet, the top row has **Survey**, which reads **Put away** while the kit is out. While sighting, **Bearing**, **+**, **−**, **Sheet**, **Flag** (plant one, or pull it up) and a round colour swatch (tap for the next colour) take the place of Use and Jump. Drag on the right to aim, as usual. On the sheet the symbol buttons are 44 px tall.
 
 ## Where a game begins
 
@@ -165,36 +174,37 @@ At twice the pixel density (3136×1600), the ruler takes 7–9 ms and a pan step
 - The full drawing of the map at its farthest zooms takes 0.1–0.35 s headless (mostly the thousands of fields). It happens when the map opens and when a drag or zoom comes to rest.
 - If the map is opened within a few seconds of loading the page, it finishes the pictures of the land then, up to some 1.6 s headless.
 
-## Asked for next (2026-11-18): flags in the world, symbols on the map
+## Flags and symbols (2026-11-18)
 
-The user asked for three things. The plan below is not built yet, and the session stopped at 84% of the five-hour limit before starting.
-- A flag you plant where you stand.
-- A flag symbol you put on the map.
-- A wide range of symbols to put on the map, among them hilltop, village, bridge, crossroads and tower.
+The user asked for three things:
+- a flag you plant where you stand;
+- a flag symbol you put on the map;
+- a wide range of symbols for the map (among them hilltop, village, bridge, crossroads and tower).
 
-Flags come in several colours.
-
-- **Flags in the world**, part of the kit (K):
-  - **B** plants a flag of the chosen colour a step ahead of you: a survey pole about 4 m tall with a pennant, so it can be made out through the spyglass from a few km off. **B** beside one of your flags pulls it up again. **C** (with the kit out) changes the colour.
-  - Colours: red, yellow, blue, white, black and green (dyes of the period: madder, weld, woad).
-  - Flags are kept with the game (`G.flags.survey.flags`: position, height, colour) and rebuilt in the open country's scene on load.
-  - A planted flag is not put on the map by itself: you fix where it stands and draw it yourself. This is the "signals" step below, done by hand.
-- **Symbols on the map**: a Symbols section in the field book panel (it folds), with the colours for the flag symbol.
-  - Proposed symbols: flag, hilltop, pass, village, farm, church, tower, castle, ruin, mill, inn, bridge, ford, crossroads, wood, spring, and standing stone or cairn. They are drawn as small ink pictograms in the manner of 17th-century maps (a molehill for a hill, a church with its spire, a post mill).
-  - Pick a symbol and tap the map to place it. It stays picked until it is tapped again or Esc. A symbol can be dragged to move it, an eraser removes the ones tapped, and Undo takes off the last.
-  - Symbols are kept as sheet items like the lines and marks, are shown on the ordinary map too, and the ruler's pin settles on them. A flag symbol can then serve as a landmark for later lines.
-- **Touch**: while sighting, Flag and a colour swatch join Bearing, +, − and Sheet. Palette buttons are at least 40 px.
-- **Tests** (`tools/survey.py`):
-  - plant a flag and pull it up;
-  - see the flag through the spyglass from 1–3 km;
-  - place, move and erase symbols by mouse and by touch;
-  - the pin settling on a symbol;
-  - a save and load keeping both.
+Flags come in several colours. How it is built:
+- **Flags in the world** (`Survey.flag`, `syncFlags`, `flagMesh`, `waveFlags` in `src/11_survey.js`).
+  - They are kept in `G.flags.survey.flags` (position, ground height, colour) with the chosen colour in `G.flags.survey.colour`.
+  - Each frame `syncFlags` compares the list with the meshes in the open country's scene, and makes them again when it has changed: a flag planted or pulled up, a game loaded or begun, the title screen. Games saved before flags load with none.
+  - The pole and the pennant use unlit, tinted materials like the rest of the world (lit materials came out black: the world is lit by tinting through `area.tintMats`, not by lamps).
+  - The pennants stream the way the chimney smoke drifts (`FLAG_WIND`) and wave like the town banners.
+- **Symbols** (`SYMBOLS`, `drawSym`).
+  - They are sheet items (`{k: 'sym', s, x, z, c}`) beside the lines and marks, so Undo, Clear sheet and saving cover them.
+  - They are drawn over the pencil lines and under the labels, 26 px across, with the same drawing on the palette's buttons.
+  - Sharp (mitred) joins keep the small gables readable. Round joins melted the houses into bumps at this size.
+- **Pointers on the sheet**: the ruler has the first claim, then a symbol under the pointer (dragged, or a tap with the tool in hand), then the map pans.
+- **Measured** (`tools/survey.py`), with real key, mouse and touch input:
+  - B plants a flag 1.3 m ahead; C twice turns red to blue; B beside it pulls it up; a second flag 40 m on is white.
+  - A save and a load bring both back, meshes and all.
+  - Two towers land exactly where clicked; Esc puts the tool down and leaves the sheet open.
+  - A tower dragged by 60 × 30 px moves by exactly that on the map (110 m and 55 m at that zoom); the rubber takes one off; a flag symbol takes the chosen colour.
+  - The ruler's pin dropped beside the flag symbol settles in it.
+  - By touch, a bridge lands where tapped and a drag moves it exactly as far as the finger.
+  - On the tablet the colour swatch moves on to the next colour and Flag plants, or pulls up the flag you stand beside.
 
 ## Next steps, in the order they would make sense
 
 1. **Mapping new landmarks (intersection).** From two places you have fixed, sight the same new thing and draw a line from each; where they cross, it goes on your map under a name you give it. This is what carries the map beyond the border, where the known landmarks are hidden.
-2. **Signals.** Survey poles, flags or cairns you plant on hilltops, to have something to sight where nature offers nothing distinct. Alternatively, or as well, a chain of **beacons** on the home range's summits. These are visible from both sides of the border (lit at night: sighting by beacon fires), and English beacon chains were real in the 1580s. Either would make the edge of the known map surveyable from outside.
+2. **Signals.** Survey poles, flags or cairns you plant on hilltops, to have something to sight where nature offers nothing distinct. (Flags you plant by hand are in, see "Flags and symbols". Cairns are not.) Alternatively, or as well, a chain of **beacons** on the home range's summits. These are visible from both sides of the border (lit at night: sighting by beacon fires), and English beacon chains were real in the 1580s. Either would make the edge of the known map surveyable from outside.
 3. **Drawing the land between the fixes**: roads, rivers, coast and woods in pencil, then ink. Possibly a **waywiser** (the wheel that counts distance as you walk; Ogilby measured his road atlas *Britannia*, 1675, with one) for traverses along roads.
 4. **Heights.**
    - A **quadrant** with a plumb line: the angle up to a summit, its "shadow square" giving the ratio directly, times the distance off your map.
