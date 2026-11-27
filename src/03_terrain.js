@@ -38,6 +38,8 @@ function coastZ(x) {
     + (wild > 0 ? wild * (150 * fbm(x / 900 + WSEED * 3.1, 7.3, 3, 306) + 40 * fbm(x / 160, 2.9, 2, 307)) : 0)
     + smoothstep(1800, 4000, ax) * 650 * fbm(x / 5200 + WSEED * 1.9, 13.7, 3, 309)); // and at the scale of the whole bay, in broad bights and capes (fixed where a site holds the coast)
 }
+// the coast the land far behind it goes by: without the point Fort Merrow stands on, which must not tilt the country for miles inland
+function coastInland(x) { if (QUIET || Math.abs(x - FORT.x) > 1600) return coastZ(x); QUIET = 1; const z = coastZ(x); QUIET = 0; return z; }
 // Pilgrim's Rise: a crag whose steep face looks down on the city from the north-east
 const RISE = { a: [115, -290], b: [295, -150], H: 85, wIn: 46, wOut: 150 };
 // far mountain massifs: [x, z, height, radius along, radius across, heading]
@@ -296,7 +298,7 @@ function terrainBase(x, z, noRim) {
     const hills = 0.6 * ridgeNoise(wx / 230, wz / 230, 4, 25) + 0.4 * (fbm(wx / 150, wz / 150, 4, 26) * 0.5 + 0.5);
     h += amp * (hills - 0.42) * (wr ? lerp(1, lerp(0.35, 1, wr[1]), wW) : 1);
   } }
-  if (wr) h += out * wW * ((RL ? wr[0] + regionMix(rw, RP.lift) + regionShape(x, z, rw, RL.lift) : wr[0]) + 70 * smoothstep(1500, 14000, coastZ(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
+  if (wr) h += out * wW * ((RL ? wr[0] + regionMix(rw, RP.lift) + regionShape(x, z, rw, RL.lift) : wr[0]) + 70 * smoothstep(1500, 14000, coastInland(x) - z)); // the land rises slowly towards the interior (each kind of country in its own shape)
   if (r0 > 5500 && !noRim) h += LEGACY ? rimHeight0(x, z) : rimHeight(x, z);
   if (Math.abs(x - 205) < 700 && Math.abs(z + 220) < 700) h += out * riseHeight(x, z); // it has faded to nothing long before the box ends
   // western downs framing the other side of the bay

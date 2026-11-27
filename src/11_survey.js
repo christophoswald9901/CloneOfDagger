@@ -21,6 +21,7 @@ const SURVEY_EDGE = { x: -8800, z: -9000, bearing: 78, map: [-7400, -9800] };
 const SIGHT_AT = {
   greywatch: S => [S.x - 10, S.z - 12], stones: S => [S.x, S.z], mirrormere: S => [S.x + 274, S.z - 34.6], kestrel: S => [S.x - 24, S.z + 6],
   gullscar: () => [GULL.x, gullCoast(GULL.x) - 34], halewood: () => hallW(0, 0), // (the house itself, at the middle of its own frame)
+  fort: () => [FORT.x + FT.BP[3][0] * 0.7, FORT.z + FT.BP[3][1] * 0.7], // (the windmill on its north-east bastion)
 };
 // two summits of the western home mountains, known by name and on every map: the Spindle, the sharp horn 1.1 km west-north-west of the edge
 // start, and Harrow Fell, where the ridge north of it ends in a point (stand-in names until the story returns). Each is taken as the top of

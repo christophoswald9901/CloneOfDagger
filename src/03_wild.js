@@ -41,7 +41,7 @@ const WILD_KINDS = {
 };
 const FIELD_KEYS = [['fMeadow', 0.3], ['fWheat', 0.3], ['fBarley', 0.18], ['fPlowed', 0.16], ['fGreens', 0.06]];
 // the tree line rises inland with the land itself; the snow lies some way above it
-function wildTreeLine(x, z) { return 150 + 95 * smoothstep(1500, 14000, coastZ(x) - z) + 110 * smoothstep(2200, 500, rimNear(x, z)) + 24 * fbm(x / 260, z / 260, 2, 331); } // (and climbs the flanks of the great mountains at the world's edge)
+function wildTreeLine(x, z) { return 150 + 95 * smoothstep(1500, 14000, coastInland(x) - z) + 110 * smoothstep(2200, 500, rimNear(x, z)) + 24 * fbm(x / 260, z / 260, 2, 331); } // (and climbs the flanks of the great mountains at the world's edge)
 function wildSnowLine(x, z) { return wildTreeLine(x, z) + 210; }
 // how far the land is farmed: the hand-made fields carry on outwards and thin out over a kilometre or so, the city's farmland
 // rings it (but not where woods meet the surveyed square), and a belt runs along the tracks far out into the country
@@ -280,7 +280,7 @@ const Wild = {
     const farShader = (m, outer, pull = false) => { m.onBeforeCompile = sh => {
       sh.uniforms.wMask = this.maskU; sh.uniforms.wMaskO = this.maskO; sh.uniforms.wInner = this.innerU; sh.uniforms.wOuter = this.outerU;
       sh.vertexShader = 'varying vec2 vWxz; varying float vWy;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n { vec4 wp = modelMatrix * vec4(transformed, 1.0); vWxz = wp.xz; vWy = wp.y; }');
-      if (pull) sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', 'vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0); mvPosition.xyz *= 0.995; gl_Position = projectionMatrix * mvPosition;'); // (rivers drawn over the far ground win where it would hide them)
+      if (pull) sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', 'vec4 mvPosition = modelViewMatrix * vec4(transformed, 1.0); mvPosition.xyz *= 0.95; gl_Position = projectionMatrix * mvPosition;'); // (rivers and roads drawn over the far ground win where it would hide them: they are drawn a twentieth of their distance nearer, no more, as a polygon offset pulls ground seen at a grazing angle forward by hundreds of metres and showed it through walls)
       sh.fragmentShader = '#define FAR_HIGH\nuniform sampler2D wMask; uniform vec2 wMaskO; uniform vec4 wInner; uniform vec4 wOuter; varying vec2 vWxz; varying float vWy;\n' + sh.fragmentShader.replace('void main() {', `void main() {
         { vec2 mc = floor((vWxz + 352.0) / 176.0) - wMaskO; if (mc.x >= 0.0 && mc.y >= 0.0 && mc.x < 128.0 && mc.y < 128.0 && texture2D(wMask, (mc + 0.5) / 128.0).r > 0.5) discard; }
         ${outer === 1 ? 'if (vWxz.x > wInner.x + 64.0 && vWxz.y > wInner.y + 64.0 && vWxz.x < wInner.z - 64.0 && vWxz.y < wInner.w - 64.0) discard;' : outer === 2 ? 'if (vWxz.x > wOuter.x + 200.0 && vWxz.y > wOuter.y + 200.0 && vWxz.x < wOuter.z - 200.0 && vWxz.y < wOuter.w - 200.0) discard;' : ''}`).replace('#include <fog_fragment>', FAR_FOG); };
@@ -468,7 +468,7 @@ const Wild = {
   *genChunk(i, j) {
     const E = this.env, x0 = -TG.R + i * WC, z0 = -TG.R + j * WC, B = 3, S = WN + 1 + 2 * B, N1 = WN + 1;
     const c = { i, j, x0, z0, H: null, done: false, cols: [], fl: {} }; for (const k in WILD_KINDS) c.fl[k] = [];
-    const earthS = SITES.find(S => S.earth && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null;
+    const earthS = SITES.find(S => S.earth && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null, turfS = SITES.find(S => S.noRock && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null, sandS = SITES.find(S => S.sand && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null, rockS = SITES.find(S => S.rock && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null, mudS = SITES.find(S => S.mud && !siteOff(S, x0 + WC / 2, z0 + WC / 2, S.rb + 200)) || null;
     const Hb = new Float32Array(S * S);
     for (let b = 0; b < S; b++) { for (let a = 0; a < S; a++) Hb[b * S + a] = terrainRaw(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL); if (b % 6 === 5) yield; }
     // tracks cut into the slope: level across, their smoothed grade along, blending back into the ground over a few metres
@@ -541,7 +541,7 @@ const Wild = {
     }
     // bare rock over the whole bordered grid first, so scree can gather in aprons below it
     const RK = new Float32Array(S * S);
-    for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, gx = (Hb[k + 1] - Hb[k - 1]) / (2 * WCELL), gz = (Hb[k + S] - Hb[k - S]) / (2 * WCELL); RK[k] = best[k] < 16 ? 0 : wildRockiness(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, Hb[k], Math.hypot(gx, gz))[0] * (rD[k] < rW[k] + 70 ? smoothstep(rW[k] + 6, rW[k] + 70, rD[k]) : 1); if (earthS && RK[k] > 0 && earthS.earth(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, 1) > 0) RK[k] = 0; } // (no rock in a site's earthen bank)
+    for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, gx = (Hb[k + 1] - Hb[k - 1]) / (2 * WCELL), gz = (Hb[k + S] - Hb[k - S]) / (2 * WCELL); RK[k] = best[k] < 16 ? 0 : wildRockiness(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, Hb[k], Math.hypot(gx, gz))[0] * (rD[k] < rW[k] + 70 ? smoothstep(rW[k] + 6, rW[k] + 70, rD[k]) : 1); if (earthS && RK[k] > 0 && earthS.earth(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL, 1) > 0) RK[k] = 0; if (turfS && RK[k] > 0 && turfS.noRock(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL)) RK[k] = 0; } // (no rock in a site's earthen bank, nor on its turfed earthworks)
     let anyRock = false; for (let k = 0; k < S * S; k++) if (RK[k] > 0.01) { anyRock = true; break; }
     // rock does not lie in smooth sheets: its faces break into ledges and buttresses, a few metres at a time
     if (anyRock) for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, w = smoothstep(0.25, 0.85, RK[k]); if (w <= 0) continue; const x = x0 + (a - B) * WCELL, z = z0 + (b - B) * WCELL, h = Hb[k];
@@ -549,11 +549,11 @@ const Wild = {
       Hb[k] = h + w * (st * (smoothstep(0.3, 0.7, f) - f) + 3.2 * fbm(x / 13, z / 13, 2, 397)); }
     // where steep ground meets the sea the waves have cut a shelf: a strip of shingle and wet rock at the foot of the cliff, wide enough to walk
     { let anySea = false; for (let k = 0; k < S * S; k += 7) if (Hb[k] < SEA + 1) { anySea = true; break; }
-      if (anySea) { const T2 = Hb.slice(); for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, h = T2[k]; if (h < SEA - 5 || h > SEA + 9 || rD[k] < rW[k] + 30) continue;
+      if (anySea) { const T2 = Hb.slice(); for (let b = 1; b < S - 1; b++) for (let a = 1; a < S - 1; a++) { const k = b * S + a, h = T2[k]; if (h < SEA - 5 || h > SEA + 9 || rD[k] < rW[k] + 30 || (turfS && turfS.noRock(x0 + (a - B) * WCELL, z0 + (b - B) * WCELL))) continue; // (nor in a site's earthworks: the drop into a moat is no sea cliff)
         const sl = Math.hypot(T2[k + 1] - T2[k - 1], T2[k + S] - T2[k - S]) / (2 * WCELL), w = smoothstep(0.28, 0.55, sl) * smoothstep(SEA + 9, SEA + 4, h) * smoothstep(SEA - 5, SEA - 2, h); if (w > 0) Hb[k] = lerp(h, SEA + 0.45 + 0.1 * (h - SEA) + 0.25 * fbm((x0 + (a - B) * WCELL) / 9, (z0 + (b - B) * WCELL) / 9, 1, 399), w); } } }
     const hb = (a, b) => Hb[(b + B) * S + a + B];
     const apronAt = (a, b) => { if (!anyRock) return 0; const k0 = (b + B) * S + a + B, h0 = Hb[k0]; let m = 0; for (let dj = -3; dj <= 3; dj++) for (let di = -3; di <= 3; di++) { const aa = a + B + di, bb = b + B + dj; if (aa < 0 || bb < 0 || aa >= S || bb >= S) continue; const k = bb * S + aa; if (Hb[k] > h0 + 1.5) m = Math.max(m, RK[k] * (1 - Math.hypot(di, dj) / 4.5)); } return m * 0.9; };
-    const H = c.H = new Float32Array(N1 * N1), col = new Float32Array(N1 * N1 * 3), lit = new Float32Array(N1 * N1 * 3), colR = new Float32Array(N1 * N1 * 3), qR = new Float32Array(N1 * N1), qS = new Float32Array(N1 * N1), qW = new Float32Array(N1 * N1), qE = new Float32Array(N1 * N1), qF = new Float32Array(N1 * N1);
+    const H = c.H = new Float32Array(N1 * N1), col = new Float32Array(N1 * N1 * 3), lit = new Float32Array(N1 * N1 * 3), colR = new Float32Array(N1 * N1 * 3), qR = new Float32Array(N1 * N1), qS = new Float32Array(N1 * N1), qW = new Float32Array(N1 * N1), qE = new Float32Array(N1 * N1), qF = new Float32Array(N1 * N1), qD = new Float32Array(N1 * N1);
     this.chunks.set(this.key(i, j), c); // heights are known: tracks and plants below can sit on them
     for (let b = 0; b <= WN; b++) {
       for (let a = 0; a <= WN; a++) {
@@ -568,13 +568,16 @@ const Wild = {
         const SL = wildSnowLine(x, z), snow = smoothstep(SL, SL + 50, h + 12 * fbm(x / 40, z / 40, 2, 337)) * smoothstep(0.35, 0.75, 1 / Math.hypot(1, Math.hypot(gx, gz))); // snow lies on the high ledges, not the sheer faces
         const rt = (1 + 0.14 * fbm(x / 55, z / 55, 2, 338)) * (0.86 + 0.14 * Math.sin(h / 2.6 + 3 * fbm(x / 40, z / 40, 1, 339)) + 0.08 * fbm(x / 9, z / 9, 1, 340)); // rock weathers unevenly: large lighter and darker patches, and bands of ledges across the face
         colR[k] = sh[0] * cav * rt * lerp(0.94, 1.85, snow); colR[k + 1] = sh[1] * cav * rt * lerp(0.97, 1.87, snow); colR[k + 2] = sh[2] * cav * rt * lerp(1.03, 1.95, snow); // grey stone out here
-        const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 || RK[kb] === 0 && earthS && earthS.earth(x, z, 1) > 0 ? 0 : q[1];
+        const kb = (b + B) * S + a + B, q = wildRockiness(x, z, h, Math.hypot(gx, gz), apronAt(a, b)); qR[v] = smoothstep(0.3, 0.7, RK[kb]); qS[v] = best[kb] < 16 || RK[kb] === 0 && earthS && earthS.earth(x, z, 1) > 0 || turfS && turfS.noRock(x, z) ? 0 : q[1];
+        if (rockS) qR[v] = Math.max(qR[v], rockS.rock(x, z, h)); // (a site's own bare rock)
         qE[v] = (1 - smoothstep(3.5, 10, best[kb])) * smoothstep(0.22, 0.5, Math.hypot(gx, gz)); // the raw earth of a track's cutting
         if (earthS) qE[v] = Math.max(qE[v], earthS.earth(x, z, Math.hypot(gx, gz))); // (a site's own bare earth: the steep faces of a bank)
-        qF[v] = coastZ(x) - z < 220 ? smoothstep(220, 150, coastZ(x) - z) * smoothstep(SEA + 2.4 + 3.5 * Math.min(1, Math.hypot(gx, gz) * 1.5) + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
+        if (sandS) qD[v] = sandS.sand(x, z); // (and its own bare sand: dunes)
+        qF[v] = coastZ(x) - z < 220 && !(turfS && turfS.calm && turfS.calm(x, z)) ? smoothstep(220, 150, coastZ(x) - z) * smoothstep(SEA + 2.4 + 3.5 * Math.min(1, Math.hypot(gx, gz) * 1.5) + 0.8 * fbm(x / 25, z / 25, 1, 374), SEA + 0.4, h) : 0; // shingle and wrack along the foreshore
         if (BAR[kb] > 0) qF[v] = Math.max(qF[v], BAR[kb]);
         if (qE[v] < 0.6 && h > SEA + 2) { const fm = E.forestMask(x, z, h); if (fm > 0.4) qE[v] = Math.max(qE[v], 0.42 * smoothstep(0.4, 0.75, fm) * smoothstep(-0.35, 0.15, fbm(x / 14, z / 14, 2, 400))); } // leaf litter and bare earth under the trees, in patches
         { const kr = (b + B) * S + a + B, mw = 1.1 + 3.6 * smoothstep(-0.35, 0.45, fbm(x / 24, z / 24, 2, 372)); qW[v] = rD[kr] < 90 ? 1 - smoothstep(rW[kr] + 0.2, rW[kr] + mw, rD[kr]) : 0; } // wet mud along the banks, of uneven width
+        if (mudS) qW[v] = Math.max(qW[v], mudS.mud(x, z)); // (a site's own wet mud)
       }
       if (b % 8 === 7) yield;
     }
@@ -608,12 +611,13 @@ const Wild = {
       const steepUV = Math.max(...hs) - Math.min(...hs) > WCELL * 0.9 ? rockUV : flat; // on steep ground the texture wraps round the face instead of stretching
       if (sMin > 0.98) put('tScree', steepUV, colR); else put('tGrass', steepUV, col);
       if (sMax > 0.02 && sMin <= 0.98) put('wScreeO', flat, colR, qS);
+      if (sandS && Math.max(...vs.map(v => qD[v])) > 0.02) put('wSandO', flat, lit, qD);
       if (Math.max(...vs.map(v => qE[v])) > 0.02) put('wEarthO', flat, col, qE);
       if (Math.max(...vs.map(v => qF[v])) > 0.02) put('wScreeO', flat, colR, qF);
       if (rMax > 0.02) put('wRockO', rockUV, colR, qR);
       if (Math.max(...vs.map(v => qW[v])) > 0.02 && Math.min(...vs.map(v => qW[v])) < 0.97) put('wMudO', flat, col, qW); // only the banks: under the water it would show through from afar
       // the sea's edge: wet sand, and a fringe of foam where the water is shallow
-      if (Math.min(...hs) < SEA + 0.1 && Math.max(...hs) > SEA - 1.2 && coastZ(x + 2) - (z + 2) < 200) { const g = grp('wFoam'); g.rgba = true; const base = g.p.length / 3;
+      if (Math.min(...hs) < SEA + 0.1 && Math.max(...hs) > SEA - 1.2 && coastZ(x + 2) - (z + 2) < 200 && !(turfS && turfS.calm && turfS.calm(x + 2, z + 2))) { const g = grp('wFoam'); g.rgba = true; const base = g.p.length / 3;
         CORN.forEach(([di, dj], q) => { const vx = x + di * WCELL, vz = z + dj * WCELL, dep = SEA - hs[q]; g.p.push(vx, SEA + 0.03, vz); g.u.push(vx / 3 + 0.3 * Math.sin(vz / 5), vz / 3); g.c.push(1.8, 1.84, 1.84, dep < -0.05 ? 0 : smoothstep(0.35, 0.02, dep) * 0.8); }); // a band a few metres wide along the waterline
         g.i.push(base, base + 3, base + 1, base, base + 2, base + 3); }
     }
@@ -628,7 +632,7 @@ const Wild = {
     }
     yield;
     const group = c.group = new THREE.Group();
-    for (const [k, g] of groups) { const m = groupMesh(g, E.mats[k], x0, z0); m.renderOrder = { wMudO: 1, wEarthO: 1, wScreeO: 2, wRockO: 3, wFoam: 4 }[k] || 0; group.add(m); }
+    for (const [k, g] of groups) { const m = groupMesh(g, E.mats[k], x0, z0); m.renderOrder = { wMudO: 1, wEarthO: 1, wSandO: 1, wScreeO: 2, wRockO: 3, wFoam: 4 }[k] || 0; group.add(m); }
     // tracks through this chunk
     const gb = new GB();
     for (const { R, q0, q1 } of rivRuns) { // the water: one ribbon along the river, level across, always falling downstream
@@ -765,7 +769,7 @@ const Wild = {
         if (qw > 0.3) { if (qw < 0.97 && rng.chance(0.55)) fl.reeds.push([x, h - 0.1, z, rng.range(0.8, 1.2)]); continue; } // reeds along the banks
         { const kb = (Math.round((z - z0) / WCELL) + B) * S + Math.round((x - x0) / WCELL) + B, e = rD[kb] - rW[kb]; if (e > 1.2 && e < 13 && rW[kb] > 1 && !inField(x, z, 2.5) && !nearTrack(x, z, 4) && rng.chance(0.5 * (1 - 0.5 * smoothstep(6, 13, e)) * (0.4 + smoothstep(-0.2, 0.3, fbm(x / 30, z / 30, 1, 385))))) { // alders and willow scrub along the water
           if (rng.chance(0.45)) tree(regionW(x, z) ? (rng.chance(0.75) ? 'willow' : 'oak' + rng.int(0, 2)) : rng.chance(0.6) ? 'oak' + rng.int(0, 2) : 'cypress', x, z, h, rng.range(0.65, 1.0)); else fl[rng.chance(0.5) ? 'bush' : 'bushB'].push([x, h - 0.1, z, rng.range(0.7, 1.1)]); continue; } }
-        if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25)) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
+        if (coastZ(x) - z < 90 && h < SEA + 8) { if (rng.chance(0.25) && !(st && st.w > 0.5 && Sites.clearAt(x, z, 1))) fl.tufts.push([x, h - 0.04, z, rng.range(0.7, 1.1)]); continue; } // no trees on the shore: dune grass
         const n = terrainNormal(x, z), sl = terrainSlope(x, z);
         let pick = wildPlant(x, z, h, sl, n, rng, E.forestMask(x, z, h), DENS, qs, wildCult(x, z), wildHeath(x, z, h), rng !== rngW);
         if (pick && !pick.small && openRoad) continue;
@@ -841,7 +845,7 @@ const Wild = {
   /* ---------- the far ground: coarse ground out to the edge of sight, its colour in its vertices, rivers and tracks painted on, woods as single trees ---------- */
   *genFar(L, cx, cz) {
     const E = this.env, C = L.C, n = Math.round(2 * L.R / C), S = n + 3, M = this.mean, inner = !!L.inner;
-    const earthF = SITES.find(S => S.earth && !siteOff(S, cx, cz, L.R + S.rb)) || null;
+    const earthF = SITES.find(S => S.earth && !siteOff(S, cx, cz, L.R + S.rb)) || null, turfF = SITES.find(S => S.noRock && !siteOff(S, cx, cz, L.R + S.rb)) || null;
     const ox = Math.round(cx / L.snap) * L.snap - L.R, oz = Math.round(cz / L.snap) * L.snap - L.R; // snapped, so the fine ring's squares are the chunks' squares
     const Hb = new Float32Array(S * S);
     for (let b = 0; b < S; b++) { for (let a = 0; a < S; a++) Hb[b * S + a] = terrainRaw(ox + (a - 1) * C, oz + (b - 1) * C); if (b % 3 === 2) yield; }
@@ -854,8 +858,8 @@ const Wild = {
         const gx = (hb(a + 1, b) - hb(a - 1, b)) / (2 * C), gz = (hb(a, b + 1) - hb(a, b - 1)) / (2 * C);
         const nn = v3norm([-gx * 2.4, 1, -gz * 2.4]), t = E.tintOf(x, z, h, nn), k = (b * (n + 1) + a) * 3;
         const avg = (hb(a - 1, b) + hb(a + 1, b) + hb(a, b - 1) + hb(a, b + 1)) / 4, cav = clamp(1 + (h - avg) * 0.03, 0.72, 1.1), sh = terrainShade(nn).map(v => v * cav);
-        let [qr, qs] = wildRockiness(x, z, h, Math.hypot(gx, gz) * (inner ? 1.2 : 1.3)); const qe = earthF ? earthF.earth(x, z, Math.hypot(gx, gz) * 1.6) : 0; if (qe > 0) { qr *= 1 - qe; qs *= 1 - qe; } const qg = 1 - qr - qs; // (a site's earthen bank: bare earth, not rock)
-        const sand = isBeach(x, z, h) && Math.hypot(gx, gz) < 0.3;
+        let [qr, qs] = wildRockiness(x, z, h, Math.hypot(gx, gz) * (inner ? 1.2 : 1.3)); const qe = earthF ? earthF.earth(x, z, Math.hypot(gx, gz) * 1.6) : 0; if (qe > 0) { qr *= 1 - qe; qs *= 1 - qe; } if (turfF && turfF.noRock(x, z)) qr = qs = 0; qr = Math.max(qr, siteRockAt(x, z, h)); const qg = 1 - qr - qs; // (a site's earthen bank: bare earth, not rock; its turfed earthworks: grass)
+        const sand = (isBeach(x, z, h) || siteSand(x, z) > 0.5) && Math.hypot(gx, gz) < 0.3;
         const SL = wildSnowLine(x, z), snow = smoothstep(SL, SL + 50, h) * smoothstep(0.35, 0.75, nn[1]), sn = [1.85, 1.87, 1.95];
         // farmland reads from afar as a patchwork of strips
         const cult = sand || qr > 0.3 ? 0 : wildCult(x, z); let fc = null;

@@ -38,7 +38,15 @@ function siteWeight(x, z) { let w = 0; for (const S of SITES) w = Math.max(w, si
 // as siteWeight, but leaving out the sites whose country is farmed like any other (the towns: their own fields reach out over the plain)
 function siteWild(x, z) { let w = 0; for (const S of SITES) if (!S.farmed) w = Math.max(w, siteW(S, x, z)); return w; }
 // rivers are not planned through a site or the land blending into it
-function siteZone(x, z, m = 0) { for (const S of SITES) if (!siteOff(S, x, z, S.rb + m + 260) && siteDist(S, x, z) < S.rb + m) return true; return false; }
+// (QUIET: the home country as it lies without the landmarks added after its plan was settled, S.quiet: what the plan compares itself with, so that it changes only near them)
+let QUIET = 0;
+function siteZone(x, z, m = 0) { for (const S of SITES) if (!(QUIET && S.quiet) && !siteOff(S, x, z, S.rb + m + 260) && siteDist(S, x, z) < S.rb + m) return true; return false; }
+
+// a site's own colour for the ground (a multiplier), its own bare rock and wet mud (0..1)
+function siteTint(x, z, h) { for (const S of SITES) if (S.tint && !siteOff(S, x, z, S.rb)) { const m = S.tint(x, z, h); if (m) return m; } return null; }
+function siteRockAt(x, z, h) { let w = 0; for (const S of SITES) if (S.rock && !siteOff(S, x, z, S.rb)) w = Math.max(w, S.rock(x, z, h)); return w; }
+// bare sand a site lays of its own, away from the beach (its dunes): how much, 0..1
+function siteSand(x, z) { let w = 0; for (const S of SITES) if (S.sand && !siteOff(S, x, z, S.rb)) w = Math.max(w, S.sand(x, z)); return w; }
 
 /* ---------------- the fixed ground ---------------- */
 const angDiff = (a, b) => { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return Math.abs(d); };
@@ -85,7 +93,8 @@ function kestrelH(x, z) {
 // Gullscar: a headland of sheer cliffs pushing south into the bay; the coast itself is fixed for some way either side
 const GULL = { x: 5400 };
 function gullCoast(x) { return 360 + 240 * Math.exp(-Math.pow((x - GULL.x) / 190, 2)) + 14 * fbm(x / 70, 4.4, 2, 941) + 40 * fbm(x / 600, 2.2, 2, 942); }
-function siteCoast(x, z) { const w = 1 - smoothstep(650, 1600, Math.abs(x - GULL.x)); return w > 0 ? lerp(z, gullCoast(x), w) : z; }
+function siteCoast(x, z) { let w = 1 - smoothstep(650, 1600, Math.abs(x - GULL.x)); if (w > 0) return lerp(z, gullCoast(x), w);
+  if (QUIET) return z; w = 1 - smoothstep(650, 1600, Math.abs(x - FORT.x)); return w > 0 ? lerp(z, fortCoast(x), w) : z; } // (and the point Fort Merrow stands on: src/03_sites_star.js)
 function gullscarH(x, z) {
   const d = gullCoast(x) - z;
   if (d < 0) return SEA - 0.3 - Math.min(9, -d * 0.09);
@@ -112,6 +121,7 @@ function siteForest(S, x, z, h) {
   return 0;
 }
 function siteHeath(S, x, z, h) {
+  if (S.heath) return S.heath(x, z, h);
   const r = Math.hypot(x - S.x, z - S.z), n = fbm(x / 90, z / 90, 2, 955);
   switch (S.id) {
     case 'greywatch': return 0.6 * smoothstep(0.0, 0.3, n) * (1 - smoothstep(60, 140, r));
@@ -123,17 +133,33 @@ function siteHeath(S, x, z, h) {
   return 0;
 }
 
+// masts and staffs, [x, z, y0, y1, width]: upright strips turned to the camera that never come out narrower than a pixel, so that from afar a
+// ship keeps its masts and a flag its staff (close by they lie inside the pole itself)
+function sitePoles(area, list) {
+  const p = [], s = [], w = [], idx = [], geo = new THREE.BufferGeometry(), pxA = { value: 0.005 }, size = new THREE.Vector2();
+  for (const [x, z, y0, y1, pw] of list) { const b = p.length / 3; for (const [y, sd] of [[y0, -0.5], [y0, 0.5], [y1, 0.5], [y1, -0.5]]) { p.push(x, y, z); s.push(sd); w.push(pw); } idx.push(b, b + 1, b + 2, b, b + 2, b + 3); }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(p, 3)); geo.setAttribute('side', new THREE.Float32BufferAttribute(s, 1)); geo.setAttribute('pw', new THREE.Float32BufferAttribute(w, 1)); geo.setIndex(idx); geo.computeBoundingSphere();
+  const mat = new THREE.MeshBasicMaterial({ color: 0x35261b, side: THREE.DoubleSide, fog: true }); mat.userData.base = mat.color.clone(); area.tintMats.push(mat);
+  mat.onBeforeCompile = sh => { sh.uniforms.pxA = pxA; sh.uniforms.wYaw = Wild.yawU; sh.vertexShader = 'attribute float side; attribute float pw; uniform float pxA; uniform float wYaw;\n' + sh.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position; { float ww = max(pw, distance(position, cameraPosition) * pxA) * side; transformed.x += cos(wYaw) * ww; transformed.z -= sin(wYaw) * ww; }'); };
+  mat.customProgramCacheKey = () => 'sitePoles';
+  const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; m.onBeforeRender = (r, sc, cam) => { r.getSize(size); if (cam.fov && size.y) pxA.value = 2 * Math.tan(cam.fov * Math.PI / 360) / size.y; };
+  area.scene.add(m); return m;
+}
+
 /* ---------------- the buildings, built once and kept: each can be seen from far off ---------------- */
 const Sites = {
   group: null, cols: [], glows: [], spawned: {}, lights: [], folk: {},
   build(area, mats) {
     const gb = new GB(), saved = area.colliders; area.colliders = [];
     const H = (x, z) => terrainRaw(x, z);
-    for (const S of SITES) if (SITE_BUILD[S.id]) SITE_BUILD[S.id](gb, S, H, area);
+    for (const S of SITES) if (SITE_BUILD[S.id] && !S.own) SITE_BUILD[S.id](gb, S, H, area);
+    // a landmark with meshes of its own (S.own: how near it and its small detail are drawn): left out when far off or out of sight
+    for (const S of SITES) if (SITE_BUILD[S.id] && S.own) { const g = new GB(); S.near = new GB(); SITE_BUILD[S.id](g, S, H, area); S.lod = [g, S.near].map((b, k) => { const o = b.build(mats); o.matrixAutoUpdate = false; o.visible = false; area.scene.add(o); return [o, S.own[k]]; }); S.near = null; }
     this.cols = area.colliders; area.colliders = saved;
     const G2 = area.grid; for (const col of this.cols) for (let ix = Math.floor(col.x0 / CELL); ix <= Math.floor(col.x1 / CELL); ix++) for (let iz = Math.floor(col.z0 / CELL); iz <= Math.floor(col.z1 / CELL); iz++) { const k = ix * 10007 + iz; let l = G2.get(k); if (!l) G2.set(k, l = []); l.push(col); }
     this.group = gb.build(mats); this.group.traverse(o => { o.matrixAutoUpdate = false; o.updateMatrix(); }); area.scene.add(this.group);
-    for (const S of SITES) for (const [fx, fy, fz, fa] of S.flags || []) makeFlag(area, TEX.bannerRed, fx, fy, fz, fa, 2.4, 1.4);
+    for (const S of SITES) for (const [fx, fy, fz, fa, fw, fh] of S.flags || []) makeFlag(area, TEX.bannerRed, fx, fy, fz, fa, fw || 2.4, fh || 1.4);
+    for (const S of SITES) if (S.poles && S.poles.length) { const m = sitePoles(area, S.poles); if (S.lod) { m.visible = false; S.lod.push([m, 1500]); } } // (out in the haze they would only show as its colour)
     for (const T of TOWNS) T.buildLasting(area, mats); // the towns' water, lamps, silhouettes and doors
     if (this.glows.length) { const b = new SpriteBatch(area, TEX.glow, 3.2, 3.2, this.glows, { additive: true, lit: false, fog: false }); this.glowMat = b.mat; }
   },
@@ -147,6 +173,7 @@ const Sites = {
   near(x, z) { if (!this.hash) { this.hash = new SHash(32); for (const c of this.cols) this.hash.add(c, [c.x0, c.z0, c.x1, c.z1]); } return this.hash.query(x - 6, z - 6, x + 6, z + 6); },
   // the player comes within sight of a site: it goes on the map
   update(x, z) {
+    for (const S of SITES) if (S.lod) { const d = Math.hypot(x - S.x, z - S.z); for (const [o, r] of S.lod) o.visible = d < r; }
     if (!G.player || G.area !== G.city) return null;
     const found = G.flags.found || (G.flags.found = {}); let hit = null;
     for (const S of SITES) if (!found[S.id] && (S.dist ? S.dist(x, z) : Math.hypot(x - S.x, z - S.z)) < S.discR) { found[S.id] = dayOf(G.time) + 1; hit = S; msg(`You have found ${S.name}: ${S.blurb}.`, 'district'); bigMsg(S.name.replace(/^the /, 'The '), 2.2); }
