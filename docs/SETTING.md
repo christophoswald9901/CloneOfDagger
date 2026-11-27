@@ -71,7 +71,7 @@ Most of the sections below describe one side of such a pair.
 
 - What's in the game now leans medieval, and that's fine.
 - On 2026-11-12 every Elder Scrolls name and term was replaced with a stand-in, chosen to fit these notes rather than as decisions:
-  - **Places:** Daggerfall became **Aldhaven**, a port on **Merrow Bay**; Vellaro and Brakkenburg are distant cities in rumours.
+  - **Places:** Daggerfall became **Aldhaven**, a port on **Merrow Bay**; Vellaro and Brakkenburg are distant cities in rumours. **Fort Merrow** (added 2026-11-19) is the star fort on the western point of the bay; who garrisons it is left open.
   - **Faith:** the Temple of Arkay became the **Church of Saint Hallam**, with its rector and churchyard.
   - **Learning and arms:** the Mages Guild became the **Philosophers' Society**, whose "spells" are its arts and whose magicka is **spirit**; the Fighters Guild became the **Fencing School**.
   - **The parked story:** the Emperor became the **Stadtholder**, King Lysandus **King Aldwin** (the ghost), King Gothryd **King Ottmar**, Queen Aubk-i **Queen Isabeau**, the court mage a **court philosopher**, the necromancer **Corvin Ash**, and the soul gem a **black stone**.

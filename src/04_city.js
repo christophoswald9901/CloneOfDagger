@@ -84,12 +84,14 @@ const CITY_MATS = {
   // the terrain itself
   farRock: { tex: 'scree' }, tGrass: { tex: 'grass' }, tGrassFade: { tex: 'grass', po: 1, transparent: true }, tDirt: { tex: 'yard' }, tSand: { tex: 'sand' }, tRock: { tex: 'cliff' }, tCrag: { tex: 'crag' }, crag: { tex: 'crag' }, farGround: { tex: 'grass' }, tScree: { tex: 'scree' },
   // the generated wild: its horizon mesh and the open sea
-  wFar: { tex: 'farNoise' }, wFarO: { tex: 'farNoise' }, wFarR: { tex: 'farNoise', po: 8 }, wFarRO: { tex: 'farNoise', po: 8 }, wFarH: { tex: 'farNoise' }, wSea: { tex: 'water', po: -2 }, boulder: { tex: 'cliff' },
-  wScreeO: { tex: 'scree', po: 1, transparent: true }, wEarthO: { tex: 'dirt', po: 1, transparent: true }, wRockO: { tex: 'cliff', po: 2, transparent: true }, wMudO: { tex: 'mud', po: 1, transparent: true }, wStream: { tex: 'water', double: true }, wFoam: { tex: 'farNoise', transparent: true, po: 1 },
+  wFar: { tex: 'farNoise' }, wFarO: { tex: 'farNoise' }, wFarR: { tex: 'farNoise' }, wFarRO: { tex: 'farNoise' }, wFarH: { tex: 'farNoise' }, wSea: { tex: 'water', po: -2 }, boulder: { tex: 'cliff' },
+  wScreeO: { tex: 'scree', po: 1, transparent: true }, wEarthO: { tex: 'dirt', po: 1, transparent: true }, wSandO: { tex: 'sand', po: 1, transparent: true }, wRockO: { tex: 'cliff', po: 2, transparent: true }, wMudO: { tex: 'mud', po: 1, transparent: true }, wStream: { tex: 'water', double: true }, wFoam: { tex: 'farNoise', transparent: true, po: 1 },
   // layers laid over it: polygon offset decides what is drawn on top (overlays < roads < squares)
   gDirt: { tex: 'yard', po: 1 }, gSand: { tex: 'sand', po: 1 }, gGrass: { tex: 'meadow', po: 1 },
   fWheat: { tex: 'wheat', po: 1 }, fBarley: { tex: 'barley', po: 1 }, fPlowed: { tex: 'plowed', po: 1 }, fGreens: { tex: 'greens', po: 1 }, fMeadow: { tex: 'meadow', po: 1 },
   rCobble: { tex: 'cobble', po: 2 }, rFlag: { tex: 'setts', po: 2 }, rGravel: { tex: 'gravel', po: 2 }, rDirt: { tex: 'dirt', po: 2 }, rDirtCart: { tex: 'cart', po: 2 }, rMud: { tex: 'mud', po: 2 }, rAve: { tex: 'paveLight', po: 2 },
+  // the same for floors built well above the ground (nothing pulled forward: seen edge-on from afar, what is pulled forward shows through a wall before it)
+  gravelN: { tex: 'gravel' }, settsN: { tex: 'setts' }, dirtN: { tex: 'dirt' }, mudN: { tex: 'mud' },
   // soft margins of the unpaved ways, and the kerbs that edge the paved ones
   rGravelF: { tex: 'gravel', po: 2, transparent: true, double: true }, rDirtF: { tex: 'dirt', po: 2, transparent: true, double: true }, rMudF: { tex: 'mud', po: 2, transparent: true, double: true }, kerb: { tex: 'kerb', po: 3 },
   sqPlaza: { tex: 'paveLight', po: 3 }, sqCobble: { tex: 'cobble', po: 3 }, sqFlag: { tex: 'flag', po: 3 },
@@ -754,6 +756,7 @@ function buildCity() {
     if (Math.max(Math.abs(x), Math.abs(z)) <= TG.R) { const bare = smoothstep(118, 165, h); r = lerp(r, 1.05, bare); g = lerp(g, 1.0, bare); b = lerp(b, 1.02, bare); } // thin turf and bare rock above the tree line
     else { const TL = wildTreeLine(x, z), turf = smoothstep(TL - 20, TL + 70, h), bare = smoothstep(TL + 110, TL + 230, h); r = lerp(lerp(r, 1.1, turf * 0.7), 1.02, bare); g = lerp(lerp(g, 0.97, turf * 0.7), 0.98, bare); b = lerp(lerp(b, 0.74, turf * 0.7), 0.96, bare); } // out in the country: tawny alpine turf, then bare stone
     const SL = Math.max(Math.abs(x), Math.abs(z)) <= TG.R ? 250 : wildSnowLine(x, z), snow = smoothstep(SL, SL + 50, h) * smoothstep(0.35, 0.7, n[1]); if (snow > 0) { r = lerp(r, 1.9, snow); g = lerp(g, 1.92, snow); b = lerp(b, 2.0, snow); }
+    { const st = siteTint(x, z, h); if (st) { r *= st[0]; g *= st[1]; b *= st[2]; } } // (a landmark's own ground: its glacis, dunes, heath)
     const wear = wearAt(x, z); r = lerp(r, 1.1, wear); g = lerp(g, 0.98, wear); b = lerp(b, 0.78, wear);
     if (insideCity(x, z, -3)) { r = 1; g = 1; b = 0.96; }
     if (n[1] < 0.72 && Math.hypot(x, z + 125) < 75) { r = 0.92; g = 0.9; b = 0.88; } // the castle rock: grey limestone, a shade darker than the walls
