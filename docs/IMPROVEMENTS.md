@@ -65,6 +65,15 @@ In `src/02_music.js` (`Music`) a new piece gets a fresh bus whose fade gain is a
 
 Ideas: a fade-in on the bus at the start of each piece (several seconds), a longer fade-out on a change of place, and pieces that open quietly. Check by ear with `tools/music.py`.
 
+### 18. The Giant's Ridge is two to three times longer than it needs to be (2026-11-27)
+Keep its height, so it stays as spectacular as it is, and shorten mostly the parts that don't stand high. Today (`src/03_sites_ridge.js`, `docs/EMBANKMENT.md`, data in `docs/embankment_data.json`) the bank is 2000 m long, on a fixed line of 70 points from (-6614, -652) to (-7966, -2100), with the valley round it fixed too. How high it stands over the land beside it, from the south-east end:
+
+| along the bank | 0–350 m | 350–560 m | 560–1500 m | 1500–1900 m | 1900–2000 m |
+| --- | --- | --- | --- | --- | --- |
+| height | 0 → 10 m | 10 → 15 m | 20 → 33 m | 18 → 10 m | 10 → 0 m |
+
+So it stands 20 m or more for about 950 m, 15 m or more for about 1100 m and under 10 m for about 450 m in all. Two to three times shorter would be about 700 to 1000 m: cutting the low ends alone gets to about 1.1 km, so the high middle would get somewhat shorter too, or the valley's sides steeper or closer together, which means changing its fixed ground as well as its line. The ridge was cut from seed 0's west road and the home plan was redrawn round it, so a new line changes the home plan: check with `tools/digest.py --diff`, `tools/ridgewalk.py 0 1 2` and `tools/invariants.py`.
+
 ## Done
 
 - **3. The world should not end** (2026-11-12): the world goes on as a lattice of countries, with roads running out of each. Merged in PR #3, notes in `docs/ENDLESS.md`.
