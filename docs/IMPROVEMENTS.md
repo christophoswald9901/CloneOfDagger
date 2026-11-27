@@ -97,6 +97,11 @@ The user found this where the country's generation went wrong. They find it very
 
 **What it means for the build.** The raised stream comes from the river's water level being kept while the land under it falls away, so today it exists only by chance and only in these spots. Fixing the river fault (in `src/03_water.js` or the land) would remove it from here, so the place should be made on purpose, as its own landmark or kind of place, before such a fix. The scripts used for the search and the pictures are in the session's scratchpad and not kept: the search reads `World.planBox`, each country's `ways.tracks` (with `T.h`), `ways.bridges` and `land.rivers` (`P`, `wl`, `w`) against `terrainRaw`.
 
+### 20. Guards above all, and other people too, need clothing of their period (2026-11-27)
+The game is set in 1652. Today (`LOOKS` and `drawHuman` in `src/01_textures.js`) the city's guard wears what a medieval guard would: a mail shirt, a red tabard with a gold cross, a round steel cap and a spear. The people come from `randomLook` and `lookByWealth` (`src/04_city.js`), built from parts such as shirt, trousers, boots, robe, hood, cape, apron and hat. The robe, hood and tabard read as medieval more than seventeenth-century. Fort Merrow's sentry, gunner and sergeant (`src/03_sites_star.js`) get only a hat, a red coat and breeches.
+
+Ideas, for a town watch and a garrison of about 1650: a broad-brimmed felt hat or an open steel helmet (morion or cabasset), a buff leather coat, a sash, a bandolier of powder charges, breeches with stockings and shoes, a halberd or partisan for the watch and a musket for the garrison. Townsmen in doublet or long coat with a falling collar, breeches and stockings; women in bodice and skirt, with a white cap or coif, a collar or kerchief and an apron. The sprites are small, so each piece must read at a few pixels: a hat's brim, a collar, a sash. Any colours or badges meant to mark a city or a country tie in with the setting, which is the user's to decide (`docs/SETTING.md`).
+
 ## Done
 
 - **3. The world should not end** (2026-11-12): the world goes on as a lattice of countries, with roads running out of each. Merged in PR #3, notes in `docs/ENDLESS.md`.
