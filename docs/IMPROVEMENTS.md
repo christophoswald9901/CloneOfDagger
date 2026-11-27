@@ -74,6 +74,29 @@ Keep its height, so it stays as spectacular as it is, and shorten mostly the par
 
 So it stands 20 m or more for about 950 m, 15 m or more for about 1100 m and under 10 m for about 450 m in all. Two to three times shorter would be about 700 to 1000 m: cutting the low ends alone gets to about 1.1 km, so the high middle would get somewhat shorter too, or the valley's sides steeper or closer together, which means changing its fixed ground as well as its line. The ridge was cut from seed 0's west road and the home plan was redrawn round it, so a new line changes the home plan: check with `tools/digest.py --diff`, `tools/ridgewalk.py 0 1 2` and `tools/invariants.py`.
 
+### 19. A new kind of place, after a fault in the generated country (2026-11-27)
+![The hump as the user found it](img/mound.png)
+
+The user found this where the country's generation went wrong. They find it very memorable and mysterious, and it is to be the template for a new place.
+
+**What the user saw.** A dirt track runs straight into a tall, narrow hump of bare brown earth and up its face to two small posts on the top: the rails of a timber bridge. From the bridge a stream is seen flowing along the top of the land between steep green banks. In the first picture those banks are the row of steep, peaked green hills behind the hump, and the blue line above them along the horizon is the stream's water, seen edge-on.
+
+**The user's idea.**
+- The raised banks curve inward. That would be a natural place for an old earthen fortress, now used as the marketplace of a nearby village, or with several villages close by.
+- The walls are jagged and peaked, and that is a really nice look to keep.
+- It should be built away from the main map first, until the place and its immediate surroundings are built, look nice and feel authentic. Only then is it put back into the game world. (The user wrote "You were built away from the main map"; read here as "it should be built away from the main map".)
+
+![Where it is: the red arrow on the left](img/mound-map.webp)
+
+**Where it is.** Seed 0 (the artifact has no `?seed=`), in the country west of the home country (lattice cell -1, 1), about 17.5 km west of Aldhaven and 7 km beyond the home mountains. Found with a headless search on 2026-11-27:
+- **The stream** is river 3 of that country, a tributary that joins river 0 (the larger river towards the coast) at (-17627, -104). Upstream it crosses a plateau with its water at 32 m, the land 0.5 m above it. Where the plateau ends, near (-17320, -879), the land falls to 14–18 m, but the water keeps its level: for 945 m, from (-17320, -879) to (-17611, -116), it runs up to 18 m above the land beside it (highest at (-17501, -659)). It curves west, then south, and drops about 12 m to river 0's level only at the join. Its banks are drawn as steep, jagged slopes from the land up to the water.
+- **The two humps** are where two lanes cross it on timber bridges. A bridge's deck is set 1.6 to 5 m above the water (`deck` in `waysFromGen`, `src/03_wild.js`), so each lane climbs about 16 m on a bank of bare earth some 75 m long: lane 17 at (-17441, -754), deck at 33 m on land at 17.6 m (most likely the one in the user's picture, on their route), and lane 78 at (-17473, -577), deck at 32.3 m on land at 14.8 m.
+- **The same fault elsewhere** (rivers more than 3 m above the land for over 150 m, in the same search): cell (-1, 1) river 5 near (-17589, -6876), 604 m long and up to 54 m high, and river 4 near (-17525, -5511), 313 m, 19 m; cell (-2, 1) rivers 4, 1 and 5 near (-26700, -950), 420–474 m long and 13–18 m high, where three streams meet. So the look can be studied in more than one place.
+
+![From the air: the stream on its raised bank, and the lanes' humps where they cross it](img/mound-air.png)
+
+**What it means for the build.** The raised stream comes from the river's water level being kept while the land under it falls away, so today it exists only by chance and only in these spots. Fixing the river fault (in `src/03_water.js` or the land) would remove it from here, so the place should be made on purpose, as its own landmark or kind of place, before such a fix. The scripts used for the search and the pictures are in the session's scratchpad and not kept: the search reads `World.planBox`, each country's `ways.tracks` (with `T.h`), `ways.bridges` and `land.rivers` (`P`, `wl`, `w`) against `terrainRaw`.
+
 ## Done
 
 - **3. The world should not end** (2026-11-12): the world goes on as a lattice of countries, with roads running out of each. Merged in PR #3, notes in `docs/ENDLESS.md`.
