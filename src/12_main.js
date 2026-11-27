@@ -424,6 +424,7 @@ function frame(now) {
     if (G.mapOpen && Math.floor(G.clock * 8) !== Math.floor((G.clock - dt) * 8)) MapView.draw(true); // (the objectives pulse)
     updateWorld(dt);
   }
+  Survey.syncFlags(); // (the planted flags, made again when the game's list of them changes)
   MapView.work(G.state === 'play' ? 3 : 6); // (the map's pictures of the land, made a little each frame from the title screen on: some 1.6 s of work)
   updateTextHUD(dt); Touch.update();
   if (G.area && !G.mapOpen) { // (the map covers the whole screen: the world behind it is not drawn while it is open)
