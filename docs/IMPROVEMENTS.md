@@ -86,6 +86,14 @@ The user found this where the country's generation went wrong. They find it very
 - The walls are jagged and peaked, and that is a really nice look to keep.
 - It should be built away from the main map first, until the place and its immediate surroundings are built, look nice and feel authentic. Only then is it put back into the game world. (The user wrote "You were built away from the main map"; read here as "it should be built away from the main map".)
 
+**Decided by the user (2026-11-27).**
+- **A single spot**, not a kind of place the generator makes elsewhere.
+- **Several villages share it**: the market in the old fortress serves the villages round about, not one village.
+- **The stream is part of an irrigation system.** The model would be the floated water meadows of 17th-century England: a main carrier taken off the river upstream at a weir and a hatch, carried on its own bank at a level above the meadows, feeding small carriers along the ridges of the meadow beds, with drains in the furrows between and hatches at the branches to flood the grass early in the year. The raised stream becomes that main carrier, and its jagged, peaked banks stay.
+- In talk the place has been called after Yarnbury Castle, a real hillfort whose sheep fair was one of the examples. In the game it gets a stand-in name of its own.
+
+**Next to be worked on**, as the user said on 2026-11-27 (not started; waiting for the user's go).
+
 ![Where it is: the red arrow on the left](img/mound-map.webp)
 
 **Where it is.** Seed 0 (the artifact has no `?seed=`), in the country west of the home country (lattice cell -1, 1), about 17.5 km west of Aldhaven and 7 km beyond the home mountains. Found with a headless search on 2026-11-27:
