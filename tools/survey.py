@@ -3,8 +3,10 @@ Starts a game at each of the three starts (Aldhaven, Corrinvale, the edge of the
 map gives away and any errors. At the edge it takes a bearing to each landmark in sight with an exact needle, lays each on the sheet as a
 player would (the ruler's pin in the landmark, the ruler turned to the bearing, Draw line), and reports where the lines cross against
 where the player really stands: a check of the whole chain from heading to bearing to ruler to line. It also turns and takes a bearing at
-once with the swinging needle, and again after it settles, and checks the touch buttons. With OUTDIR it photographs the start menu, each
-start, the view through the spyglass at each landmark, the sheet with its lines and the debug panel."""
+once with the swinging needle, and again after it settles, and checks the touch buttons. It plants flags with B (and C for the colour),
+pulls one up, and checks that a save and a load keep them; it puts symbols on the sheet by mouse and by touch, drags one, rubs one
+out, and lets the ruler's pin settle in a flag symbol. With OUTDIR it photographs the start menu, each start, the view through the
+spyglass at each landmark, the sheet with its lines, its symbols and the debug panel."""
 import asyncio, sys, os, json
 sys.path.insert(0, os.path.dirname(__file__)); from cdp import CDP
 OUT = sys.argv[1] if len(sys.argv) > 1 else None
@@ -101,13 +103,75 @@ async def main():
     print('needle', sw)
     # touch: the survey buttons in place of Use and Jump
     tb = await c.ev("""(()=>{const g=__game,T=g.Touch;T.enable(true);T.sig='';T.update();const B=T.btn,h=k=>B[k]&&!B[k].hidden&&getComputedStyle(B[k]).display!=='none';
-      const on={bearing:h('svTake'),sheet:h('svMap'),use:h('use'),jump:h('Space'),label:B.KeyK.textContent};g.Survey.close();T.sig='';T.update();const off={bearing:h('svTake'),use:h('use'),label:B.KeyK.textContent};T.enable(false);return JSON.stringify({on,off});})()""")
+      const on={bearing:h('svTake'),sheet:h('svMap'),flag:h('svFlag'),colour:h('svCol'),use:h('use'),jump:h('Space'),label:B.KeyK.textContent};g.Survey.close();T.sig='';T.update();const off={bearing:h('svTake'),use:h('use'),label:B.KeyK.textContent};T.enable(false);return JSON.stringify({on,off});})()""")
     print('touch', tb)
+    # flags in the world: B plants one a step ahead, C changes the colour, B beside one pulls it up; a save and a load keep them
+    async def press(code):
+        for t in ('keyDown', 'keyUp'): await c.send('Input.dispatchKeyEvent', type=t, code=code, key=code[-1].lower(), windowsVirtualKeyCode=ord(code[-1]))
+        await asyncio.sleep(0.15)
+    FS = "JSON.stringify((()=>{const g=__game,S=g.Survey,P=g.G.player,f=S.st().flags;return {flags:f.map(q=>q.c),meshes:S.meshes.length,inScene:S.meshes.every(m=>m.g.parent===g.G.city.scene),colour:S.st().colour,ahead:f.length?+Math.hypot(f[f.length-1].x-P.pos.x,f[f.length-1].z-P.pos.z).toFixed(1):null}})())"
+    await c.ev("(()=>{const g=__game;if(g.G.mapOpen)g.MapView.close();g.Survey.close();g.setArea(g.G.city,-8800,-9000,-78*Math.PI/180);g.Survey.st().flags.length=0;g.Survey.st().colour='red';g.Survey.open();})()"); await asyncio.sleep(0.3)
+    fl = {}
+    await press('KeyB'); fl['B'] = json.loads(await c.ev(FS))
+    await press('KeyC'); await press('KeyC'); fl['C C'] = json.loads(await c.ev(FS))
+    await press('KeyB'); fl['B beside it'] = json.loads(await c.ev(FS))
+    await press('KeyB'); fl['B again'] = json.loads(await c.ev(FS))
+    await c.ev("(()=>{const g=__game;g.setArea(g.G.city,-8760,-9030,0);g.Survey.open();})()"); await press('KeyC'); await press('KeyB'); fl['40 m on, C, B'] = json.loads(await c.ev(FS))
+    await c.ev("window.__keptSave = localStorage.getItem('onecity_aldhaven_save'); __game.saveGame()"); await c.ev("__game.Survey.st().flags.length=0"); await asyncio.sleep(0.4); fl['list emptied'] = json.loads(await c.ev(FS))
+    await c.ev("__game.loadGame()"); await asyncio.sleep(1.5); fl['loaded'] = json.loads(await c.ev(FS))
+    await c.ev("(()=>{const k='onecity_aldhaven_save',v=window.__keptSave;if(v==null)localStorage.removeItem(k);else localStorage.setItem(k,v);})()")  # (leave no save behind: the other tools expect none)
+    print('flags', json.dumps(fl))
+    # symbols on the sheet, by mouse: pick, put down twice, Esc, drag, rub out, a coloured flag, the ruler's pin settling in it
+    await c.ev("(()=>{const g=__game,S=g.Survey,P=g.G.player;S.close();S.st().items=[];S.st().ruler=null;S.fold=false;S.symFold=false;S.open();S.openSheet();g.MapView.zoom=0.4;g.MapView.view=[P.pos.x,P.pos.z];g.MapView.draw();})()"); await asyncio.sleep(0.5)
+    async def click(x, y):
+        for t in ('mousePressed', 'mouseReleased'): await c.send('Input.dispatchMouseEvent', type=t, x=x, y=y, button='left', buttons=1 if t == 'mousePressed' else 0, clickCount=1)
+        await asyncio.sleep(0.15)
+    async def drag(x0, y0, x1, y1):
+        await c.send('Input.dispatchMouseEvent', type='mousePressed', x=x0, y=y0, button='left', buttons=1, clickCount=1)
+        for k in range(1, 11): await c.send('Input.dispatchMouseEvent', type='mouseMoved', x=x0 + (x1 - x0) * k / 10, y=y0 + (y1 - y0) * k / 10, button='left', buttons=1); await asyncio.sleep(0.02)
+        await c.send('Input.dispatchMouseEvent', type='mouseReleased', x=x1, y=y1, button='left', buttons=0, clickCount=1); await asyncio.sleep(0.15)
+    btn = lambda a: c.ev("(()=>{const r=document.querySelector('#mapsurvey [data-sv=\"%s\"]').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()" % a)
+    SY = "JSON.stringify((()=>{const S=__game.Survey;return {tool:S.tool||null,sheet:S.sheet,syms:S.st().items.filter(i=>i.k==='sym').map(i=>[i.s,Math.round(i.x),Math.round(i.z)].concat(i.c?[i.c]:[]))}})())"
+    w2 = lambda x, y: c.ev("JSON.stringify(__game.MapView.toWorld(%s,%s).map(Math.round))" % (x, y))
+    sy = {}
+    x, y = await btn('sym:tower'); await click(x, y); sy['picked'] = json.loads(await c.ev(SY))['tool']
+    await click(900, 450); await click(1020, 450); r = json.loads(await c.ev(SY)); sy['two towers'] = r['syms']; sy['wanted at'] = [json.loads(await w2(900, 450)), json.loads(await w2(1020, 450))]
+    await press('Escape'); r = json.loads(await c.ev(SY)); sy['Esc'] = {'tool': r['tool'], 'sheet still open': r['sheet']}
+    m = await c.ev("__game.MapView.tf.dpr/__game.MapView.tf.scale")
+    await drag(900, 450, 960, 480); r = json.loads(await c.ev(SY)); sy['dragged'] = {'moved_m': [r['syms'][0][1] - sy['two towers'][0][1], r['syms'][0][2] - sy['two towers'][0][2]], 'wanted': [round(60 * m), round(30 * m)]}
+    x, y = await btn('erase'); await click(x, y); await click(1020, 450); r = json.loads(await c.ev(SY)); sy['rubbed out, left'] = len(r['syms'])
+    x, y = await btn('erase'); await click(x, y)
+    x, y = await btn('col:green'); await click(x, y); x, y = await btn('sym:flag'); await click(x, y); await click(760, 330); await press('Escape'); r = json.loads(await c.ev(SY)); sy['flag'] = r['syms'][-1]
+    await c.ev("__game.Survey.act('mid')")  # (Ruler here: the ruler was first laid over the sheet's own view)
+    pin = json.loads(await c.ev("""(()=>{const S=__game.Survey,t=__game.MapView.tf,g=S.geo(t),f=S.st().items.filter(i=>i.k==='sym'&&i.s==='flag').pop(),fx=(t.W/2+(f.x-t.cx)*t.scale)/t.dpr,fy=(t.H/2+(f.z-t.cz)*t.scale)/t.dpr;
+      return JSON.stringify({grab:[g.cx+g.ux*60+g.nx*12,g.cy+g.uy*60+g.ny*12],to:[fx+6+g.ux*60+g.nx*12,fy+5+g.uy*60+g.ny*12]})})()"""))
+    await drag(*pin['grab'], *pin['to']); sy['pinned'] = await c.ev("document.getElementById('svpin').textContent")
+    # by touch: pick the bridge, tap the sheet, drag the bridge
+    await c.send('Emulation.setTouchEmulationEnabled', enabled=True, maxTouchPoints=5)
+    await c.ev("__game.Touch.enable(true); __game.Survey.panel()"); await asyncio.sleep(0.3)  # (the touch layout first: a first touch switches to it and moves the buttons under the finger)
+    async def tap(x, y):
+        await c.send('Input.dispatchTouchEvent', type='touchStart', touchPoints=[{'x': x, 'y': y, 'id': 3}]); await c.send('Input.dispatchTouchEvent', type='touchEnd', touchPoints=[]); await asyncio.sleep(0.2)
+    x, y = await btn('sym:bridge'); await tap(x, y); await tap(860, 560); await press('Escape'); r = json.loads(await c.ev(SY)); b0 = r['syms'][-1]; sy['touch bridge'] = b0
+    await c.send('Input.dispatchTouchEvent', type='touchStart', touchPoints=[{'x': 860, 'y': 560, 'id': 4}])
+    for k in range(1, 11): await c.send('Input.dispatchTouchEvent', type='touchMove', touchPoints=[{'x': 860 - 5 * k, 'y': 560, 'id': 4}]); await asyncio.sleep(0.02)
+    await c.send('Input.dispatchTouchEvent', type='touchEnd', touchPoints=[]); await asyncio.sleep(0.2); r = json.loads(await c.ev(SY)); sy['touch drag moved_m'] = [r['syms'][-1][1] - b0[1], 'wanted', round(-50 * m)]
+    await c.send('Emulation.setTouchEmulationEnabled', enabled=False); await c.ev("__game.Touch.enable(false)")
+    print('symbols', json.dumps(sy))
+    await shot('sheet_symbols', 1)
+    await c.ev("__game.MapView.close(); __game.Survey.close()")
     # on a tablet: the buttons while sighting, and the sheet
     if OUT:
         await c.send('Emulation.setDeviceMetricsOverride', width=1024, height=768, deviceScaleFactor=1, mobile=False)
         await c.ev("(()=>{const g=__game;g.Touch.enable(true);dispatchEvent(new Event('resize'));const P=g.G.player,p=g.Survey.points().find(q=>q.name.startsWith('Mirrormere'));const dx=p.x-P.pos.x,dz=p.z-P.pos.z;P.yaw=-Math.atan2(dx,-dz);P.pitch=-0.02;g.Survey.open();g.Survey.zoom=4;g.Touch.sig='';})()")
         await shot('touch_sight', 3)
+        await c.send('Emulation.setTouchEmulationEnabled', enabled=True, maxTouchPoints=5)
+        tb2 = {'before': await c.ev("JSON.stringify([__game.Survey.st().colour, __game.Survey.st().flags.length])")}
+        for k in ['svCol', 'svFlag']:
+            x, y = await c.ev("(()=>{const r=document.querySelector('#touch [data-k=%s]').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]})()" % k)
+            await c.send('Input.dispatchTouchEvent', type='touchStart', touchPoints=[{'x': x, 'y': y, 'id': 6}]); await c.send('Input.dispatchTouchEvent', type='touchEnd', touchPoints=[]); await asyncio.sleep(0.3)
+            tb2['after ' + k] = await c.ev("JSON.stringify([__game.Survey.st().colour, __game.Survey.st().flags.length])")
+        print('touch flag buttons', json.dumps(tb2))
+        await c.send('Emulation.setTouchEmulationEnabled', enabled=False)
         await c.ev("__game.Survey.openSheet(); __game.MapView.zoom=0.05; __game.MapView.view=[-6000,-9500]; __game.MapView.draw()"); await shot('touch_sheet', 1.5)
         await c.ev("__game.Survey.act('dbg')"); await shot('touch_debug', 1)
         await c.ev("__game.Survey.close(); __game.Touch.enable(false)")

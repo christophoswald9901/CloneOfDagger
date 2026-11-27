@@ -13,7 +13,7 @@ const Touch = {
     const b = (k, label, cls = '') => `<button class="tb ${cls}" data-k="${k}">${label}</button>`;
     el.innerHTML = `<div class="stk" hidden><i></i></div>
       <div class="tbar">${b('Escape', 'Menu', 'sq')}${b('KeyM', 'Map', 'sq')}${b('KeyJ', 'Journal', 'sq')}${b('KeyI', 'Character', 'sq')}${b('KeyR', 'Rest', 'sq')}${b('KeyK', 'Survey', 'sq')}${b('KeyT', 'Travel', 'sq')}${b('full', 'Full screen', 'sq')}</div>
-      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}${b('svTake', 'Bearing')}${b('svIn', '+')}${b('svOut', '−')}${b('svMap', 'Sheet')}
+      <div class="tact">${b('attack', 'Attack', 'big')}${b('use', 'Use')}${b('cast', 'Cast')}${b('Space', 'Jump', 'jump')}${b('KeyX', 'Down', 'down')}${b('svTake', 'Bearing')}${b('svIn', '+')}${b('svOut', '−')}${b('svMap', 'Sheet')}${b('svFlag', 'Flag')}${b('svCol', '')}
         <div class="tside">${b('KeyH', 'Potion', 'pill')}${b('KeyZ', 'Draw', 'pill')}${b('spell', 'Spell', 'pill')}${b('KeyG', 'Fly', 'pill')}</div></div>`;
     this.btn = {}; for (const e of el.querySelectorAll('[data-k]')) this.btn[e.dataset.k] = e;
     if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) this.btn.full.remove();
@@ -47,7 +47,7 @@ const Touch = {
     if (show !== this.shown) { this.shown = show; this.el.classList.toggle('live', show); if (!show) this.release(); }
     if (!show) return;
     const pots = P.inv.find(i => i.kind === 'potion' && i.base === 'heal');
-    const sv = Survey.on, sig = [sv, rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
+    const sv = Survey.on, sig = [sv, sv && Survey.st().colour, rpgUI(), !!G.focus, G.flying, settings.dbgFly, P.spells.length, P.sheathed, pots ? pots.qty : 0, !!document.fullscreenElement || !!document.webkitFullscreenElement].join();
     if (sig === this.sig) return; this.sig = sig;
     const B = this.btn;
     B.use.classList.toggle('ready', !!G.focus);
@@ -56,7 +56,8 @@ const Touch = {
     const rpg = rpgUI(); B.attack.hidden = B.KeyZ.hidden = B.KeyH.hidden = !rpg || sv; B.KeyI.hidden = !rpg;
     B.cast.hidden = !rpg || !P.spells.length || sv; B.spell.hidden = !rpg || P.spells.length < 2 || sv;
     // the compass in hand: note a bearing, work the spyglass, open the sheet
-    B.use.hidden = B.Space.hidden = sv; for (const k of ['svTake', 'svIn', 'svOut', 'svMap']) B[k].hidden = !sv;
+    B.use.hidden = B.Space.hidden = sv; for (const k of ['svTake', 'svIn', 'svOut', 'svMap', 'svFlag', 'svCol']) B[k].hidden = !sv;
+    if (sv) { const c = Survey.st().colour; B.svCol.style.background = FLAG_COLOURS[c]; B.svCol.setAttribute('aria-label', `Flag colour: ${c} (tap for the next)`); }
     B.KeyK.textContent = sv ? 'Put away' : 'Survey'; B.KeyK.classList.toggle('ready', sv);
     this.el.classList.toggle('min', !rpg);
     B.KeyZ.textContent = P.sheathed ? 'Draw' : 'Sheathe';
@@ -130,6 +131,8 @@ const Touch = {
     if (k === 'svTake') { Survey.take(); return; }
     if (k === 'svIn' || k === 'svOut') { Survey.zoomBy(k === 'svIn' ? 1.4 : 1 / 1.4); return; }
     if (k === 'svMap') { Survey.openSheet(); return; }
+    if (k === 'svFlag') { Survey.flag(); return; }
+    if (k === 'svCol') { Survey.colourNext(); this.sig = ''; return; }
     onKey({ code: k, preventDefault() {} });
   },
   unpress(k) { if (k === 'Space' || k === 'KeyX') Input.vkeys[k] = false; },
