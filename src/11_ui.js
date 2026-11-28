@@ -259,6 +259,7 @@ const UI = {
   },
   openTravel(stop) {
     const P = G.player;
+    if (G.area.kind === 'land') { msg(`${G.area.name} is not yet joined to the world: there is nowhere to travel to from here. You can walk it end to end.`); return; }
     if (G.area.kind !== 'city') { msg('There are no carriages in here.'); return; }
     if (!stop) {
       const s = nearestStop(P.pos.x, P.pos.z);
@@ -296,6 +297,7 @@ const MapView = {
   // pick: opened to choose where to travel (starts zoomed out over the country)
   open(pick = false) {
     if (G.area.kind === 'interior') { msg(`You are inside ${G.area.name}. There is no need for a map here.`); return; }
+    if (G.area.kind === 'land') { msg(`${G.area.name} is a country of its own, not yet joined to the world: it is on no map you have.`); return; }
     G.mapOpen = true; G.uiOpen = true; this.moving = false; exitLock(); $('mapview').hidden = false; this.view = Survey.showPos() ? null : Survey.st().view || Survey.anchor(); this.dest = null; $('mapdest').hidden = true; // (a map that does not show you stays where you left it)
     const P = G.player; if (pick || (G.area === G.city && Math.max(Math.abs(P.pos.x), Math.abs(P.pos.z)) > TG.R)) this.zoom = Math.min(this.zoom, pick ? 0.06 : 0.3);
     this.draw(); Survey.onMapOpen();

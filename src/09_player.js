@@ -136,6 +136,7 @@ function updatePlayer(dt) {
     p.pos.x += (-sn * f + cs * s) * spd * dt; p.pos.z += (-cs * f - sn * s) * spd * dt;
     collide(G.area, p.pos, 0.38, p.pos.y, 1.75); keepAshore(G.area, p.pos, ox, oz, 0.38, p.pos.y);
     if (G.area.kind === 'city' && Math.max(Math.abs(p.pos.x), Math.abs(p.pos.z)) > TG.R) wildFooting(p, ox, oz);
+    else if (G.area.kind === 'land') G.area.footing(p, ox, oz);
     if (keyDown('Space') && p.onGround && p.fat > 3 && !Survey.on) { p.vy = 5.2; p.onGround = false; p.fat -= 3; }
     p.vy -= 18 * dt; p.pos.y += p.vy * dt;
     const g = groundAt(G.area, p.pos.x, p.pos.z, 0.38, p.pos.y);

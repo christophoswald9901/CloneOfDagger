@@ -385,7 +385,10 @@ function shapeTerrain(x0, z0, x1, z1, fn) {
   for (let q = 0; q < out.length; q += 2) TH[out[q]] = out[q + 1];
 }
 // height at any point; inside the fine grid this matches the rendered triangles exactly
+// a map of its own (a land, src/08_land.js) answers for the ground while it is made or walked: the drapes, the slopes and the footing read it
+let GROUND_H = null;
 function terrainH(x, z) {
+  if (GROUND_H) return GROUND_H(x, z);
   const { C, R, N } = TG; const fx = (x + R) / C, fz = (z + R) / C;
   const i = Math.floor(fx), j = Math.floor(fz);
   if (!TH || i < 0 || j < 0 || i >= N || j >= N) return Wild.heightAt(x, z);
