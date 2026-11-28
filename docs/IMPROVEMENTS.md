@@ -92,7 +92,7 @@ The user found this where the country's generation went wrong. They find it very
 - **The stream is part of an irrigation system.** The model would be the floated water meadows of 17th-century England: a main carrier taken off the river upstream at a weir and a hatch, carried on its own bank at a level above the meadows, feeding small carriers along the ridges of the meadow beds, with drains in the furrows between and hatches at the branches to flood the grass early in the year. The raised stream becomes that main carrier, and its jagged, peaked banks stay.
 - In talk the place has been called after Yarnbury Castle, a real hillfort whose sheep fair was one of the examples. In the game it gets a stand-in name of its own.
 
-**Next to be worked on**, as the user said on 2026-11-27 (not started; waiting for the user's go).
+**In progress since 2026-11-28** as a map of its own, a start in New Game (the user's rule for major places: built apart, never laid over the generated map; put into the main map later, which then adapts to it). Notes in `docs/YARNBURY.md`.
 
 ![Where it is: the red arrow on the left](img/mound-map.webp)
 
@@ -109,6 +109,8 @@ The user found this where the country's generation went wrong. They find it very
 The game is set in 1652. Today (`LOOKS` and `drawHuman` in `src/01_textures.js`) the city's guard wears what a medieval guard would: a mail shirt, a red tabard with a gold cross, a round steel cap and a spear. The people come from `randomLook` and `lookByWealth` (`src/04_city.js`), built from parts such as shirt, trousers, boots, robe, hood, cape, apron and hat. The robe, hood and tabard read as medieval more than seventeenth-century. Fort Merrow's sentry, gunner and sergeant (`src/03_sites_star.js`) get only a hat, a red coat and breeches.
 
 Ideas, for a town watch and a garrison of about 1650: a broad-brimmed felt hat or an open steel helmet (morion or cabasset), a buff leather coat, a sash, a bandolier of powder charges, breeches with stockings and shoes, a halberd or partisan for the watch and a musket for the garrison. Townsmen in doublet or long coat with a falling collar, breeches and stockings; women in bodice and skirt, with a white cap or coif, a collar or kerchief and an apron. The sprites are small, so each piece must read at a few pixels: a hat's brim, a collar, a sash. Any colours or badges meant to mark a city or a country tie in with the setting, which is the user's to decide (`docs/SETTING.md`).
+
+The user said on 2026-11-27 that these ideas go in the right direction.
 
 ## Done
 

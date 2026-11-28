@@ -12,6 +12,7 @@
 const SURVEY_STARTS = [
   { id: 'aldhaven', name: 'Aldhaven', sub: "On Pilgrim's Rise, above the walled port and the bay." },
   { id: 'corrinvale', name: 'Corrinvale', sub: 'In the Grand Square of the canal town, under its belfry.' },
+  { id: 'yarnbury', name: 'Yarnbury', sub: 'A map of its own, not yet joined to the world: an old earthwork in the bend of a stream carried high on its bank, where the villages round about hold their fair.', land: 'yarnbury' },
   { id: 'edge', name: 'The edge of the known map', sub: 'High on the western mountains: the known country below you, the unknown beyond the range behind. Your map does not show where you are; find it with the compass and the ruler.' },
 ];
 // the edge start: a flat shoulder of the western home mountains, 1.2 km inside the border, in sight of seven landmarks
@@ -128,6 +129,8 @@ const Survey = {
   place() {
     const start = SURVEY_STARTS.some(o => o.id === this.pending) ? this.pending : 'aldhaven'; this.pending = null; this.close();
     const s = G.flags.survey = this.fresh(start), found = G.flags.found || (G.flags.found = {}), day = dayOf(G.time) + 1, P = G.player;
+    const SL = SURVEY_STARTS.find(o => o.id === start);
+    if (SL && SL.land) { const A = buildLand(SL.land), S = A.start, [wx, wz] = A.toWorld(S.x, S.z); setArea(A, wx, wz, S.yaw); P.pitch = S.pitch || 0; G.lastDistrict = null; s.home = [wx, wz]; return start; }
     if (start === 'corrinvale') {
       const T = TOWNS[0], sq = T.landmarks.find(l => l.id === 'square'), bf = T.landmarks.find(l => l.id === 'belfry');
       found[T.id] = day; setArea(G.city, sq.x, sq.z, Math.atan2(-(bf.x - sq.x), -(bf.z - sq.z))); P.pitch = 0.12; G.lastDistrict = null; s.home = [sq.x, sq.z];
@@ -139,6 +142,7 @@ const Survey = {
   },
   welcome(start) {
     const t = Input.touch;
+    const SL = SURVEY_STARTS.find(o => o.id === start); if (SL && SL.land) return LANDS[SL.land].welcome(t);
     if (start === 'edge') return [`You stand at the edge of the known map. To the east the known country lies below you; beyond the mountains to the west the land is unknown. Your map (${t ? 'Map' : 'M'}) shows the country, but not where you are. The peaks of the range behind you are on it too: the Spindle, the sharp horn, and Harrow Fell to the north.`,
       `${t ? 'Tap Survey' : 'Press K'} for the compass. Sight a landmark you can find on the map, note its bearing, then lay the ruler through that landmark on the map at that bearing and draw the line. Where two lines cross, you are.`];
     if (start === 'corrinvale') return [`Welcome to Corrinvale. ${t ? 'The buttons at the top open the map and your journal.' : 'M opens the map, J your journal.'}`, `${t ? 'Survey' : 'K'} takes out a compass and a ruler, to find where you are from the landmarks you can see.`];
@@ -150,6 +154,7 @@ const Survey = {
   toggle() { if (this.on || this.sheet) this.close('You put the compass and the ruler away.'); else this.open(); },
   open() {
     const P = G.player; if (!P || P.dead || G.state !== 'play') return;
+    if (G.area.kind === 'land') { msg('This country is not on any map yet: there is nothing to take a bearing on.'); return; }
     if (G.area !== G.city) { msg('You need open sky to take a bearing.'); return; }
     if (Travel.cur) Travel.stop('You stop.');
     this.on = true; this.n = this.heading(); this.v = 0; SFX.play('click');

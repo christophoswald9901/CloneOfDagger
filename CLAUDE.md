@@ -10,6 +10,7 @@ A world that feels believable when walking through it. Lore and systemic feature
 - Keep parked systems switchable rather than deleting them. Combat and stats are behind Settings → "Show combat and character stats", which also brings back character creation. The INTRO story text is kept in `src/12_main.js` but not shown.
 - Don't test or extend the main quest unless asked.
 - The game is also played on an iPad, so touch controls must keep working.
+- New major points of interest are built in a separate map of their own, disconnected from the game world and offered as a start in New Game. They are never laid over the generated map. Once a place and its surroundings look right and feel authentic, it is put into the main map, and the main map adapts to it: points of interest matter more than the generated landscape (decided 2026-11-28).
 - The user's list of improvements for later is `docs/IMPROVEMENTS.md`. Add new notes there (next free number, the user's words, what the code does today). Don't start an item unless asked, and when one is done, move it to the Done section.
 - Setting and story ideas for when lore comes back are in `docs/SETTING.md`. They are ideas, not decisions, so don't build from them unless asked.
 - The Elder Scrolls is not an inspiration for the setting. On 2026-11-12 its names and lore were replaced throughout (the city is Aldhaven on Merrow Bay; see README.md). Don't bring any back, and don't add Elder Scrolls names, gods, races, guilds or terms. The new names are stand-ins until the story returns; `docs/SETTING.md` lists them.

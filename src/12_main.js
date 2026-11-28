@@ -61,7 +61,7 @@ function updateSky(area, dt) {
   const fogMul = wx === 'rain' ? 0.55 : wx === 'overcast' ? 0.8 : 1;
   area.scene.fog.color.copy(hor); const cp = camera.position; const above = cp.y - (area.heightAt ? area.heightAt(cp.x, cp.z) : 0); // see further from high ground, through more haze
   const hi = Math.max(cp.y - 2, above), lift = 1 + clamp((hi - 4) / 22, 0, 2.6) + 3.2 * smoothstep(70, 260, hi); // and from the peaks, or on the wing, across the country
-  const open = 1 + 0.55 * smoothstep(420, 1000, Math.max(Math.abs(cp.x), Math.abs(cp.z))); // out in the open country the air is clearer than over the smoky town
+  const open = area.open ?? 1 + 0.55 * smoothstep(420, 1000, Math.max(Math.abs(cp.x), Math.abs(cp.z))); // out in the open country the air is clearer than over the smoky town (a land of its own: open country)
   area.scene.fog.near = lerp(18, 60, L) * fogMul * (1 + (lift - 1) * 0.18) * open; area.scene.fog.far = lerp(115, 260, L) * fogMul * lift * open;
   { const k = Survey.fogK(); area.scene.fog.near *= k; area.scene.fog.far *= k; } // (through the spyglass far things stand clear of the haze)
   S.sky.position.copy(cp); S.stars.position.copy(cp); S.mountains.position.set(cp.x, 38, cp.z); S.mountains.visible = false; // real ground now reaches the horizon; the painted range would only fight it
@@ -190,7 +190,7 @@ function cityTick(area, dt) {
 
 /* ---------------- areas & transitions ---------------- */
 function setArea(area, x, z, yaw, yHint = null) {
-  const P = G.player; G.area = area;
+  const P = G.player; G.area = area; GROUND_H = area.kind === 'land' ? area.heightAt : null; // (in a land of its own, its ground is the ground)
   if (area.kind === 'city') Wild.prime(x, z);
   P.pos.set(x, area.floorY ?? 0, z); P.yaw = yaw; P.pitch = 0; P.vy = 0; P.onGround = true;
   P.pos.y = groundAt(area, x, z, 0.38, Math.max(baseY(area, x, z), yHint ?? -1e9) + 0.5);
@@ -201,7 +201,7 @@ function transition(fn) {
   if (G.fading) return; G.fading = true; const f = $('fade'); f.classList.add('on'); SFX.play('door');
   setTimeout(() => { try { fn(); } finally { setTimeout(() => { f.classList.remove('on'); G.fading = false; }, 80); } }, 300);
 }
-function leaveCurrentArea() { if (G.area && G.area !== G.city) { disposeArea(G.area); } }
+function leaveCurrentArea() { GROUND_H = null; if (G.area && G.area !== G.city) { disposeArea(G.area); } }
 function tryEnter(b) {
   const P = G.player;
   if (b.type === 'mausoleum') {
@@ -252,10 +252,11 @@ function pickMusic(force) {
   const now = performance.now(); if (!force && now < _musicT) return; _musicT = now + 1000;
   if (G.state === 'title' || G.state === 'create') return Music.play('title');
   const a = G.area; if (!a) return;
-  Music.weather = a.kind === 'city' ? G.weather : null; // the next piece outdoors follows the weather
+  Music.weather = a.kind === 'city' || a.kind === 'land' ? G.weather : null; // the next piece outdoors follows the weather
   if (a.kind === 'dungeon') return Music.play('dungeon');
   if (a.kind === 'interior') return Music.play(a.music || 'house');
   if (isNight(G.time)) return Music.play('night');
+  if (a.kind === 'land') return Music.play(a.music || 'wild');
   // outdoors by day: Aldhaven, Corrinvale or the wild; a place has to hold for a few seconds before the music follows
   const P = G.player, m = !P ? 'wild' : insideCity(P.pos.x, P.pos.z) ? 'city' : TOWNS.some(T => T.inside(P.pos.x, P.pos.z)) ? 'town' : 'wild';
   if (force || !Music.mood || ['title', 'night', 'dungeon', 'tavern', 'hall', 'house'].includes(Music.mood)) { _moodSeen = m; _moodN = now; return Music.play(m); }
@@ -297,7 +298,7 @@ function serialize() {
   return {
     v: 3, time: G.time, flags: G.flags, quests: G.quests, wanted: G.wanted, bState: G.bState, weather: G.weather, weatherDay: G.weatherDay,
     player: { ...P, pos: [P.pos.x, P.pos.y, P.pos.z], equipIds: Object.fromEntries(Object.entries(P.equip).map(([k, v]) => [k, v ? v.id : null])), equip: undefined, swingT: -1, castT: -1 },
-    area: G.area.kind === 'interior' ? { kind: 'interior', id: G.area.building.id } : { kind: G.area.kind },
+    area: G.area.kind === 'interior' ? { kind: 'interior', id: G.area.building.id } : G.area.kind === 'land' ? { kind: 'land', id: G.area.landId } : { kind: G.area.kind },
   };
 }
 // a game saved before the names were changed (2026-11-12) is read with the new ones
@@ -322,6 +323,7 @@ function loadGame(data) {
   let area = G.city;
   if (data.area.kind === 'interior') { const b = G.buildings.find(x => x.id === data.area.id); if (b) area = buildInterior(b); }
   else if (data.area.kind === 'dungeon') area = buildDungeon();
+  else if (data.area.kind === 'land' && LANDS[data.area.id]) area = buildLand(data.area.id);
   if ((data.v || 1) < 3) { // the city was rebuilt since this save: start again at the Grand Market
     area = G.city; const s = G.city.stops.find(q => q.id === 'market'); P.pos.set(s.arrive[0], 0, s.arrive[1]); P.yaw = s.arrive[2];
     for (const q of G.quests) if (q.type === 'deliver' && q.status === 'active') q.status = 'failed';
@@ -394,7 +396,7 @@ function updateTextHUD(dt) {
     if (G.lastDistrict && G.lastDistrict !== id && !P.dead) msg(inside ? `You enter ${d.name} — ${d.blurb}.` : T ? `You enter ${td.name} of ${T.name} — ${td.blurb}.` : (G.lastDistrict.includes(':') ? `You leave the walls of ${capFirst(G.lastDistrict.split(':')[0])} behind.` : G.lastDistrict === 'outside' ? '' : 'You leave the city walls behind.'), 'district');
     G.lastDistrict = id;
   }
-  $('status').textContent = G.state === 'play' && P ? `${where} · ${dateString(G.time)} · ${clockString(G.time)}${G.weather !== 'clear' && G.area.kind === 'city' ? ' · ' + G.weather : ''}${G.flying || settings.dbgStamina ? ' · debug: ' + [G.flying && 'flying', G.flying && settings.dbgNoClip && 'no clip', settings.dbgStamina && 'stamina'].filter(Boolean).join(', ') : ''}` : '';
+  $('status').textContent = G.state === 'play' && P ? `${where} · ${dateString(G.time)} · ${clockString(G.time)}${G.weather !== 'clear' && (G.area.kind === 'city' || G.area.kind === 'land') ? ' · ' + G.weather : ''}${G.flying || settings.dbgStamina ? ' · debug: ' + [G.flying && 'flying', G.flying && settings.dbgNoClip && 'no clip', settings.dbgStamina && 'stamina'].filter(Boolean).join(', ') : ''}` : '';
   $('resume').hidden = !(G.state === 'play' && !G.uiOpen && !G.mapOpen && !Input.locked && !Input.fallback && !Input.touch && !G.resting && !G.fading && P && !P.dead);
   const low = P && G.state === 'play' ? clamp(1 - P.hp / P.maxHp * 3, 0, 1) : 0; $('vignette').style.opacity = low * 0.8;
 }
@@ -441,7 +443,9 @@ function updateWorld(dt) {
   for (const f of area.anim) f(dt, G.clock);
   const yaw = camera.rotation.y; for (const b of area.batches) b.update(yaw);
   for (const m of area.bbs || []) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z);
-  if (area.kind === 'city') { updateSky(area, dt); Wild.update(camera.position, camera.rotation.y); } else { G.tint.setRGB(1, 1, 1); SFX.rain(false); }
+  if (area.kind === 'city') { updateSky(area, dt); Wild.update(camera.position, camera.rotation.y); }
+  else if (area.kind === 'land') { updateSky(area, dt); Wild.yawU.value = camera.rotation.y; area.update(dt); } // (its plants turn as the open country's do)
+  else { G.tint.setRGB(1, 1, 1); SFX.rain(false); }
 }
 
 /* ---------------- setup ---------------- */
